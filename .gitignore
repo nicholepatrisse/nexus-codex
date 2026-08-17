@@ -78,6 +78,11 @@ web_modules/
 .next
 out
 
+# Next.js local deployment and test artifacts
+.vercel
+playwright-report/
+test-results/
+
 # Nuxt.js build / generate output
 .nuxt
 dist
