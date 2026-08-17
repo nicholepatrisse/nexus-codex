@@ -11,16 +11,22 @@ M0 introduces authenticated writes, independently administered communities, memb
 
 ### Authentication
 
-M0 supports one sign-in method: Google OpenID Connect through a maintained authentication library compatible with the Next.js App Router.
+M0 supports one sign-in method: Google OpenID Connect through Better Auth using its Next.js integration and Drizzle/PostgreSQL adapter.
 
 - The application stores Google's immutable `sub` claim as the provider subject. Email address and display name are profile attributes, not identity keys.
 - Google owns credential verification, account recovery, and provider-side security controls. Nexus Codex stores no passwords.
 - Authentication identity and application person remain separate records. A successful first sign-in creates one `person` and one `auth_identity` in a transaction; later sign-ins resolve by provider plus subject.
 - M0 does not link multiple authentication providers to one person.
-- Sessions use secure, HTTP-only, same-site cookies, rotate after sign-in and privilege changes, and are invalidated on sign-out. Provider tokens remain server-only and are retained only when a documented application capability requires them.
+- Better Auth uses database-backed sessions. The browser receives an opaque session cookie; authoritative session state remains in PostgreSQL.
+- Sessions have a rolling seven-day lifetime and refresh after one day of activity. Multiple active devices are allowed.
+- Cookie session caching is disabled in M0 so sign-out, revocation, and privilege changes take effect on the next database-backed authorization check.
+- Session cookies are secure, HTTP-only, and same-site. Sessions rotate after sign-in and privilege changes; sign-out revokes the current session immediately.
+- Better Auth's authentication user links to exactly one application `person`. Provider accounts and sessions belong to that authentication user; community memberships, roles, sessions, and audit events reference the application person.
+- Provider tokens remain server-only and are not retained unless a documented Google integration later requires them.
+- Account linking is disabled in M0. Duplicate-person correction is an explicit, audited support operation and never joins records by email or display name alone.
 - Every state-changing operation resolves an authenticated actor and performs authorization again in the application/data-access boundary. Route guards and hidden controls are convenience layers, not security boundaries.
 
-Google was selected because it supplies standards-based OIDC, stable subject identifiers, and provider-managed recovery without requiring Nexus Codex to operate credential storage. Discord account linking remains a later integration concern and must not make a mutable Discord handle an identity key.
+Google was selected because it supplies standards-based OIDC, stable subject identifiers, and provider-managed recovery without requiring Nexus Codex to operate credential storage. Better Auth was selected because it supports Next.js 16, Google social authentication, Drizzle/PostgreSQL persistence, and revocable database sessions without introducing a hosted identity vendor. Discord account linking remains a later integration concern and must not make a mutable Discord handle an identity key.
 
 ### Fixed community roles
 
@@ -88,6 +94,7 @@ Only an owner may save an exceptional capacity, and a nonblank reason is require
 ## Consequences
 
 - M0-02 can implement one narrow authentication path without designing password storage or provider linking.
+- Database-backed session validation adds one local database read to authenticated request paths in exchange for immediate revocation semantics. Cookie caching may be reconsidered only after measurement.
 - Community queries and application services must accept actor context and evaluate current grants close to the database operation.
 - A newly created community is safe before its owner completes configuration.
 - Public discovery, public schedules, and location disclosure remain three distinct decisions.
@@ -97,6 +104,8 @@ Only an owner may save an exceptional capacity, and a nonblank reason is require
 ## Required verification in later tickets
 
 - Test provider-subject identity resolution independently from email and display name.
+- Test seven-day rolling expiration, one-day refresh, concurrent devices, current-session sign-out, and immediate revocation after privilege changes.
+- Test authentication locally and in CI through an application-controlled fixture; automated tests must not call real Google sign-in.
 - Test every role against both its own community and an unrelated community.
 - Test private-community nonexistence behavior across profile, schedule, session, search, counts, and autocomplete.
 - Test that policy changes affect future actions without silently rewriting pending requests or existing grants.
@@ -108,3 +117,6 @@ Only an owner may save an exceptional capacity, and a nonblank reason is require
 - [Next.js authentication guide](https://nextjs.org/docs/app/guides/authentication)
 - [Next.js data-security guide](https://nextjs.org/docs/app/guides/data-security)
 - [Google OpenID Connect documentation](https://developers.google.com/identity/openid-connect/openid-connect)
+- [Better Auth Next.js integration](https://better-auth.com/docs/integrations/next)
+- [Better Auth Drizzle installation](https://better-auth.com/docs/installation)
+- [Better Auth session management](https://better-auth.com/docs/concepts/session-management)
