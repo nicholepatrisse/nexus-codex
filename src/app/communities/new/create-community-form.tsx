@@ -5,8 +5,10 @@ import { useFormStatus } from "react-dom";
 import Link from "next/link";
 import {
   createCommunityAction,
-  initialCreateCommunityFormState,
+  type CreateCommunityFormState,
 } from "@/app/communities/new/actions";
+
+const initialCreateCommunityFormState: CreateCommunityFormState = {};
 
 function SubmitButton() {
   const { pending } = useFormStatus();

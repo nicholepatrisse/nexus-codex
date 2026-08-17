@@ -17,8 +17,6 @@ export interface CreateCommunityFormState {
   formError?: string;
 }
 
-export const initialCreateCommunityFormState: CreateCommunityFormState = {};
-
 export async function createCommunityAction(
   _previousState: CreateCommunityFormState,
   formData: FormData,
