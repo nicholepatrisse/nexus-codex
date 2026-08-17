@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { PublicCommunityList } from "@/app/communities/public-community-list";
 import { directoryHref, parseDirectoryQuery } from "@/app/communities/discovery-query";
-import { searchPublicCommunities } from "@/community/public-discovery";
+import { listPublicCommunities } from "@/community/public-discovery";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +11,7 @@ interface CommunitiesPageProps {
 
 export default async function CommunitiesPage({ searchParams }: CommunitiesPageProps) {
   const { page } = parseDirectoryQuery(await searchParams);
-  const result = await searchPublicCommunities({ page }).catch(() => null);
+  const result = await listPublicCommunities({ page }).catch(() => null);
 
   if (!result) {
     return (
