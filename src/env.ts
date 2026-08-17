@@ -10,8 +10,16 @@ const serverEnvironmentSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().min(1),
 });
 
+const databaseUrlSchema = serverEnvironmentSchema.shape.DATABASE_URL;
+
 export type ServerEnvironment = z.infer<typeof serverEnvironmentSchema>;
 let environment: ServerEnvironment | undefined;
+let databaseUrl: string | undefined;
+
+export function getDatabaseUrl(): string {
+  databaseUrl ??= databaseUrlSchema.parse(process.env.DATABASE_URL);
+  return databaseUrl;
+}
 
 export function getServerEnvironment(): ServerEnvironment {
   environment ??= serverEnvironmentSchema.parse(process.env);
