@@ -1,9 +1,10 @@
 import { AuthControls } from "@/app/auth-controls";
+import { MyCommunities } from "@/app/my-communities";
 
 export default function Home() {
   return (
-    <main className="mx-auto flex min-h-screen max-w-5xl items-center px-6 py-20">
-      <section className="max-w-3xl">
+    <main className="mx-auto min-h-screen max-w-5xl px-6 py-20">
+      <section className="max-w-3xl pt-8 sm:pt-16">
         <p className="mb-5 text-sm font-semibold tracking-[0.24em] text-[var(--accent)] uppercase">
           Society operations, connected
         </p>
@@ -16,6 +17,7 @@ export default function Home() {
           <AuthControls />
         </div>
       </section>
+      <MyCommunities />
     </main>
   );
 }
