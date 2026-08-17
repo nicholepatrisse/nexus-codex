@@ -12,6 +12,7 @@ export type CommunityAccessResult =
         id: string;
         name: string;
         slug: string;
+        description?: string | null;
         visibility: string;
         scheduleVisibility: string;
       };
@@ -37,6 +38,7 @@ export async function resolveCommunityAccessBySlug(
       id: communities.id,
       name: communities.name,
       slug: communities.slug,
+      description: communities.description,
       visibility: communities.visibility,
       scheduleVisibility: communities.scheduleVisibility,
     })
