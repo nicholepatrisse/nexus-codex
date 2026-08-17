@@ -8,6 +8,13 @@
       "when": 1786988790349,
       "tag": "0000_lean_quasimodo",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1786993529936,
+      "tag": "0001_brave_sasquatch",
+      "breakpoints": true
     }
   ]
 }
