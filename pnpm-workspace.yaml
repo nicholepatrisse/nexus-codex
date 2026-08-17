@@ -1,4 +1,7 @@
 allowBuilds:
   esbuild: true
   unrs-resolver: true
+# Intel macOS cannot run pnpm 11's standalone native binary. Contributors
+# manage the Node-based pnpm installation externally instead.
+pmOnFail: ignore
 verifyDepsBeforeRun: false
