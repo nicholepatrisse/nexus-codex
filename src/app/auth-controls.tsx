@@ -1,10 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { SignInButton } from "@/app/sign-in/sign-in-button";
 import { authClient } from "@/auth/client";
+import { signOutAndRefresh } from "@/auth/sign-out";
 
 export function AuthControls() {
+  const router = useRouter();
   const { data: session, isPending } = authClient.useSession();
   const [signOutPending, setSignOutPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -18,7 +21,10 @@ export function AuthControls() {
   async function signOut() {
     setSignOutPending(true);
     setError(null);
-    const result = await authClient.signOut();
+    const result = await signOutAndRefresh(
+      () => authClient.signOut(),
+      () => router.refresh(),
+    );
     if (result.error) {
       setError("Sign-out failed. Please try again.");
       setSignOutPending(false);
