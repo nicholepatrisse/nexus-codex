@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Home() {
   return (
     <main className="mx-auto flex min-h-screen max-w-5xl items-center px-6 py-20">
@@ -12,6 +14,14 @@ export default function Home() {
         </p>
         <div className="mt-10 inline-flex rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80">
           Foundation ready · Product workflows coming next
+        </div>
+        <div className="mt-8">
+          <Link
+            href="/communities/new"
+            className="inline-flex rounded-full bg-[var(--accent)] px-6 py-3 font-semibold text-[#07110f] transition hover:brightness-110"
+          >
+            Create a community
+          </Link>
         </div>
       </section>
     </main>
