@@ -337,8 +337,128 @@ export const communityAuditEvents = pgTable(
     index("community_audit_events_actor_person_id_idx").on(table.actorPersonId),
     check(
       "community_audit_events_type_check",
-      sql`${table.eventType} in ('community.settings.updated', 'community.archived', 'community.restored')`,
+      sql`${table.eventType} in ('community.settings.updated', 'community.archived', 'community.restored', 'community.invitation.created', 'community.invitation.accepted', 'community.invitation.revoked', 'community.invitation.expired', 'community.membership.requested', 'community.membership.approved', 'community.membership.rejected', 'community.membership.cancelled')`,
     ),
     check("community_audit_events_details_object_check", sql`jsonb_typeof(${table.details}) = 'object'`),
+  ],
+);
+
+/**
+ * A single-recipient community invitation. Only a one-way digest of the bearer
+ * token is persisted; callers are responsible for normalizing recipientEmail.
+ */
+export const communityInvitations = pgTable(
+  "community_invitations",
+  {
+    id: text("id").primaryKey(),
+    communityId: text("community_id")
+      .notNull()
+      .references(() => communities.id, { onDelete: "restrict" }),
+    recipientEmail: text("recipient_email").notNull(),
+    tokenHash: text("token_hash").notNull(),
+    status: text("status").notNull().default("pending"),
+    createdByPersonId: text("created_by_person_id")
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
+    acceptedByPersonId: text("accepted_by_person_id").references(() => people.id, {
+      onDelete: "restrict",
+    }),
+    revokedByPersonId: text("revoked_by_person_id").references(() => people.id, {
+      onDelete: "restrict",
+    }),
+    revocationReason: text("revocation_reason"),
+    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true, mode: "date" }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true, mode: "date" }),
+  },
+  (table) => [
+    uniqueIndex("community_invitations_token_hash_unique").on(table.tokenHash),
+    uniqueIndex("community_invitations_id_community_unique").on(table.id, table.communityId),
+    uniqueIndex("community_invitations_live_recipient_unique")
+      .on(table.communityId, table.recipientEmail)
+      .where(sql`${table.status} = 'pending'`),
+    index("community_invitations_community_status_idx").on(table.communityId, table.status),
+    index("community_invitations_recipient_email_idx").on(table.recipientEmail),
+    check("community_invitations_recipient_email_normalized", sql`${table.recipientEmail} = lower(btrim(${table.recipientEmail})) and length(${table.recipientEmail}) > 0`),
+    check(
+      "community_invitations_status_check",
+      sql`${table.status} in ('pending', 'accepted', 'revoked', 'expired')`,
+    ),
+    check(
+      "community_invitations_terminal_state_check",
+      sql`(${table.status} = 'pending' and ${table.acceptedAt} is null and ${table.acceptedByPersonId} is null and ${table.revokedAt} is null and ${table.revokedByPersonId} is null and ${table.revocationReason} is null)
+        or (${table.status} = 'accepted' and ${table.acceptedAt} is not null and ${table.acceptedByPersonId} is not null and ${table.revokedAt} is null and ${table.revokedByPersonId} is null and ${table.revocationReason} is null)
+        or (${table.status} = 'revoked' and ${table.revokedAt} is not null and ${table.revokedByPersonId} is not null and ${table.acceptedAt} is null and ${table.acceptedByPersonId} is null)
+        or (${table.status} = 'expired' and ${table.acceptedAt} is null and ${table.acceptedByPersonId} is null and ${table.revokedAt} is null and ${table.revokedByPersonId} is null and ${table.revocationReason} is null)`,
+    ),
+    check("community_invitations_expiration_check", sql`${table.expiresAt} > ${table.createdAt}`),
+  ],
+);
+
+/** Admission attempts are immutable history except for their explicit state transition fields. */
+export const communityMembershipRequests = pgTable(
+  "community_membership_requests",
+  {
+    id: text("id").primaryKey(),
+    communityId: text("community_id")
+      .notNull()
+      .references(() => communities.id, { onDelete: "restrict" }),
+    personId: text("person_id")
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
+    invitationId: text("invitation_id"),
+    status: text("status").notNull().default("pending"),
+    approvalPolicy: text("approval_policy").notNull(),
+    decidedByPersonId: text("decided_by_person_id").references(() => people.id, {
+      onDelete: "restrict",
+    }),
+    decisionReason: text("decision_reason"),
+    requestedAt: timestamp("requested_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+    decidedAt: timestamp("decided_at", { withTimezone: true, mode: "date" }),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true, mode: "date" }),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.invitationId, table.communityId],
+      foreignColumns: [communityInvitations.id, communityInvitations.communityId],
+      name: "community_membership_requests_invitation_community_fk",
+    }).onDelete("restrict"),
+    uniqueIndex("community_membership_requests_live_person_unique")
+      .on(table.communityId, table.personId)
+      .where(sql`${table.status} = 'pending'`),
+    uniqueIndex("community_membership_requests_invitation_unique")
+      .on(table.invitationId)
+      .where(sql`${table.invitationId} is not null`),
+    index("community_membership_requests_community_status_idx").on(
+      table.communityId,
+      table.status,
+    ),
+    index("community_membership_requests_person_id_idx").on(table.personId),
+    check(
+      "community_membership_requests_status_check",
+      sql`${table.status} in ('pending', 'approved', 'rejected', 'cancelled')`,
+    ),
+    check(
+      "community_membership_requests_approval_policy_check",
+      sql`${table.approvalPolicy} in ('manual', 'automatic')`,
+    ),
+    check(
+      "community_membership_requests_terminal_state_check",
+      sql`(${table.status} = 'pending' and ${table.decidedAt} is null and ${table.decidedByPersonId} is null and ${table.decisionReason} is null and ${table.cancelledAt} is null)
+        or (${table.status} = 'approved' and ${table.decidedAt} is not null and ${table.cancelledAt} is null and ((${table.approvalPolicy} = 'manual' and ${table.decidedByPersonId} is not null) or (${table.approvalPolicy} = 'automatic' and ${table.decidedByPersonId} is null)))
+        or (${table.status} = 'rejected' and ${table.decidedAt} is not null and ${table.decidedByPersonId} is not null and ${table.cancelledAt} is null)
+        or (${table.status} = 'cancelled' and ${table.cancelledAt} is not null and ${table.decidedAt} is null and ${table.decidedByPersonId} is null and ${table.decisionReason} is null)`,
+    ),
   ],
 );
