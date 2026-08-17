@@ -14,8 +14,8 @@ describe("community list", () => {
     const markup = renderToStaticMarkup(
       <CommunityList
         communities={[
-          { id: "one", name: "Absalom Lodge", slug: "absalom", visibility: "private" },
-          { id: "two", name: "Drift Lodge", slug: "drift", visibility: "public" },
+          { id: "one", name: "Absalom Lodge", slug: "absalom", visibility: "private", lifecycleStatus: "active" },
+          { id: "two", name: "Drift Lodge", slug: "drift", visibility: "public", lifecycleStatus: "active" },
         ]}
       />,
     );
@@ -24,5 +24,25 @@ describe("community list", () => {
     expect(markup).toContain("Absalom Lodge");
     expect(markup).toContain('href="/communities/drift"');
     expect(markup).toContain("Drift Lodge");
+  });
+
+  it("links archived communities to their restore settings", () => {
+    const markup = renderToStaticMarkup(
+      <CommunityList
+        communities={[
+          {
+            id: "archived",
+            name: "Archived Lodge",
+            slug: "archived-lodge",
+            visibility: "private",
+            lifecycleStatus: "archived",
+          },
+        ]}
+      />,
+    );
+
+    expect(markup).toContain("Archived communities");
+    expect(markup).toContain('href="/communities/archived-lodge/settings"');
+    expect(markup).toContain("Open settings to restore");
   });
 });
