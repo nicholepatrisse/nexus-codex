@@ -26,26 +26,23 @@ Google was selected because it supplies standards-based OIDC, stable subject ide
 
 Roles are independent, community-scoped grants rather than one escalating enum. Ordinary membership is represented by an active membership, not a role grant.
 
-| Capability | Visitor | Member | GM | Organizer | Administrator | Owner |
-| --- | --- | --- | --- | --- | --- | --- |
-| Discover public community | yes | yes | yes | yes | yes | yes |
-| View community/schedule | public policy | member policy | member policy | yes | yes | yes |
-| Request membership or redeem invitation | yes | n/a | n/a | n/a | n/a | n/a |
-| Request GM status | no | yes | n/a | n/a | n/a | n/a |
-| Create and manage a game they GM | no | only through atomic self-service promotion | yes | yes | yes | yes |
-| Create, edit, cancel, or staff any community game | no | no | no | yes | yes | yes |
-| Invite members and decide membership requests | no | no | no | no | yes | yes |
-| Decide, suspend, or revoke GM status | no | no | no | no | yes | yes |
-| Grant or revoke organizer role | no | no | no | no | yes | yes |
-| Grant or revoke administrator role | no | no | no | no | no | yes |
-| Change community policies and profile settings | no | no | no | no | no | yes |
-| Archive, restore, or transfer ownership | no | no | no | no | no | yes |
+| Capability | Visitor | Member | GM | Owner |
+| --- | --- | --- | --- | --- |
+| Discover public community | yes | yes | yes | yes |
+| View community/schedule | public policy | member policy | member policy | yes |
+| Request membership or redeem invitation | yes | n/a | n/a | n/a |
+| Request GM status | no | yes | n/a | n/a |
+| Create and manage a game they GM | no | only through atomic self-service promotion | yes | yes |
+| Create, edit, cancel, or staff any community game | no | no | no | yes |
+| Invite members and decide membership requests | no | no | no | yes |
+| Decide, suspend, or revoke GM status | no | no | no | yes |
+| Change community policies and profile settings | no | no | no | yes |
+| Archive, restore, or transfer ownership | no | no | no | yes |
 
 Additional constraints:
 
-- A GM grant provides no organizer or membership-management authority.
-- An organizer grant provides no membership, GM-admission, role-management, or settings authority.
-- An administrator cannot grant administrator or owner authority.
+- A GM grant provides no community-wide scheduling, membership-management, policy, lifecycle, or ownership authority.
+- Administrator and organizer roles are deferred. The owner performs all community-wide administration in M0.
 - Only an owner can change visibility, admission policies, schedule visibility, supported programs, lifecycle, or ownership.
 - At least one active owner must remain. Ownership transfer and archival require explicit confirmation and an audit event.
 - Revocation affects the next authorization check and never deletes historical authorship.
@@ -75,16 +72,16 @@ Capacity counts player seats; staff assignments do not consume capacity.
 - exceptional accepted range: 7 through 12
 - hard rejection: non-integers, values below 1, or values above 12
 
-Only an owner, administrator, or organizer may save an exceptional capacity, and a nonblank reason is required. A GM without another administrative grant cannot override the normal range. The exception records actor, reason, timestamp, and requested capacity. M0 treats this as an operational scheduling exception, not a ruling that the eventual table is legal; scenario-specific legality belongs to M2.
+Only an owner may save an exceptional capacity, and a nonblank reason is required. A GM cannot override the normal range. The exception records actor, reason, timestamp, and requested capacity. M0 treats this as an operational scheduling exception, not a ruling that the eventual table is legal; scenario-specific legality belongs to M2.
 
 ### Invitations
 
 - Invitations use a cryptographically random token with at least 256 bits of entropy; only a one-way token hash is stored.
-- Default expiry is 7 days. An owner or administrator may choose 1 through 30 days.
+- Default expiry is 7 days. An owner may choose 1 through 30 days.
 - Invitations are single-use, revocable, and scoped to exactly one community.
 - An invitation may target an existing person or an email address, or be explicitly created as a claimable link. Targeted invitations may be accepted only by the intended signed-in identity.
 - Possessing an invitation permits entry into the admission flow; it does not bypass the community's membership approval mode. With the default manual mode, acceptance creates a pending request.
-- Invitations request ordinary membership only. Administrator, organizer, GM, and owner authority require their separate audited workflows.
+- Invitations request ordinary membership only. GM and owner authority require separate audited workflows.
 - Expired, revoked, already-used, malformed, and unknown tokens return the same public failure response.
 - Raw tokens and intended email addresses do not appear in application logs, analytics, referrers, or error details. Redemption is rate-limited and idempotent.
 
@@ -94,7 +91,7 @@ Only an owner, administrator, or organizer may save an exceptional capacity, and
 - Community queries and application services must accept actor context and evaluate current grants close to the database operation.
 - A newly created community is safe before its owner completes configuration.
 - Public discovery, public schedules, and location disclosure remain three distinct decisions.
-- The fixed matrix may be less flexible than custom RBAC, but it is reviewable and testable for M0. Custom permission builders remain out of scope.
+- The reduced matrix keeps the first release reviewable and testable. Administrator, organizer, and custom permission builders remain out of scope until delegated community operations are demonstrated as necessary.
 - Capacity exceptions remain auditable without embedding the later eligibility engine in scheduling.
 
 ## Required verification in later tickets
