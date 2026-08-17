@@ -16,6 +16,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "catalog:refresh:sfs2": "tsx scripts/refresh-sfs2-catalog.ts",
+    "catalog:seed:sfs2": "tsx scripts/seed-sfs2-catalog.ts",
     "db:generate": "drizzle-kit generate",
     "db:check": "drizzle-kit check",
     "db:migrate": "drizzle-kit migrate"
@@ -35,11 +37,13 @@
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
+    "cheerio": "^1.2.0",
     "dotenv": "latest",
     "drizzle-kit": "latest",
     "eslint": "^9.39.0",
     "eslint-config-next": "latest",
     "tailwindcss": "latest",
+    "tsx": "^4.23.12",
     "typescript": "^6.0.2",
     "vitest": "latest"
   }
