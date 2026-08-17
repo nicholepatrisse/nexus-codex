@@ -45,11 +45,25 @@ export async function updateCommunitySettingsAction(
       return { formError: "You no longer have permission to update this community." };
     }
     revalidatePath("/");
-    revalidatePath(`/communities/${currentSlug}`);
+    // Revalidate the profile itself without invalidating the active settings
+    // page. Invalidating the route tree here can remount the form with its
+    // pre-save server props before the action result reaches the client.
+    revalidatePath(`/communities/${currentSlug}`, "page");
     if (result.community.slug !== currentSlug) {
+      revalidatePath(`/communities/${result.community.slug}`, "page");
+      revalidatePath(`/communities/${result.community.slug}/settings`, "page");
       redirect(`/communities/${encodeURIComponent(result.community.slug)}/settings?saved=1`);
     }
-    return { success: "Settings saved." };
+    return {
+      success: "Settings saved.",
+      saved: {
+        slug: result.community.slug,
+        visibility: parsed.data.visibility,
+        membershipApproval: parsed.data.membershipApproval,
+        gmAdmission: parsed.data.gmAdmission,
+        scheduleVisibility: parsed.data.scheduleVisibility,
+      },
+    };
   } catch (error) {
     if (error instanceof z.ZodError) {
       return { fieldErrors: z.flattenError(error).fieldErrors };
