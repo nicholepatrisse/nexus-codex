@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { AuthControls } from "@/app/auth-controls";
 
 export default function Home() {
@@ -15,14 +14,6 @@ export default function Home() {
         </p>
         <div className="mt-10">
           <AuthControls />
-        </div>
-        <div className="mt-8">
-          <Link
-            href="/communities/new"
-            className="inline-flex rounded-full bg-[var(--accent)] px-6 py-3 font-semibold text-[#07110f] transition hover:brightness-110"
-          >
-            Create a community
-          </Link>
         </div>
       </section>
     </main>
