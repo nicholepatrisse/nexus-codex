@@ -101,3 +101,83 @@ export const authVerifications = pgTable(
   },
   (table) => [index("auth_verifications_identifier_idx").on(table.identifier)],
 );
+
+export const gameSystems = pgTable("game_systems", {
+  id: text("id").primaryKey(),
+  code: text("code").notNull().unique(),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+});
+
+export const rulesets = pgTable(
+  "rulesets",
+  {
+    id: text("id").primaryKey(),
+    gameSystemId: text("game_system_id")
+      .notNull()
+      .references(() => gameSystems.id, { onDelete: "restrict" }),
+    code: text("code").notNull(),
+    name: text("name").notNull(),
+    edition: text("edition").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("rulesets_system_code_unique").on(table.gameSystemId, table.code),
+    index("rulesets_game_system_id_idx").on(table.gameSystemId),
+  ],
+);
+
+export const organizedPlayPrograms = pgTable(
+  "organized_play_programs",
+  {
+    id: text("id").primaryKey(),
+    rulesetId: text("ruleset_id")
+      .notNull()
+      .references(() => rulesets.id, { onDelete: "restrict" }),
+    code: text("code").notNull(),
+    name: text("name").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("organized_play_programs_ruleset_code_unique").on(table.rulesetId, table.code),
+    index("organized_play_programs_ruleset_id_idx").on(table.rulesetId),
+  ],
+);
+
+export const contentItems = pgTable(
+  "content_items",
+  {
+    id: text("id").primaryKey(),
+    programId: text("program_id")
+      .notNull()
+      .references(() => organizedPlayPrograms.id, { onDelete: "restrict" }),
+    code: text("code").notNull(),
+    normalizedCode: text("normalized_code").notNull(),
+    title: text("title").notNull(),
+    normalizedTitle: text("normalized_title").notNull(),
+    contentType: text("content_type").notNull(),
+    minimumLevel: integer("minimum_level").notNull(),
+    maximumLevel: integer("maximum_level").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("content_items_program_normalized_code_unique").on(
+      table.programId,
+      table.normalizedCode,
+    ),
+    index("content_items_program_title_idx").on(table.programId, table.normalizedTitle),
+    check(
+      "content_items_type_check",
+      sql`${table.contentType} in ('scenario', 'special', 'adventure')`,
+    ),
+    check("content_items_minimum_level_check", sql`${table.minimumLevel} >= 1`),
+    check(
+      "content_items_level_range_check",
+      sql`${table.maximumLevel} >= ${table.minimumLevel}`,
+    ),
+  ],
+);
