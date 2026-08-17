@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { SignInButton } from "@/app/sign-in/sign-in-button";
 import { authClient } from "@/auth/client";
 
@@ -31,14 +32,22 @@ export function AuthControls() {
         <p className="font-semibold text-white">Signed in as {session.user.name}</p>
         <p className="mt-1 text-sm text-[var(--muted)]">{session.user.email}</p>
       </div>
-      <button
-        className="rounded-full border border-white/20 bg-white/5 px-5 py-2 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-wait disabled:opacity-60"
-        type="button"
-        onClick={signOut}
-        disabled={signOutPending}
-      >
-        {signOutPending ? "Signing out…" : "Sign out"}
-      </button>
+      <div className="flex flex-wrap gap-3">
+        <Link
+          href="/communities/new"
+          className="inline-flex rounded-full bg-[var(--accent)] px-6 py-3 font-semibold text-[#07110f] transition hover:brightness-110"
+        >
+          Create a community
+        </Link>
+        <button
+          className="rounded-full border border-white/20 bg-white/5 px-5 py-2 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-wait disabled:opacity-60"
+          type="button"
+          onClick={signOut}
+          disabled={signOutPending}
+        >
+          {signOutPending ? "Signing out…" : "Sign out"}
+        </button>
+      </div>
       {error ? (
         <p className="text-sm text-red-300" role="alert">
           {error}

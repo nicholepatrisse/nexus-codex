@@ -3,14 +3,14 @@
 import { useState } from "react";
 import { authClient } from "@/auth/client";
 
-export function SignInButton() {
+export function SignInButton({ callbackURL = "/" }: { callbackURL?: string }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
   async function signIn() {
     setPending(true);
     setError(null);
-    const result = await authClient.signIn.social({ provider: "google", callbackURL: "/" });
+    const result = await authClient.signIn.social({ provider: "google", callbackURL });
     if (result.error) {
       setError("Google sign-in could not be started. Please try again.");
       setPending(false);
