@@ -1,4 +1,4 @@
-import { SignInButton } from "@/app/sign-in/sign-in-button";
+import { AuthControls } from "@/app/auth-controls";
 
 export default function Home() {
   return (
@@ -13,7 +13,7 @@ export default function Home() {
           auditable from play to Society record.
         </p>
         <div className="mt-10">
-          <SignInButton />
+          <AuthControls />
         </div>
       </section>
     </main>
