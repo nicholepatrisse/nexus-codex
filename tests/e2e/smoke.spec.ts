@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test("renders the application foundation", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1, name: "Hello World" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Nexus Codex" })).toBeVisible();
   await expect(page).toHaveTitle("Nexus Codex");
   await expect(page.getByRole("link", { name: "Create a community" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Your communities" })).toHaveCount(0);

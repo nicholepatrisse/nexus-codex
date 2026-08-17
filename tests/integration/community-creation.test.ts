@@ -2,7 +2,7 @@ import { eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createTestIdentity } from "@/auth/test-fixture";
 import { CommunityCreationError, createCommunity } from "@/community/create-community";
-import { findCommunityForActiveMember } from "@/community/repository";
+import { resolveCommunityAccessBySlug } from "@/authorization/community-access";
 import { getDb } from "@/db/client";
 import {
   authUsers,
@@ -70,11 +70,13 @@ describeWithDatabase("community creation service", () => {
     });
     expect(membership).toMatchObject({ personId, status: "active" });
     expect(grant).toMatchObject({ personId, role: "owner", grantedByPersonId: personId });
-    expect(await findCommunityForActiveMember(created.slug, personId)).toMatchObject({
-      id: created.id,
-      name: created.name,
+    expect(await resolveCommunityAccessBySlug(created.slug, personId)).toMatchObject({
+      status: "available",
+      community: { id: created.id, name: created.name },
     });
-    expect(await findCommunityForActiveMember(created.slug, crypto.randomUUID())).toBeNull();
+    expect(await resolveCommunityAccessBySlug(created.slug, crypto.randomUUID())).toEqual({
+      status: "unavailable",
+    });
   });
 
   it("lets one person own independent communities and allocates collisions deterministically", async () => {

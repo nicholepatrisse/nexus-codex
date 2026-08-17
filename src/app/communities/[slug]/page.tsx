@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { getAuthenticatedActor } from "@/auth/actor";
-import { findCommunityForActiveMember } from "@/community/repository";
+import { authorizeCommunityBySlug } from "@/authorization/community-guard";
 
 interface CommunityPageProps {
   params: Promise<{ slug: string }>;
@@ -11,8 +11,13 @@ export default async function CommunityPage({ params }: CommunityPageProps) {
   const actor = await getAuthenticatedActor();
   if (!actor) redirect("/sign-in");
 
-  const community = await findCommunityForActiveMember((await params).slug, actor.personId);
-  if (!community) notFound();
+  const authorization = await authorizeCommunityBySlug({
+    actor,
+    slug: (await params).slug,
+    operation: "community.view",
+  });
+  if (authorization.status !== "authorized") notFound();
+  const community = authorization.access.community;
 
   return (
     <main className="mx-auto min-h-screen max-w-4xl px-6 py-16 sm:py-24">
