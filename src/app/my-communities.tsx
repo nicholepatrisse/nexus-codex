@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { getAuthenticatedActor } from "@/auth/actor";
-import { listHomepageCommunitiesForPerson } from "@/community/repository";
+import {
+  listHomepageAdmissionStatusesForPerson,
+  listHomepageCommunitiesForPerson,
+} from "@/community/repository";
 
 interface CommunitySummary {
   id: string;
@@ -10,7 +13,94 @@ interface CommunitySummary {
   lifecycleStatus: string;
 }
 
-export function CommunityList({ communities }: { communities: CommunitySummary[] }) {
+interface AdmissionSummary {
+  id: string;
+  communityName: string;
+  communitySlug: string;
+  communityVisibility: string;
+  status: string;
+  updatedAt: Date;
+}
+
+const admissionBadges: Record<string, { label: string; className: string; message: string }> = {
+  pending: {
+    label: "Pending",
+    className: "border-amber-200/30 bg-amber-300/10 text-amber-100",
+    message: "An owner is reviewing your membership request.",
+  },
+  approved: {
+    label: "Approved",
+    className: "border-emerald-200/30 bg-emerald-300/10 text-emerald-100",
+    message: "Your membership request was approved.",
+  },
+  rejected: {
+    label: "Not approved",
+    className: "border-red-200/30 bg-red-300/10 text-red-100",
+    message: "Your membership request was not approved.",
+  },
+  cancelled: {
+    label: "Cancelled",
+    className: "border-white/15 bg-white/5 text-[var(--muted)]",
+    message: "You cancelled this membership request.",
+  },
+};
+
+export function AdmissionStatusList({ admissions }: { admissions: AdmissionSummary[] }) {
+  if (admissions.length === 0) return null;
+
+  return (
+    <section aria-labelledby="admission-status-heading" className="mt-10">
+      <h3 id="admission-status-heading" className="text-xl font-semibold">
+        Membership requests
+      </h3>
+      <ul className="mt-4 grid gap-4 sm:grid-cols-2">
+        {admissions.map((admission) => {
+          const badge = admissionBadges[admission.status] ?? {
+            label: "Updated",
+            className: "border-white/15 bg-white/5 text-[var(--muted)]",
+            message: "Your membership request has been updated.",
+          };
+          const content = (
+            <>
+              <span className="flex items-start justify-between gap-4">
+                <span className="font-semibold text-white">{admission.communityName}</span>
+                <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${badge.className}`}>
+                  {badge.label}
+                </span>
+              </span>
+              <span className="mt-3 block text-sm text-[var(--muted)]">{badge.message}</span>
+            </>
+          );
+
+          return (
+            <li key={admission.id} role={admission.status === "pending" ? "status" : undefined}>
+              {admission.communityVisibility === "public" ? (
+                <Link
+                  href={`/communities/${encodeURIComponent(admission.communitySlug)}`}
+                  className="block rounded-2xl border border-white/10 bg-white/[0.03] p-5 transition hover:border-[var(--accent)]"
+                >
+                  {content}
+                </Link>
+              ) : (
+                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                  {content}
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+export function CommunityList({
+  communities,
+  admissions = [],
+}: {
+  communities: CommunitySummary[];
+  admissions?: AdmissionSummary[];
+}) {
   const activeCommunities = communities.filter(({ lifecycleStatus }) => lifecycleStatus === "active");
   const archivedCommunities = communities.filter(
     ({ lifecycleStatus }) => lifecycleStatus === "archived",
@@ -70,6 +160,8 @@ export function CommunityList({ communities }: { communities: CommunitySummary[]
         </ul>
       ) : null}
 
+      <AdmissionStatusList admissions={admissions} />
+
       {archivedCommunities.length > 0 ? (
         <div className="mt-10">
           <h3 className="text-xl font-semibold">Archived communities</h3>
@@ -99,6 +191,9 @@ export async function MyCommunities() {
   const actor = await getAuthenticatedActor();
   if (!actor) return null;
 
-  const communities = await listHomepageCommunitiesForPerson(actor.personId);
-  return <CommunityList communities={communities} />;
+  const [communities, admissions] = await Promise.all([
+    listHomepageCommunitiesForPerson(actor.personId),
+    listHomepageAdmissionStatusesForPerson(actor.personId),
+  ]);
+  return <CommunityList communities={communities} admissions={admissions} />;
 }

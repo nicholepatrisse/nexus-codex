@@ -3,10 +3,17 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createTestIdentity } from "@/auth/test-fixture";
 import {
   listCommunitiesForActiveMember,
+  listHomepageAdmissionStatusesForPerson,
   listHomepageCommunitiesForPerson,
 } from "@/community/repository";
 import { getDb } from "@/db/client";
-import { authUsers, communities, communityMemberships, communityRoleGrants } from "@/db/schema";
+import {
+  authUsers,
+  communities,
+  communityMembershipRequests,
+  communityMemberships,
+  communityRoleGrants,
+} from "@/db/schema";
 
 const describeWithDatabase = process.env.CI ? describe : describe.skip;
 const suffix = crypto.randomUUID();
@@ -61,9 +68,37 @@ describeWithDatabase("my communities", () => {
       role: "owner",
       grantedByPersonId: personId,
     });
+    await getDb().insert(communityMembershipRequests).values([
+      {
+        id: `pending-request-${suffix}`,
+        communityId: communityIds[1]!,
+        personId,
+        approvalPolicy: "manual",
+      },
+      {
+        id: `cancelled-request-${suffix}`,
+        communityId: communityIds[3]!,
+        personId,
+        status: "cancelled",
+        approvalPolicy: "manual",
+        cancelledAt: new Date(),
+      },
+      {
+        id: `approved-active-request-${suffix}`,
+        communityId: communityIds[0]!,
+        personId,
+        status: "approved",
+        approvalPolicy: "automatic",
+        decisionReason: "Automatic admission policy",
+        decidedAt: new Date(),
+      },
+    ]);
   });
 
   afterAll(async () => {
+    await getDb()
+      .delete(communityMembershipRequests)
+      .where(inArray(communityMembershipRequests.communityId, communityIds));
     await getDb()
       .delete(communityRoleGrants)
       .where(inArray(communityRoleGrants.communityId, communityIds));
@@ -90,5 +125,23 @@ describeWithDatabase("my communities", () => {
       expect.objectContaining({ id: communityIds[5], lifecycleStatus: "archived" }),
     ]);
     expect(await listHomepageCommunitiesForPerson(crypto.randomUUID())).toEqual([]);
+  });
+
+  it("returns the latest request status only when no active membership exists", async () => {
+    const statuses = await listHomepageAdmissionStatusesForPerson(personId);
+    expect(statuses).toHaveLength(2);
+    expect(statuses).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: `pending-request-${suffix}`,
+        communityId: communityIds[1],
+        status: "pending",
+      }),
+      expect.objectContaining({
+        id: `cancelled-request-${suffix}`,
+        communityId: communityIds[3],
+        status: "cancelled",
+      }),
+    ]));
+    expect(await listHomepageAdmissionStatusesForPerson(crypto.randomUUID())).toEqual([]);
   });
 });

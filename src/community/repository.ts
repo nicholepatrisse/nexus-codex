@@ -1,6 +1,11 @@
-import { and, asc, eq, isNotNull, isNull, or } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, isNull, or } from "drizzle-orm";
 import { getDb } from "@/db/client";
-import { communities, communityMemberships, communityRoleGrants } from "@/db/schema";
+import {
+  communities,
+  communityMembershipRequests,
+  communityMemberships,
+  communityRoleGrants,
+} from "@/db/schema";
 
 export async function listCommunitiesForActiveMember(personId: string, database = getDb()) {
   return database
@@ -60,4 +65,43 @@ export async function listHomepageCommunitiesForPerson(personId: string, databas
       ),
     )
     .orderBy(asc(communities.lifecycleStatus), asc(communities.name), asc(communities.slug));
+}
+
+/** Latest admission attempt for each community where the person is not yet an active member. */
+export async function listHomepageAdmissionStatusesForPerson(
+  personId: string,
+  database = getDb(),
+) {
+  return database
+    .selectDistinctOn([communityMembershipRequests.communityId], {
+      id: communityMembershipRequests.id,
+      communityId: communities.id,
+      communityName: communities.name,
+      communitySlug: communities.slug,
+      communityVisibility: communities.visibility,
+      status: communityMembershipRequests.status,
+      requestedAt: communityMembershipRequests.requestedAt,
+      updatedAt: communityMembershipRequests.updatedAt,
+    })
+    .from(communityMembershipRequests)
+    .innerJoin(communities, eq(communities.id, communityMembershipRequests.communityId))
+    .leftJoin(
+      communityMemberships,
+      and(
+        eq(communityMemberships.communityId, communityMembershipRequests.communityId),
+        eq(communityMemberships.personId, personId),
+        eq(communityMemberships.status, "active"),
+      ),
+    )
+    .where(
+      and(
+        eq(communityMembershipRequests.personId, personId),
+        isNull(communityMemberships.id),
+      ),
+    )
+    .orderBy(
+      communityMembershipRequests.communityId,
+      desc(communityMembershipRequests.requestedAt),
+      desc(communityMembershipRequests.id),
+    );
 }

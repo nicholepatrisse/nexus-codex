@@ -47,4 +47,37 @@ describe("community list", () => {
     expect(markup).toContain('href="/communities/archived-lodge/settings"');
     expect(markup).toContain("Open settings to restore");
   });
+
+  it("shows admission status badges without exposing private-community links", () => {
+    const markup = renderToStaticMarkup(
+      <CommunityList
+        communities={[]}
+        admissions={[
+          {
+            id: "pending-request",
+            communityName: "Public Lodge",
+            communitySlug: "public-lodge",
+            communityVisibility: "public",
+            status: "pending",
+            updatedAt: new Date("2026-08-17T12:00:00Z"),
+          },
+          {
+            id: "rejected-request",
+            communityName: "Private Lodge",
+            communitySlug: "private-lodge",
+            communityVisibility: "private",
+            status: "rejected",
+            updatedAt: new Date("2026-08-17T13:00:00Z"),
+          },
+        ]}
+      />,
+    );
+
+    expect(markup).toContain("Membership requests");
+    expect(markup).toContain("Pending");
+    expect(markup).toContain("Not approved");
+    expect(markup).toContain('href="/communities/public-lodge"');
+    expect(markup).not.toContain('href="/communities/private-lodge"');
+    expect(markup).not.toContain("decisionReason");
+  });
 });
