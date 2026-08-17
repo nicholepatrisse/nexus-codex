@@ -14,7 +14,6 @@ describe("public community discovery list", () => {
             description: "Weekly games in the Grand Lodge.",
           },
         ]}
-        hasQuery
       />,
     );
 
@@ -25,17 +24,11 @@ describe("public community discovery list", () => {
     expect(markup).not.toContain("member");
   });
 
-  it("renders a nonrevealing search empty state", () => {
-    const markup = renderToStaticMarkup(<PublicCommunityList communities={[]} hasQuery />);
-
-    expect(markup).toContain("No public communities found");
-    expect(markup).not.toContain("private");
-    expect(markup).not.toContain("archived");
-  });
-
-  it("distinguishes an empty public directory from an unmatched search", () => {
-    const markup = renderToStaticMarkup(<PublicCommunityList communities={[]} hasQuery={false} />);
+  it("renders a nonrevealing empty directory state", () => {
+    const markup = renderToStaticMarkup(<PublicCommunityList communities={[]} />);
 
     expect(markup).toContain("No public communities yet");
+    expect(markup).not.toContain("private");
+    expect(markup).not.toContain("archived");
   });
 });

@@ -9,21 +9,17 @@ export interface PublicCommunitySummary {
 
 export function PublicCommunityList({
   communities,
-  hasQuery,
 }: {
   communities: PublicCommunitySummary[];
-  hasQuery: boolean;
 }) {
   if (communities.length === 0) {
     return (
       <div className="mt-8 rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-7">
         <h2 className="text-xl font-semibold">
-          {hasQuery ? "No public communities found" : "No public communities yet"}
+          No public communities yet
         </h2>
         <p className="mt-2 leading-6 text-[var(--muted)]">
-          {hasQuery
-            ? "Try a different community name or slug."
-            : "Public communities will appear here when they are available."}
+          Public communities will appear here when they are available.
         </p>
       </div>
     );
