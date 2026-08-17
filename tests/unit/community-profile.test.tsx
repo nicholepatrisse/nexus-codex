@@ -43,4 +43,28 @@ describe("community profile", () => {
     expect(markup).toContain('href="/communities/absalom-station/settings"');
     expect(markup).toContain("Community settings");
   });
+
+  it("offers signed-out visitors a sign-in return path", () => {
+    const markup = renderToStaticMarkup(
+      <CommunityProfile community={publicCommunity} isOwner={false} />,
+    );
+    expect(markup).toContain("Sign in to request membership");
+    expect(markup).toContain("callbackURL=%2Fcommunities%2Fabsalom-station");
+  });
+
+  it("shows pending cancellation without exposing decision details", () => {
+    const markup = renderToStaticMarkup(
+      <CommunityProfile community={publicCommunity} isOwner={false} isSignedIn pendingRequestId="request-secret" />,
+    );
+    expect(markup).toContain("Cancel membership request");
+    expect(markup).toContain("awaiting review");
+    expect(markup).not.toMatch(/reason|decision note/i);
+  });
+
+  it("does not offer admission to active members", () => {
+    const markup = renderToStaticMarkup(
+      <CommunityProfile community={publicCommunity} isOwner={false} isSignedIn isMember />,
+    );
+    expect(markup).not.toMatch(/request membership|cancel membership request/i);
+  });
 });

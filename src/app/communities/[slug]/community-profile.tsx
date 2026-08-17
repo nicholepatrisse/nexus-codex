@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AdmissionForm } from "./admission-form";
 
 export type CommunityProfileProps = Readonly<{
   community: {
@@ -8,10 +9,13 @@ export type CommunityProfileProps = Readonly<{
     visibility: string;
   };
   isOwner: boolean;
+  isSignedIn?: boolean;
+  isMember?: boolean;
+  pendingRequestId?: string;
 }>;
 
 /** Public/member profile deliberately limited to approved, non-operational fields. */
-export function CommunityProfile({ community, isOwner }: CommunityProfileProps) {
+export function CommunityProfile({ community, isOwner, isSignedIn = false, isMember = false, pendingRequestId }: CommunityProfileProps) {
   const isPublic = community.visibility === "public";
 
   return (
@@ -41,6 +45,18 @@ export function CommunityProfile({ community, isOwner }: CommunityProfileProps) 
           >
             Community settings
           </Link>
+        ) : null}
+        {isPublic && !isMember && !isOwner ? (
+          isSignedIn ? (
+            <AdmissionForm slug={community.slug} pendingRequestId={pendingRequestId} />
+          ) : (
+            <Link
+              href={`/sign-in?callbackURL=${encodeURIComponent(`/communities/${community.slug}`)}`}
+              className="mt-8 inline-flex rounded-full bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-[#07110f]"
+            >
+              Sign in to request membership
+            </Link>
+          )
         ) : null}
       </section>
     </main>
