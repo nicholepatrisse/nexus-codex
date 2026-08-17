@@ -4,6 +4,7 @@ import {
   foreignKey,
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -189,6 +190,8 @@ export const communities = pgTable(
     id: text("id").primaryKey(),
     name: text("name").notNull(),
     slug: text("slug").notNull(),
+    description: text("description"),
+    defaultTimeZone: text("default_time_zone").notNull().default("UTC"),
     visibility: text("visibility").notNull().default("private"),
     scheduleVisibility: text("schedule_visibility").notNull().default("members"),
     membershipApproval: text("membership_approval").notNull().default("manual"),
@@ -200,6 +203,14 @@ export const communities = pgTable(
   (table) => [
     uniqueIndex("communities_slug_unique").on(table.slug),
     check("communities_name_not_blank", sql`length(btrim(${table.name})) > 0`),
+    check(
+      "communities_description_length_check",
+      sql`${table.description} is null or length(${table.description}) <= 2000`,
+    ),
+    check(
+      "communities_default_time_zone_check",
+      sql`length(${table.defaultTimeZone}) <= 255 and ${table.defaultTimeZone} ~ '^(UTC|[A-Za-z][A-Za-z0-9._+-]*(/[A-Za-z][A-Za-z0-9._+-]*)+)$'`,
+    ),
     check("communities_slug_format", sql`${table.slug} ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'`),
     check("communities_visibility_check", sql`${table.visibility} in ('private', 'public')`),
     check(
@@ -218,6 +229,27 @@ export const communities = pgTable(
       "communities_lifecycle_status_check",
       sql`${table.lifecycleStatus} in ('active', 'archived')`,
     ),
+  ],
+);
+
+export const communitySupportedPrograms = pgTable(
+  "community_supported_programs",
+  {
+    id: text("id").primaryKey(),
+    communityId: text("community_id")
+      .notNull()
+      .references(() => communities.id, { onDelete: "cascade" }),
+    programId: text("program_id")
+      .notNull()
+      .references(() => organizedPlayPrograms.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("community_supported_programs_community_program_unique").on(
+      table.communityId,
+      table.programId,
+    ),
+    index("community_supported_programs_program_id_idx").on(table.programId),
   ],
 );
 
@@ -278,5 +310,35 @@ export const communityRoleGrants = pgTable(
       "community_role_grants_revocation_time_check",
       sql`${table.revokedAt} is null or ${table.revokedAt} >= ${table.grantedAt}`,
     ),
+  ],
+);
+
+export const communityAuditEvents = pgTable(
+  "community_audit_events",
+  {
+    id: text("id").primaryKey(),
+    communityId: text("community_id")
+      .notNull()
+      .references(() => communities.id, { onDelete: "restrict" }),
+    actorPersonId: text("actor_person_id")
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
+    eventType: text("event_type").notNull(),
+    details: jsonb("details").$type<Record<string, unknown>>().notNull().default({}),
+    occurredAt: timestamp("occurred_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("community_audit_events_community_occurred_at_idx").on(
+      table.communityId,
+      table.occurredAt,
+    ),
+    index("community_audit_events_actor_person_id_idx").on(table.actorPersonId),
+    check(
+      "community_audit_events_type_check",
+      sql`${table.eventType} in ('community.settings.updated', 'community.archived', 'community.restored')`,
+    ),
+    check("community_audit_events_details_object_check", sql`jsonb_typeof(${table.details}) = 'object'`),
   ],
 );
