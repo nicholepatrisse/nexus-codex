@@ -1,6 +1,7 @@
 import {
   boolean,
   check,
+  foreignKey,
   index,
   integer,
   pgTable,
@@ -178,6 +179,104 @@ export const contentItems = pgTable(
     check(
       "content_items_level_range_check",
       sql`${table.maximumLevel} >= ${table.minimumLevel}`,
+    ),
+  ],
+);
+
+export const communities = pgTable(
+  "communities",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    slug: text("slug").notNull(),
+    visibility: text("visibility").notNull().default("private"),
+    scheduleVisibility: text("schedule_visibility").notNull().default("members"),
+    membershipApproval: text("membership_approval").notNull().default("manual"),
+    gmAdmission: text("gm_admission").notNull().default("approved_only"),
+    lifecycleStatus: text("lifecycle_status").notNull().default("active"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("communities_slug_unique").on(table.slug),
+    check("communities_name_not_blank", sql`length(btrim(${table.name})) > 0`),
+    check("communities_slug_format", sql`${table.slug} ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'`),
+    check("communities_visibility_check", sql`${table.visibility} in ('private', 'public')`),
+    check(
+      "communities_schedule_visibility_check",
+      sql`${table.scheduleVisibility} in ('members', 'public')`,
+    ),
+    check(
+      "communities_membership_approval_check",
+      sql`${table.membershipApproval} in ('manual', 'automatic')`,
+    ),
+    check(
+      "communities_gm_admission_check",
+      sql`${table.gmAdmission} in ('approved_only', 'self_service')`,
+    ),
+    check(
+      "communities_lifecycle_status_check",
+      sql`${table.lifecycleStatus} in ('active', 'archived')`,
+    ),
+  ],
+);
+
+export const communityMemberships = pgTable(
+  "community_memberships",
+  {
+    id: text("id").primaryKey(),
+    communityId: text("community_id")
+      .notNull()
+      .references(() => communities.id, { onDelete: "restrict" }),
+    personId: text("person_id")
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
+    status: text("status").notNull().default("pending"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("community_memberships_community_person_unique").on(
+      table.communityId,
+      table.personId,
+    ),
+    index("community_memberships_person_id_idx").on(table.personId),
+    check(
+      "community_memberships_status_check",
+      sql`${table.status} in ('pending', 'active', 'suspended', 'left')`,
+    ),
+  ],
+);
+
+export const communityRoleGrants = pgTable(
+  "community_role_grants",
+  {
+    id: text("id").primaryKey(),
+    communityId: text("community_id").notNull(),
+    personId: text("person_id").notNull(),
+    role: text("role").notNull(),
+    grantedByPersonId: text("granted_by_person_id")
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
+    grantedAt: timestamp("granted_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true, mode: "date" }),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.communityId, table.personId],
+      foreignColumns: [communityMemberships.communityId, communityMemberships.personId],
+      name: "community_role_grants_membership_fk",
+    }).onDelete("restrict"),
+    uniqueIndex("community_role_grants_active_role_unique")
+      .on(table.communityId, table.personId, table.role)
+      .where(sql`${table.revokedAt} is null`),
+    index("community_role_grants_person_id_idx").on(table.personId),
+    check("community_role_grants_role_check", sql`${table.role} in ('owner', 'gm')`),
+    check(
+      "community_role_grants_revocation_time_check",
+      sql`${table.revokedAt} is null or ${table.revokedAt} >= ${table.grantedAt}`,
     ),
   ],
 );
