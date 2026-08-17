@@ -27,12 +27,20 @@ export function CommunityList({ communities }: { communities: CommunitySummary[]
             Your communities
           </h2>
         </div>
-        <Link
-          href="/communities/new"
-          className="inline-flex rounded-full bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-[#07110f] transition hover:brightness-110"
-        >
-          Create a community
-        </Link>
+        <div className="flex flex-wrap gap-3">
+          <Link
+            href="/communities"
+            className="inline-flex rounded-full border border-white/15 px-5 py-2.5 text-sm font-semibold transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+          >
+            Find communities
+          </Link>
+          <Link
+            href="/communities/new"
+            className="inline-flex rounded-full bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-[#07110f] transition hover:brightness-110"
+          >
+            Create a community
+          </Link>
+        </div>
       </div>
 
       {activeCommunities.length === 0 && archivedCommunities.length === 0 ? (

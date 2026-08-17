@@ -3,10 +3,12 @@ import { describe, expect, it } from "vitest";
 import { CommunityList } from "@/app/my-communities";
 
 describe("community list", () => {
-  it("renders an empty state with a creation action", () => {
+  it("renders discovery and creation actions", () => {
     const markup = renderToStaticMarkup(<CommunityList communities={[]} />);
 
     expect(markup).toContain("No communities yet");
+    expect(markup).toContain('href="/communities"');
+    expect(markup).toContain("Find communities");
     expect(markup).toContain('href="/communities/new"');
   });
 
