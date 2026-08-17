@@ -1,3 +1,5 @@
+import { SignInButton } from "@/app/sign-in/sign-in-button";
+
 export default function Home() {
   return (
     <main className="mx-auto flex min-h-screen max-w-5xl items-center px-6 py-20">
@@ -10,8 +12,8 @@ export default function Home() {
           Schedule games, coordinate characters and tables, and keep every Chronicle and credit
           auditable from play to Society record.
         </p>
-        <div className="mt-10 inline-flex rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80">
-          Foundation ready · Product workflows coming next
+        <div className="mt-10">
+          <SignInButton />
         </div>
       </section>
     </main>
