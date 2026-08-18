@@ -19,7 +19,10 @@ export async function createInvitationAction(slug: string, _previous: OwnerAdmis
     });
     if (result.status === "created") {
       refresh(slug);
-      return { success: "Sharing link created. Copy it now; it won’t be shown again.", invitationPath: `/invitations/${result.token}` };
+      return {
+        success: "Sharing link created. It’s highlighted in the active links below.",
+        invitationId: result.invitation.id,
+      };
     }
     return { error: "That invitation could not be created." };
   } catch {

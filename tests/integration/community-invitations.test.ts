@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createTestIdentity } from "@/auth/test-fixture";
 import type { AuthenticatedActor } from "@/auth/actor";
@@ -22,6 +22,7 @@ import {
 
 const describeWithDatabase = process.env.CI ? describe : describe.skip;
 const suffix = crypto.randomUUID();
+const tokenSecret = `invitation-test-secret-${suffix}`;
 let communityId: string;
 let communitySlug: string;
 let owner: AuthenticatedActor;
@@ -77,7 +78,7 @@ describeWithDatabase("community invitations", () => {
       owner,
       communitySlug,
       { maxUses: null },
-      { now: new Date("2026-08-17T20:00:00Z") },
+      { now: new Date("2026-08-17T20:00:00Z"), tokenSecret },
     );
     expect(result.status).toBe("created");
     if (result.status !== "created") return;
@@ -93,9 +94,14 @@ describeWithDatabase("community invitations", () => {
     );
     expect(JSON.stringify(stored)).not.toContain(result.token);
 
-    const list = await listCommunityInvitations(owner, communitySlug);
+    const list = await listCommunityInvitations(owner, communitySlug, { tokenSecret });
     expect(list.status).toBe("found");
     expect(JSON.stringify(list)).not.toContain(stored?.tokenHash);
+    if (list.status === "found") {
+      expect(list.invitations.find(({ id }) => id === result.invitation.id)?.token).toBe(
+        result.token,
+      );
+    }
 
     expect((await createCommunityInvitation(owner, communitySlug, { maxUses: 5 })).status).toBe("created");
   });
@@ -107,6 +113,30 @@ describeWithDatabase("community invitations", () => {
     expect(
       (await revokeCommunityInvitation(outsider, communitySlug, crypto.randomUUID())).status,
     ).toBe("not-found");
+  });
+
+  it("lets the owner revoke limited and unlimited links while they have capacity", async () => {
+    const limited = await createCommunityInvitation(owner, communitySlug, { maxUses: 2 });
+    const unlimited = await createCommunityInvitation(owner, communitySlug, { maxUses: null });
+    expect(limited.status).toBe("created");
+    expect(unlimited.status).toBe("created");
+    if (limited.status !== "created" || unlimited.status !== "created") return;
+
+    expect(await acceptInvitationForAdmission(limited.token, outsider)).toMatchObject({
+      status: "accepted",
+    });
+    expect(
+      (await revokeCommunityInvitation(owner, communitySlug, limited.invitation.id)).status,
+    ).toBe("revoked");
+    expect(
+      (await revokeCommunityInvitation(owner, communitySlug, unlimited.invitation.id)).status,
+    ).toBe("revoked");
+    expect(await acceptInvitationForAdmission(limited.token, recipient)).toEqual({
+      status: "invalid",
+    });
+    expect(await acceptInvitationForAdmission(unlimited.token, recipient)).toEqual({
+      status: "invalid",
+    });
   });
 
   it("allows the selected number of distinct people and then exhausts the link", async () => {
@@ -137,6 +167,7 @@ describeWithDatabase("community invitations", () => {
         and(
           eq(communityAuditEvents.communityId, communityId),
           eq(communityAuditEvents.eventType, "community.invitation.accepted"),
+          sql`${communityAuditEvents.details}->>'invitationId' = ${created.invitation.id}`,
         ),
       );
     expect(acceptanceEvents).toHaveLength(2);

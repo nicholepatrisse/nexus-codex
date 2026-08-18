@@ -67,4 +67,8 @@ The target product spine from the Dawnsight requirements is:
 
 Authentication, the Society domain schema, integrations, and PDF generation are intentionally deferred from this foundational change. Their architecture must preserve community-scoped authorization, immutable audit history, idempotent state changes, provenance, and privacy-safe development fixtures.
 
-See [ADR 0001](docs/architecture/decisions/0001-application-stack.md) for the initial architecture decision.
+Architecture decisions:
+
+- [ADR 0001: Application stack](docs/architecture/decisions/0001-application-stack.md)
+- [ADR 0002: M0 identity, authorization, and policy defaults](docs/architecture/decisions/0002-m0-identity-and-policy-defaults.md)
+- [ADR 0003: M0 reusable community sharing links](docs/architecture/decisions/0003-m0-reusable-community-sharing-links.md)

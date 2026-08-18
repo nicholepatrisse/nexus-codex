@@ -1,1 +1,5 @@
-export type OwnerAdmissionState = Readonly<{ success?: string; invitationPath?: string; error?: string }>;
+export type OwnerAdmissionState = Readonly<{
+  success?: string;
+  invitationId?: string;
+  error?: string;
+}>;

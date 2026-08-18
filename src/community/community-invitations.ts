@@ -1,4 +1,4 @@
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, createHmac, randomUUID } from "node:crypto";
 import { and, asc, eq, gt, lte, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { AuthenticatedActor } from "@/auth/actor";
@@ -6,6 +6,7 @@ import { authorizeCommunityBySlug } from "@/authorization/community-guard";
 import type { AuthorizationDenialSink } from "@/authorization/denial-audit";
 import { resolveCommunityAccessBySlug } from "@/authorization/community-access";
 import { getDb } from "@/db/client";
+import { getServerEnvironment } from "@/env";
 import {
   communityAuditEvents,
   communityInvitations,
@@ -39,10 +40,17 @@ export type InvitationSummary = {
   expiresAt: Date;
   createdAt: Date;
   revokedAt: Date | null;
+  token?: string;
 };
 
 function invitationDigest(token: string): string {
   return createHash("sha256").update(token, "utf8").digest("hex");
+}
+
+function invitationToken(invitationId: string, secret: string): string {
+  return createHmac("sha256", secret)
+    .update(`community-invitation:${invitationId}`, "utf8")
+    .digest("base64url");
 }
 
 function asDatabase(database: InvitationDatabase): Database {
@@ -63,6 +71,7 @@ export async function createCommunityInvitation(
     database?: Database;
     denialSink?: AuthorizationDenialSink;
     now?: Date;
+    tokenSecret?: string;
   } = {},
 ): Promise<InvitationMutationResult> {
   const maxUses = maxUsesSchema.parse(input.maxUses === undefined ? 1 : input.maxUses);
@@ -87,11 +96,15 @@ export async function createCommunityInvitation(
     if (authorization.status !== "authorized") return authorization;
 
     const communityId = authorization.access.community.id;
-    const token = randomBytes(32).toString("base64url");
+    const invitationId = randomUUID();
+    const token = invitationToken(
+      invitationId,
+      options.tokenSecret ?? getServerEnvironment().BETTER_AUTH_SECRET,
+    );
     const [invitation] = await transaction
       .insert(communityInvitations)
       .values({
-        id: randomUUID(),
+        id: invitationId,
         communityId,
         tokenHash: invitationDigest(token),
         maxUses,
@@ -128,7 +141,12 @@ export async function createCommunityInvitation(
 export async function listCommunityInvitations(
   actor: AuthenticatedActor,
   slug: string,
-  options: { database?: Database; denialSink?: AuthorizationDenialSink } = {},
+  options: {
+    database?: Database;
+    denialSink?: AuthorizationDenialSink;
+    tokenSecret?: string;
+    now?: Date;
+  } = {},
 ): Promise<
   | { status: "found"; invitations: InvitationSummary[] }
   | { status: "not-found" }
@@ -157,7 +175,19 @@ export async function listCommunityInvitations(
     .from(communityInvitations)
     .where(eq(communityInvitations.communityId, authorization.access.community.id))
     .orderBy(asc(communityInvitations.createdAt), asc(communityInvitations.id));
-  return { status: "found", invitations };
+  const tokenSecret = options.tokenSecret ?? getServerEnvironment().BETTER_AUTH_SECRET;
+  const now = options.now ?? new Date();
+  return {
+    status: "found",
+    invitations: invitations.map((invitation) => ({
+      ...invitation,
+      status:
+        invitation.status === "pending" && invitation.expiresAt <= now
+          ? "expired"
+          : invitation.status,
+      token: invitationToken(invitation.id, tokenSecret),
+    })),
+  };
 }
 
 export async function revokeCommunityInvitation(
@@ -218,6 +248,7 @@ export async function revokeCommunityInvitation(
           eq(communityInvitations.id, invitationId),
           eq(communityInvitations.communityId, authorization.access.community.id),
           eq(communityInvitations.status, "pending"),
+          sql`(${communityInvitations.maxUses} is null or ${communityInvitations.useCount} < ${communityInvitations.maxUses})`,
         ),
       )
       .returning({
