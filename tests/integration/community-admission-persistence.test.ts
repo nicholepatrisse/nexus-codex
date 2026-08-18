@@ -72,13 +72,13 @@ describeWithDatabase("community admission persistence", () => {
     await getDb().delete(authUsers).where(eq(authUsers.id, requesterAuthUserId));
   });
 
-  it("stores only a token digest and prevents duplicate live invitations", async () => {
+  it("stores only a token digest and enforces link-use constraints", async () => {
     const expiresAt = new Date(Date.now() + 60_000);
     await getDb().insert(communityInvitations).values({
       id: `invitation-a-${suffix}`,
       communityId,
-      recipientEmail: `admission-requester-${suffix}@example.test`,
       tokenHash: `sha256-digest-a-${suffix}`,
+      maxUses: 5,
       createdByPersonId: ownerPersonId,
       expiresAt,
     });
@@ -92,10 +92,9 @@ describeWithDatabase("community admission persistence", () => {
 
     await expect(
       getDb().insert(communityInvitations).values({
-        id: `invitation-duplicate-recipient-${suffix}`,
+        id: `invitation-duplicate-token-${suffix}`,
         communityId,
-        recipientEmail: `admission-requester-${suffix}@example.test`,
-        tokenHash: `sha256-digest-b-${suffix}`,
+        tokenHash: `sha256-digest-a-${suffix}`,
         createdByPersonId: ownerPersonId,
         expiresAt,
       }),
@@ -103,10 +102,11 @@ describeWithDatabase("community admission persistence", () => {
 
     await expect(
       getDb().insert(communityInvitations).values({
-        id: `invitation-duplicate-token-${suffix}`,
+        id: `invitation-invalid-use-count-${suffix}`,
         communityId,
-        recipientEmail: `different-${suffix}@example.test`,
-        tokenHash: `sha256-digest-a-${suffix}`,
+        tokenHash: `invalid-use-count-${suffix}`,
+        maxUses: 1,
+        useCount: 2,
         createdByPersonId: ownerPersonId,
         expiresAt,
       }),
@@ -138,7 +138,6 @@ describeWithDatabase("community admission persistence", () => {
       getDb().insert(communityInvitations).values({
         id: `invalid-revocation-${suffix}`,
         communityId,
-        recipientEmail: `invalid-${suffix}@example.test`,
         tokenHash: `invalid-digest-${suffix}`,
         status: "revoked",
         createdByPersonId: ownerPersonId,

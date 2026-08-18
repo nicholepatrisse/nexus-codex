@@ -194,8 +194,8 @@ describeWithDatabase("community admission orchestration", () => {
     await getDb().insert(communityInvitations).values({
       id: invitationId,
       communityId: community.id,
-      recipientEmail: `admission-applicant-${suffix}@fixture.invalid`,
       tokenHash: createHash("sha256").update(rawToken, "utf8").digest("hex"),
+      maxUses: 2,
       createdByPersonId: deciderPersonId,
       expiresAt: new Date(Date.now() + 60_000),
     });
@@ -207,17 +207,29 @@ describeWithDatabase("community admission orchestration", () => {
 
     const first = await redeemCommunityInvitationAdmission(actor, rawToken);
     const retry = await redeemCommunityInvitationAdmission(actor, rawToken);
+    const secondIdentity = await createTestIdentity({
+      subject: `admission-second-applicant-${suffix}`,
+      email: `admission-second-applicant-${suffix}@fixture.invalid`,
+      sessions: 0,
+    });
+    authUserIds.push(secondIdentity.authUser.id);
+    const second = await redeemCommunityInvitationAdmission(
+      {
+        personId: secondIdentity.person.id,
+        authUserId: secondIdentity.authUser.id,
+        sessionId: `admission-second-session-${suffix}`,
+      },
+      rawToken,
+    );
 
     expect(first).toMatchObject({ status: "admitted", communityId: community.id });
     expect(retry).toEqual({ status: "already-member", communityId: community.id });
+    expect(second).toMatchObject({ status: "admitted", communityId: community.id });
     const [invitation] = await getDb()
       .select()
       .from(communityInvitations)
       .where(eq(communityInvitations.id, invitationId));
-    expect(invitation).toMatchObject({
-      status: "accepted",
-      acceptedByPersonId: applicantPersonId,
-    });
+    expect(invitation).toMatchObject({ status: "exhausted", maxUses: 2, useCount: 2 });
     const [request] = await getDb()
       .select()
       .from(communityMembershipRequests)
@@ -239,8 +251,8 @@ describeWithDatabase("community admission orchestration", () => {
     await getDb().insert(communityInvitations).values({
       id: invitationId,
       communityId: community.id,
-      recipientEmail: `admission-applicant-${suffix}@fixture.invalid`,
       tokenHash: createHash("sha256").update(rawToken, "utf8").digest("hex"),
+      maxUses: 1,
       createdByPersonId: deciderPersonId,
       expiresAt: new Date(Date.now() + 60_000),
     });

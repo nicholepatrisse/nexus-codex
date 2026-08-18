@@ -343,10 +343,7 @@ export const communityAuditEvents = pgTable(
   ],
 );
 
-/**
- * A single-recipient community invitation. Only a one-way digest of the bearer
- * token is persisted; callers are responsible for normalizing recipientEmail.
- */
+/** A reusable community share link. Only a one-way digest of its bearer token is persisted. */
 export const communityInvitations = pgTable(
   "community_invitations",
   {
@@ -354,15 +351,13 @@ export const communityInvitations = pgTable(
     communityId: text("community_id")
       .notNull()
       .references(() => communities.id, { onDelete: "restrict" }),
-    recipientEmail: text("recipient_email").notNull(),
     tokenHash: text("token_hash").notNull(),
     status: text("status").notNull().default("pending"),
+    maxUses: integer("max_uses"),
+    useCount: integer("use_count").notNull().default(0),
     createdByPersonId: text("created_by_person_id")
       .notNull()
       .references(() => people.id, { onDelete: "restrict" }),
-    acceptedByPersonId: text("accepted_by_person_id").references(() => people.id, {
-      onDelete: "restrict",
-    }),
     revokedByPersonId: text("revoked_by_person_id").references(() => people.id, {
       onDelete: "restrict",
     }),
@@ -374,28 +369,24 @@ export const communityInvitations = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
       .notNull()
       .defaultNow(),
-    acceptedAt: timestamp("accepted_at", { withTimezone: true, mode: "date" }),
     revokedAt: timestamp("revoked_at", { withTimezone: true, mode: "date" }),
   },
   (table) => [
     uniqueIndex("community_invitations_token_hash_unique").on(table.tokenHash),
     uniqueIndex("community_invitations_id_community_unique").on(table.id, table.communityId),
-    uniqueIndex("community_invitations_live_recipient_unique")
-      .on(table.communityId, table.recipientEmail)
-      .where(sql`${table.status} = 'pending'`),
     index("community_invitations_community_status_idx").on(table.communityId, table.status),
-    index("community_invitations_recipient_email_idx").on(table.recipientEmail),
-    check("community_invitations_recipient_email_normalized", sql`${table.recipientEmail} = lower(btrim(${table.recipientEmail})) and length(${table.recipientEmail}) > 0`),
     check(
       "community_invitations_status_check",
-      sql`${table.status} in ('pending', 'accepted', 'revoked', 'expired')`,
+      sql`${table.status} in ('pending', 'exhausted', 'revoked', 'expired')`,
     ),
+    check("community_invitations_max_uses_check", sql`${table.maxUses} is null or ${table.maxUses} >= 1`),
+    check("community_invitations_use_count_check", sql`${table.useCount} >= 0 and (${table.maxUses} is null or ${table.useCount} <= ${table.maxUses})`),
     check(
       "community_invitations_terminal_state_check",
-      sql`(${table.status} = 'pending' and ${table.acceptedAt} is null and ${table.acceptedByPersonId} is null and ${table.revokedAt} is null and ${table.revokedByPersonId} is null and ${table.revocationReason} is null)
-        or (${table.status} = 'accepted' and ${table.acceptedAt} is not null and ${table.acceptedByPersonId} is not null and ${table.revokedAt} is null and ${table.revokedByPersonId} is null and ${table.revocationReason} is null)
-        or (${table.status} = 'revoked' and ${table.revokedAt} is not null and ${table.revokedByPersonId} is not null and ${table.acceptedAt} is null and ${table.acceptedByPersonId} is null)
-        or (${table.status} = 'expired' and ${table.acceptedAt} is null and ${table.acceptedByPersonId} is null and ${table.revokedAt} is null and ${table.revokedByPersonId} is null and ${table.revocationReason} is null)`,
+      sql`(${table.status} = 'pending' and (${table.maxUses} is null or ${table.useCount} < ${table.maxUses}) and ${table.revokedAt} is null and ${table.revokedByPersonId} is null and ${table.revocationReason} is null)
+        or (${table.status} = 'exhausted' and ${table.maxUses} is not null and ${table.useCount} = ${table.maxUses} and ${table.revokedAt} is null and ${table.revokedByPersonId} is null and ${table.revocationReason} is null)
+        or (${table.status} = 'revoked' and ${table.revokedAt} is not null and ${table.revokedByPersonId} is not null)
+        or (${table.status} = 'expired' and ${table.revokedAt} is null and ${table.revokedByPersonId} is null and ${table.revocationReason} is null)`,
     ),
     check("community_invitations_expiration_check", sql`${table.expiresAt} > ${table.createdAt}`),
   ],
@@ -437,8 +428,8 @@ export const communityMembershipRequests = pgTable(
     uniqueIndex("community_membership_requests_live_person_unique")
       .on(table.communityId, table.personId)
       .where(sql`${table.status} = 'pending'`),
-    uniqueIndex("community_membership_requests_invitation_unique")
-      .on(table.invitationId)
+    uniqueIndex("community_membership_requests_invitation_person_unique")
+      .on(table.invitationId, table.personId)
       .where(sql`${table.invitationId} is not null`),
     index("community_membership_requests_community_status_idx").on(
       table.communityId,

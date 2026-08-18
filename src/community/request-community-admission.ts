@@ -80,7 +80,12 @@ export async function processCommunityAdmission(
     const [invitationRequest] = await transaction
       .select({ id: communityMembershipRequests.id, status: communityMembershipRequests.status })
       .from(communityMembershipRequests)
-      .where(eq(communityMembershipRequests.invitationId, target.invitationId))
+      .where(
+        and(
+          eq(communityMembershipRequests.invitationId, target.invitationId),
+          eq(communityMembershipRequests.personId, actor.personId),
+        ),
+      )
       .limit(1);
     if (invitationRequest) {
       return invitationRequest.status === "pending"

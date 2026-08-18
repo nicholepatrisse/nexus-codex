@@ -43,6 +43,13 @@
       "when": 1787009648073,
       "tag": "0005_strong_reavers",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787011555635,
+      "tag": "0006_dapper_the_executioner",
+      "breakpoints": true
     }
   ]
 }

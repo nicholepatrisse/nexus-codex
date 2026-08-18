@@ -13,15 +13,17 @@ function refresh(slug: string) {
 export async function createInvitationAction(slug: string, _previous: OwnerAdmissionState, formData: FormData): Promise<OwnerAdmissionState> {
   try {
     const actor = await requireAuthenticatedActor();
-    const result = await createCommunityInvitation(actor, slug, { recipientEmail: String(formData.get("recipientEmail") ?? "") });
+    const rawMaxUses = String(formData.get("maxUses") ?? "1");
+    const result = await createCommunityInvitation(actor, slug, {
+      maxUses: rawMaxUses === "unlimited" ? null : Number(rawMaxUses),
+    });
     if (result.status === "created") {
       refresh(slug);
-      return { success: "Invitation created. Copy this link now; it won’t be shown again.", invitationPath: `/invitations/${result.token}` };
+      return { success: "Sharing link created. Copy it now; it won’t be shown again.", invitationPath: `/invitations/${result.token}` };
     }
-    if (result.status === "already-pending") return { error: "A pending invitation already exists for that address." };
     return { error: "That invitation could not be created." };
   } catch {
-    return { error: "That invitation could not be created. Check the address and try again." };
+    return { error: "That sharing link could not be created. Check the usage limit and try again." };
   }
 }
 

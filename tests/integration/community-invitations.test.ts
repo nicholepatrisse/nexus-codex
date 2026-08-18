@@ -72,11 +72,11 @@ describeWithDatabase("community invitations", () => {
     await getDb().delete(authUsers).where(inArray(authUsers.id, authUserIds));
   });
 
-  it("authorizes freshly, normalizes the recipient, and stores only a token digest", async () => {
+  it("authorizes freshly and stores only a token digest with the selected use limit", async () => {
     const result = await createCommunityInvitation(
       owner,
       communitySlug,
-      { recipientEmail: ` INVITATION.RECIPIENT.${suffix}@fixture.invalid ` },
+      { maxUses: null },
       { now: new Date("2026-08-17T20:00:00Z") },
     );
     expect(result.status).toBe("created");
@@ -87,7 +87,7 @@ describeWithDatabase("community invitations", () => {
       .select()
       .from(communityInvitations)
       .where(eq(communityInvitations.id, result.invitation.id));
-    expect(stored?.recipientEmail).toBe(`invitation.recipient.${suffix}@fixture.invalid`);
+    expect(stored).toMatchObject({ maxUses: null, useCount: 0, status: "pending" });
     expect(stored?.tokenHash).toBe(
       createHash("sha256").update(result.token, "utf8").digest("hex"),
     );
@@ -97,17 +97,11 @@ describeWithDatabase("community invitations", () => {
     expect(list.status).toBe("found");
     expect(JSON.stringify(list)).not.toContain(stored?.tokenHash);
 
-    const duplicate = await createCommunityInvitation(owner, communitySlug, {
-      recipientEmail: `invitation.recipient.${suffix}@fixture.invalid`,
-    });
-    expect(duplicate.status).toBe("already-pending");
-    expect(duplicate).not.toHaveProperty("token");
+    expect((await createCommunityInvitation(owner, communitySlug, { maxUses: 5 })).status).toBe("created");
   });
 
   it("does not let a non-owner create, list, or revoke invitations", async () => {
-    const createResult = await createCommunityInvitation(outsider, communitySlug, {
-      recipientEmail: `blocked.${suffix}@fixture.invalid`,
-    });
+    const createResult = await createCommunityInvitation(outsider, communitySlug, { maxUses: 1 });
     expect(createResult.status).toBe("not-found");
     expect((await listCommunityInvitations(outsider, communitySlug)).status).toBe("not-found");
     expect(
@@ -115,20 +109,12 @@ describeWithDatabase("community invitations", () => {
     ).toBe("not-found");
   });
 
-  it("binds tokens to the intended account and accepts same-person replay idempotently", async () => {
-    const created = await createCommunityInvitation(owner, communitySlug, {
-      recipientEmail: `replay.${suffix}@fixture.invalid`,
-    });
+  it("allows the selected number of distinct people and then exhausts the link", async () => {
+    const created = await createCommunityInvitation(owner, communitySlug, { maxUses: 2 });
     expect(created.status).toBe("created");
     if (created.status !== "created") return;
 
-    await getDb()
-      .update(authUsers)
-      .set({ email: `replay.${suffix}@fixture.invalid` })
-      .where(eq(authUsers.id, recipient.authUserId));
-    expect(await acceptInvitationForAdmission(created.token, outsider)).toEqual({ status: "invalid" });
-    const accepted = await acceptInvitationForAdmission(created.token, recipient);
-    expect(accepted).toEqual({
+    expect(await acceptInvitationForAdmission(created.token, outsider)).toEqual({
       status: "accepted",
       invitation: { id: created.invitation.id, communityId },
     });
@@ -136,6 +122,13 @@ describeWithDatabase("community invitations", () => {
       status: "accepted",
       invitation: { id: created.invitation.id, communityId },
     });
+    expect(await acceptInvitationForAdmission(created.token, owner)).toEqual({ status: "invalid" });
+
+    const [stored] = await getDb()
+      .select({ status: communityInvitations.status, useCount: communityInvitations.useCount })
+      .from(communityInvitations)
+      .where(eq(communityInvitations.id, created.invitation.id));
+    expect(stored).toEqual({ status: "exhausted", useCount: 2 });
 
     const acceptanceEvents = await getDb()
       .select()
@@ -146,13 +139,11 @@ describeWithDatabase("community invitations", () => {
           eq(communityAuditEvents.eventType, "community.invitation.accepted"),
         ),
       );
-    expect(acceptanceEvents).toHaveLength(1);
+    expect(acceptanceEvents).toHaveLength(2);
   });
 
   it("rejects revoked and expired tokens without disclosing their state", async () => {
-    const revoked = await createCommunityInvitation(owner, communitySlug, {
-      recipientEmail: `revoked.${suffix}@fixture.invalid`,
-    });
+    const revoked = await createCommunityInvitation(owner, communitySlug, { maxUses: 1 });
     expect(revoked.status).toBe("created");
     if (revoked.status !== "created") return;
     expect(
@@ -167,17 +158,12 @@ describeWithDatabase("community invitations", () => {
       owner,
       communitySlug,
       {
-        recipientEmail: `expired.${suffix}@fixture.invalid`,
         expiresAt: new Date(now.getTime() + 1_000),
       },
       { now },
     );
     expect(expiring.status).toBe("created");
     if (expiring.status !== "created") return;
-    await getDb()
-      .update(authUsers)
-      .set({ email: `expired.${suffix}@fixture.invalid` })
-      .where(eq(authUsers.id, recipient.authUserId));
     expect(
       await acceptInvitationForAdmission(
         expiring.token,
@@ -199,7 +185,6 @@ describeWithDatabase("community invitations", () => {
       owner,
       communitySlug,
       {
-        recipientEmail: `expire-before-revoke.${suffix}@fixture.invalid`,
         expiresAt: new Date(now.getTime() + 1_000),
       },
       { now },
