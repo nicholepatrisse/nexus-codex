@@ -82,6 +82,8 @@ Only an owner may save an exceptional capacity, and a nonblank reason is require
 
 ### Invitations
 
+> Superseded for M0 by [ADR 0003](0003-m0-reusable-community-sharing-links.md). The bullets below preserve the original decision for historical context.
+
 - Invitations use a cryptographically random token with at least 256 bits of entropy; only a one-way token hash is stored.
 - Default expiry is 7 days. An owner may choose 1 through 30 days.
 - Invitations are single-use, revocable, and scoped to exactly one community.
