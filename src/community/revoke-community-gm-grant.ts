@@ -82,7 +82,8 @@ export async function revokeCommunityGmGrant(
           eq(communityRoleGrants.role, "gm"),
         ),
       )
-      .limit(1);
+      .limit(1)
+      .for("update");
     if (!grant) return { status: "not-found" };
     if (grant.status === "revoked") return { status: "unchanged", grantId };
     if (grant.status !== "active") return { status: "not-found" };

@@ -2,8 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAuthenticatedActor } from "@/auth/actor";
-import { noPersistedFutureGmSessions, revokeCommunityGmGrant } from "@/community/revoke-community-gm-grant";
+import { revokeCommunityGmGrant } from "@/community/revoke-community-gm-grant";
 import { decideCommunityGmAdmission } from "@/community/community-gm-admission";
+import { inspectFutureGmSessions } from "@/session/session-drafts";
 import type { OwnerGmActionState } from "./gm-state";
 
 function refresh(slug: string) {
@@ -26,7 +27,7 @@ export async function decideGmAction(slug: string, requestId: string, decision: 
 export async function revokeGmAction(slug: string, grantId: string, _previous: OwnerGmActionState): Promise<OwnerGmActionState> {
   void _previous;
   try {
-    const result = await revokeCommunityGmGrant(await requireAuthenticatedActor(), slug, grantId, {}, { inspectFutureSessions: noPersistedFutureGmSessions });
+    const result = await revokeCommunityGmGrant(await requireAuthenticatedActor(), slug, grantId, {}, { inspectFutureSessions: inspectFutureGmSessions });
     if (result.status === "not-found") return { error: "That GM grant is no longer available." };
     if (result.status === "blocked") return { error: "Resolve future game assignments before changing this GM’s access." };
     refresh(slug);

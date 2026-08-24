@@ -6,7 +6,7 @@ export default defineConfig({
   schema: "./src/db/schema/index.ts",
   out: "./drizzle",
   dbCredentials: {
-    url: process.env.DATABASE_URL ?? "postgresql://nexus:nexus@localhost:5432/nexus",
+    url: process.env.DATABASE_URL ?? "postgresql://nexus:nexus@localhost:5433/nexus",
   },
   strict: true,
   verbose: true,
