@@ -3,7 +3,13 @@
 import { useState } from "react";
 import { authClient } from "@/auth/client";
 
-export function SignInButton({ callbackURL = "/" }: { callbackURL?: string }) {
+export function SignInButton({
+  callbackURL = "/",
+  label = "Continue with Google",
+}: {
+  callbackURL?: string;
+  label?: string;
+}) {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -25,7 +31,7 @@ export function SignInButton({ callbackURL = "/" }: { callbackURL?: string }) {
         onClick={signIn}
         disabled={pending}
       >
-        {pending ? "Opening Google…" : "Continue with Google"}
+        {pending ? "Opening Google…" : label}
       </button>
       {error ? (
         <p className="text-sm text-red-300" role="alert">
