@@ -1,10 +1,17 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, isNotNull, or } from "drizzle-orm";
 import type { AuthenticatedActor } from "@/auth/actor";
 import { resolveCommunityAccessBySlug } from "@/authorization/community-access";
 import { canPerformCommunityOperation, type CommunityRole } from "@/authorization/policy";
 import { getDb } from "@/db/client";
-import { communities, communityAuditEvents, sessionSignups, sessions } from "@/db/schema";
+import {
+  communities,
+  communityAuditEvents,
+  communityMemberships,
+  contentItems,
+  sessionSignups,
+  sessions,
+} from "@/db/schema";
 
 type Database = ReturnType<typeof getDb>;
 
@@ -15,6 +22,63 @@ export type SessionSignupResult =
 export type CancelSessionSignupResult =
   | { status: "cancelled"; promotedSignupId?: string }
   | { status: "not-found" };
+
+export interface SignedUpGame {
+  sessionId: string;
+  communityName: string;
+  communitySlug: string;
+  scenarioCode: string;
+  scenarioTitle: string;
+  startsAt: Date;
+  displayTimeZone: string;
+  sessionStatus: "published" | "cancelled";
+  signupStatus: "confirmed" | "waitlisted";
+  waitlistPosition: number | null;
+}
+
+/** Upcoming live signups that the person is still authorized to open. */
+export async function listUpcomingSignedUpGames(
+  personId: string,
+  now: Date = new Date(),
+  database: Database = getDb(),
+): Promise<SignedUpGame[]> {
+  const rows = await database.select({
+    sessionId: sessions.id,
+    communityName: communities.name,
+    communitySlug: communities.slug,
+    scenarioCode: contentItems.code,
+    scenarioTitle: contentItems.title,
+    startsAt: sessions.startsAt,
+    displayTimeZone: sessions.displayTimeZone,
+    sessionStatus: sessions.status,
+    signupStatus: sessionSignups.status,
+    waitlistPosition: sessionSignups.waitlistPosition,
+  }).from(sessionSignups)
+    .innerJoin(sessions, eq(sessions.id, sessionSignups.sessionId))
+    .innerJoin(communities, eq(communities.id, sessions.communityId))
+    .innerJoin(contentItems, eq(contentItems.id, sessions.contentItemId))
+    .leftJoin(communityMemberships, and(
+      eq(communityMemberships.communityId, communities.id),
+      eq(communityMemberships.personId, personId),
+      eq(communityMemberships.status, "active"),
+    ))
+    .where(and(
+      eq(sessionSignups.personId, personId),
+      inArray(sessionSignups.status, ["confirmed", "waitlisted"]),
+      inArray(sessions.status, ["published", "cancelled"]),
+      eq(communities.lifecycleStatus, "active"),
+      or(
+        isNotNull(communityMemberships.id),
+        and(eq(communities.visibility, "public"), eq(communities.scheduleVisibility, "public")),
+      ),
+      gte(sessions.startsAt, now),
+    ))
+    .orderBy(asc(sessions.startsAt), asc(sessions.id));
+
+  return rows.filter((row): row is SignedUpGame =>
+    (row.sessionStatus === "published" || row.sessionStatus === "cancelled") &&
+    (row.signupStatus === "confirmed" || row.signupStatus === "waitlisted"));
+}
 
 function effectiveRole(access: { isActiveMember: boolean; roles: ("owner" | "gm")[] }): CommunityRole {
   if (access.roles.includes("owner")) return "owner";

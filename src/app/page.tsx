@@ -1,9 +1,12 @@
+import { Suspense } from "react";
 import { MyCommunities } from "@/app/my-communities";
 import { SignInButton } from "@/app/sign-in/sign-in-button";
+import { SignedUpGames, SignedUpGamesLoading } from "@/app/signed-up-games";
 import { getAuthenticatedActor } from "@/auth/actor";
 
 export default async function Home() {
-  const signedIn = Boolean(await getAuthenticatedActor());
+  const actor = await getAuthenticatedActor();
+  const signedIn = Boolean(actor);
 
   return (
     <main className={`mx-auto min-h-screen max-w-5xl px-6 ${signedIn ? "py-10" : "py-20"}`}>
@@ -22,6 +25,7 @@ export default async function Home() {
           <SignInButton label="Get started" />
         </div>
       </section> : null}
+      {actor ? <Suspense fallback={<SignedUpGamesLoading />}><SignedUpGames actor={actor} /></Suspense> : null}
       <MyCommunities />
     </main>
   );
