@@ -108,8 +108,9 @@ describeWithDatabase("community GM persistence", () => {
 
   it("tracks GM revocation without deleting grant history", async () => {
     const grantId = `gm-role-${suffix}`;
-    await getDb().insert(communityRoleGrants).values({ id: grantId, communityId, personId: applicantPersonId, role: "gm", grantedByPersonId: ownerPersonId });
-    const revokedAt = new Date();
+    const [createdGrant] = await getDb().insert(communityRoleGrants).values({ id: grantId, communityId, personId: applicantPersonId, role: "gm", grantedByPersonId: ownerPersonId }).returning({ grantedAt: communityRoleGrants.grantedAt });
+    if (!createdGrant) throw new Error("GM grant fixture was not created");
+    const revokedAt = new Date(createdGrant.grantedAt.getTime() + 1);
     await getDb().update(communityRoleGrants).set({ status: "revoked", revokedAt, revokedByPersonId: ownerPersonId, revocationReason: "Access withdrawn" }).where(eq(communityRoleGrants.id, grantId));
 
     const [grant] = await getDb().select().from(communityRoleGrants).where(eq(communityRoleGrants.id, grantId));
