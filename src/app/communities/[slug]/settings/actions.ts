@@ -27,7 +27,6 @@ export async function updateCommunitySettingsAction(
     name: formData.get("name"),
     requestedSlug: formData.get("requestedSlug"),
     description: formData.get("description") || null,
-    defaultTimeZone: formData.get("defaultTimeZone"),
     supportedProgramIds: formData.getAll("supportedProgramIds"),
     visibility: formData.get("visibility"),
     membershipApproval: formData.get("membershipApproval"),

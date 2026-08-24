@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { AuthenticationRequiredError, requireAuthenticatedActor } from "@/auth/actor";
+import { cancelSession } from "@/session/cancel-session";
 import {
   createSessionDraft,
   SessionDraftValidationError,
@@ -27,6 +28,20 @@ export type SessionDraftFormState = {
 };
 
 export type PublishSessionState = { error?: string };
+
+export async function cancelSessionAction(slug: string, sessionId: string, _previous: { error?: string }) {
+  void _previous;
+  try {
+    const result = await cancelSession(await requireAuthenticatedActor(), slug, sessionId);
+    if (result.status === "not-found") return { error: "That session is no longer available." };
+    revalidatePath(`/communities/${slug}`);
+    revalidatePath(`/communities/${slug}/settings`);
+    revalidatePath(`/communities/${slug}/sessions/${sessionId}`);
+    return {};
+  } catch {
+    return { error: "The session could not be cancelled. Please try again." };
+  }
+}
 
 function submittedValues(formData: FormData): NonNullable<SessionDraftFormState["values"]> {
   const value = (name: string) => String(formData.get(name) ?? "");

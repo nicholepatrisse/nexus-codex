@@ -37,7 +37,6 @@ function settings(overrides: Record<string, unknown> = {}) {
     name: `Updated Lodge ${suffix}`,
     requestedSlug: `updated-lodge-${suffix}`,
     description: "Games every other Starday.",
-    defaultTimeZone: "America/Phoenix",
     supportedProgramIds: [programId, programId],
     visibility: "private" as const,
     membershipApproval: "manual" as const,
@@ -100,7 +99,6 @@ describeWithDatabase("community settings service", () => {
       name: `Updated Lodge ${suffix}`,
       slug: `updated-lodge-${suffix}`,
       description: "Games every other Starday.",
-      defaultTimeZone: "America/Phoenix",
       visibility: "private",
       scheduleVisibility: "public",
     });
@@ -145,14 +143,6 @@ describeWithDatabase("community settings service", () => {
     )).rejects.toBeInstanceOf(CommunitySettingsUpdateError);
     expect(await getDb().select().from(communities).where(eq(communities.id, communityId))).toEqual(before);
     expect((await getDb().select().from(communityAuditEvents).where(eq(communityAuditEvents.communityId, communityId))).length).toBe(auditCount);
-  });
-
-  it("validates IANA time zones before writing", async () => {
-    await expect(updateCommunitySettings(
-      { personId: ownerPersonId, authUserId: authUserIds[0]!, sessionId: "test" },
-      communitySlug,
-      settings({ defaultTimeZone: "Mars/Olympus_Mons" }),
-    )).rejects.toMatchObject({ name: "ZodError" });
   });
 
   it("allocates a safe deterministic slug when the requested slug is occupied", async () => {

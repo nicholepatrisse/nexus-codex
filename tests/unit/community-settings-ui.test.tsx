@@ -7,7 +7,6 @@ const settings = {
   name: "Absalom Lodge",
   slug: "absalom-lodge",
   description: "Organized play in Absalom Station.",
-  defaultTimeZone: "America/Phoenix",
   visibility: "private",
   membershipApproval: "manual",
   gmAdmission: "approved_only",
@@ -28,7 +27,7 @@ describe("community settings UI", () => {
     );
 
     expect(markup).toContain('value="Absalom Lodge"');
-    expect(markup).toContain('value="America/Phoenix"');
+    expect(markup).not.toContain("Default time zone");
     expect(markup).toMatch(/name="supportedProgramIds"[^>]*checked=""[^>]*value="sfs2"/);
     expect(markup).toContain("Save settings");
   });

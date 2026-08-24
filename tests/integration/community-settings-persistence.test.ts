@@ -68,7 +68,7 @@ describeWithDatabase("community settings persistence", () => {
     await getDb().delete(authUsers).where(eq(authUsers.id, authUserId));
   });
 
-  it("stores profile settings with a safe default time zone", async () => {
+  it("stores profile settings without a community time zone", async () => {
     const [community] = await getDb()
       .insert(communities)
       .values({
@@ -79,27 +79,11 @@ describeWithDatabase("community settings persistence", () => {
       })
       .returning();
 
-    expect(community).toMatchObject({
-      description: "A private organized-play community.",
-      defaultTimeZone: "UTC",
-    });
-
-    const [updated] = await getDb()
-      .update(communities)
-      .set({ defaultTimeZone: "America/Phoenix" })
-      .where(eq(communities.id, communityId))
-      .returning();
-    expect(updated?.defaultTimeZone).toBe("America/Phoenix");
+    expect(community).toMatchObject({ description: "A private organized-play community." });
+    expect(community).not.toHaveProperty("defaultTimeZone");
   });
 
-  it("rejects malformed time zones and oversized descriptions", async () => {
-    await expect(
-      getDb()
-        .update(communities)
-        .set({ defaultTimeZone: "Phoenix" })
-        .where(eq(communities.id, communityId)),
-    ).rejects.toBeDefined();
-
+  it("rejects oversized descriptions", async () => {
     await expect(
       getDb()
         .update(communities)
@@ -132,7 +116,7 @@ describeWithDatabase("community settings persistence", () => {
         communityId,
         actorPersonId,
         eventType: "community.settings.updated",
-        details: { changedFields: ["defaultTimeZone"] },
+        details: { changedFields: ["description"] },
       })
       .returning();
 
@@ -140,7 +124,7 @@ describeWithDatabase("community settings persistence", () => {
       communityId,
       actorPersonId,
       eventType: "community.settings.updated",
-      details: { changedFields: ["defaultTimeZone"] },
+      details: { changedFields: ["description"] },
     });
 
     await expect(

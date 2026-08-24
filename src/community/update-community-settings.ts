@@ -16,23 +16,10 @@ import {
 
 const MAX_SLUG_LENGTH = 80;
 
-const ianaTimeZoneSchema = z.string().trim().min(1).max(100).refine(
-  (value) => {
-    try {
-      new Intl.DateTimeFormat("en-US", { timeZone: value }).format();
-      return true;
-    } catch {
-      return false;
-    }
-  },
-  "Enter a valid IANA time zone.",
-);
-
 export const updateCommunitySettingsInputSchema = z.object({
   name: z.string().trim().min(1, "Community name is required.").max(120),
   requestedSlug: z.string().trim().min(1).max(MAX_SLUG_LENGTH),
   description: z.string().trim().max(2_000).nullable(),
-  defaultTimeZone: ianaTimeZoneSchema,
   supportedProgramIds: z.array(z.string().trim().min(1)).max(100).transform((ids) => [...new Set(ids)]),
   visibility: z.enum(["private", "public"]),
   membershipApproval: z.enum(["manual", "automatic"]),
@@ -132,7 +119,6 @@ export async function updateCommunitySettings(
           name: parsed.name,
           slug,
           description: parsed.description || null,
-          defaultTimeZone: parsed.defaultTimeZone,
           visibility: parsed.visibility,
           membershipApproval: parsed.membershipApproval,
           gmAdmission: parsed.gmAdmission,
@@ -169,7 +155,6 @@ export async function updateCommunitySettings(
             "name",
             "slug",
             "description",
-            "defaultTimeZone",
             "supportedPrograms",
             "visibility",
             "membershipApproval",
