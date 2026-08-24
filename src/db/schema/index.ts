@@ -39,10 +39,23 @@ export const people = pgTable(
       .notNull()
       .references(() => authUsers.id, { onDelete: "cascade" }),
     displayName: text("display_name").notNull(),
+    discordHandle: text("discord_handle"),
+    societyPlayNumber: text("society_play_number"),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   },
-  (table) => [uniqueIndex("people_auth_user_id_unique").on(table.authUserId)],
+  (table) => [
+    uniqueIndex("people_auth_user_id_unique").on(table.authUserId),
+    check("people_display_name_not_blank", sql`length(btrim(${table.displayName})) > 0`),
+    check(
+      "people_discord_handle_length_check",
+      sql`${table.discordHandle} is null or length(${table.discordHandle}) <= 100`,
+    ),
+    check(
+      "people_society_play_number_length_check",
+      sql`${table.societyPlayNumber} is null or length(${table.societyPlayNumber}) <= 50`,
+    ),
+  ],
 );
 
 export const authSessions = pgTable(
