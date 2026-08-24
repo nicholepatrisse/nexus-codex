@@ -1,5 +1,5 @@
 {
-  "id": "b54c4ae5-d5a8-47d1-a505-0f2f13ec50b2",
+  "id": "af9bc036-ac5a-48f3-b693-11cb8de41ea1",
   "prevId": "2bd11114-b327-4701-acec-dac5f772eca1",
   "version": "7",
   "dialect": "postgresql",
@@ -454,6 +454,13 @@
           "primaryKey": false,
           "notNull": false
         },
+        "default_time_zone": {
+          "name": "default_time_zone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'UTC'"
+        },
         "visibility": {
           "name": "visibility",
           "type": "text",
@@ -533,6 +540,10 @@
         "communities_description_length_check": {
           "name": "communities_description_length_check",
           "value": "\"communities\".\"description\" is null or length(\"communities\".\"description\") <= 2000"
+        },
+        "communities_default_time_zone_check": {
+          "name": "communities_default_time_zone_check",
+          "value": "length(\"communities\".\"default_time_zone\") <= 255 and \"communities\".\"default_time_zone\" ~ '^(UTC|[A-Za-z][A-Za-z0-9._+-]*(/[A-Za-z][A-Za-z0-9._+-]*)+)$'"
         },
         "communities_slug_format": {
           "name": "communities_slug_format",
@@ -676,7 +687,7 @@
       "checkConstraints": {
         "community_audit_events_type_check": {
           "name": "community_audit_events_type_check",
-          "value": "\"community_audit_events\".\"event_type\" in ('community.settings.updated', 'community.archived', 'community.restored', 'community.invitation.created', 'community.invitation.accepted', 'community.invitation.revoked', 'community.invitation.expired', 'community.membership.requested', 'community.membership.approved', 'community.membership.rejected', 'community.membership.cancelled', 'community.gm.requested', 'community.gm.approved', 'community.gm.rejected', 'community.gm.cancelled', 'community.gm.revoked', 'community.gm.self_service_promoted', 'session.draft.created', 'session.draft.updated', 'session.gm.reassigned', 'session.published', 'session.signup.confirmed', 'session.signup.waitlisted', 'session.signup.cancelled', 'session.signup.promoted')"
+          "value": "\"community_audit_events\".\"event_type\" in ('community.settings.updated', 'community.archived', 'community.restored', 'community.invitation.created', 'community.invitation.accepted', 'community.invitation.revoked', 'community.invitation.expired', 'community.membership.requested', 'community.membership.approved', 'community.membership.rejected', 'community.membership.cancelled', 'community.gm.requested', 'community.gm.approved', 'community.gm.rejected', 'community.gm.cancelled', 'community.gm.revoked', 'community.gm.self_service_promoted', 'session.draft.created', 'session.draft.updated', 'session.gm.reassigned', 'session.published', 'session.published.updated', 'session.cancelled', 'session.signup.confirmed', 'session.signup.waitlisted', 'session.signup.cancelled', 'session.signup.promoted')"
         },
         "community_audit_events_details_object_check": {
           "name": "community_audit_events_details_object_check",

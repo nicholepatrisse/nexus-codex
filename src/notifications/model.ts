@@ -1,4 +1,8 @@
-export type AppNotificationKind = "owner.membership.pending" | "applicant.membership.status";
+export type AppNotificationKind =
+  | "owner.membership.pending"
+  | "applicant.membership.status"
+  | "session.changed"
+  | "session.cancelled";
 
 export interface AppNotification {
   id: string;

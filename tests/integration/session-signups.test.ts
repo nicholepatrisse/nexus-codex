@@ -4,6 +4,7 @@ import type { AuthenticatedActor } from "@/auth/actor";
 import { createTestIdentity } from "@/auth/test-fixture";
 import { createCommunity } from "@/community/create-community";
 import { getDb } from "@/db/client";
+import { listNotificationsForPerson } from "@/notifications/repository";
 import {
   authUsers,
   communities,
@@ -20,6 +21,7 @@ import {
 } from "@/db/schema";
 import { createSessionDraft } from "@/session/session-drafts";
 import { publishSession } from "@/session/publish-session";
+import { cancelPublishedSession, updatePublishedSession } from "@/session/published-session";
 import { cancelOwnSessionSignup, signupForSession } from "@/session/session-signups";
 
 const describeWithDatabase = process.env.CI ? describe : describe.skip;
@@ -149,5 +151,49 @@ describeWithDatabase("session signups", () => {
   it("puts the next signup into the newly available waitlist position only when full", async () => {
     const result = await signupForSession(actors[9]!, community.slug, publishedSessionId);
     expect(result).toMatchObject({ status: "waitlisted", waitlistPosition: 1, replayed: false });
+  });
+
+  it("notifies confirmed and waitlisted users, but not unrelated members, when a game changes", async () => {
+    const [confirmedSignup] = await getDb().select({ personId: sessionSignups.personId })
+      .from(sessionSignups).where(and(eq(sessionSignups.sessionId, publishedSessionId), eq(sessionSignups.status, "confirmed"))).limit(1);
+    const [waitlistedSignup] = await getDb().select({ personId: sessionSignups.personId })
+      .from(sessionSignups).where(and(eq(sessionSignups.sessionId, publishedSessionId), eq(sessionSignups.status, "waitlisted"))).limit(1);
+    await expect(updatePublishedSession(owner, community.slug, publishedSessionId, {
+      contentItemId: scenarioId,
+      gmPersonId: gm.personId,
+      startsAt: "2030-09-01T19:00:00-07:00",
+      endsAt: "2030-09-01T23:00:00-07:00",
+      displayTimeZone: "America/Phoenix",
+      locationType: "physical",
+      notes: "Start time changed",
+    })).resolves.toMatchObject({ status: "updated" });
+
+    const confirmedNotifications = await listNotificationsForPerson(confirmedSignup!.personId);
+    const waitlistedNotifications = await listNotificationsForPerson(waitlistedSignup!.personId);
+    const gmNotifications = await listNotificationsForPerson(gm.personId);
+    expect(confirmedNotifications).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "session.changed", href: `/communities/${community.slug}/sessions/${publishedSessionId}` }),
+    ]));
+    expect(waitlistedNotifications).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "session.changed" }),
+    ]));
+    expect(gmNotifications).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "session.changed" }),
+    ]));
+  });
+
+  it("notifies confirmed and waitlisted users when their game is cancelled", async () => {
+    const [confirmedSignup] = await getDb().select({ personId: sessionSignups.personId })
+      .from(sessionSignups).where(and(eq(sessionSignups.sessionId, publishedSessionId), eq(sessionSignups.status, "confirmed"))).limit(1);
+    const [waitlistedSignup] = await getDb().select({ personId: sessionSignups.personId })
+      .from(sessionSignups).where(and(eq(sessionSignups.sessionId, publishedSessionId), eq(sessionSignups.status, "waitlisted"))).limit(1);
+    await expect(cancelPublishedSession(owner, community.slug, publishedSessionId))
+      .resolves.toMatchObject({ status: "cancelled" });
+    await expect(listNotificationsForPerson(confirmedSignup!.personId)).resolves.toEqual(
+      expect.arrayContaining([expect.objectContaining({ kind: "session.cancelled" })]),
+    );
+    await expect(listNotificationsForPerson(waitlistedSignup!.personId)).resolves.toEqual(
+      expect.arrayContaining([expect.objectContaining({ kind: "session.cancelled" })]),
+    );
   });
 });

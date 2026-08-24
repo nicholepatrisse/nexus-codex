@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { AuthenticationRequiredError, requireAuthenticatedActor } from "@/auth/actor";
-import { cancelSession } from "@/session/cancel-session";
 import {
   createSessionDraft,
   SessionDraftValidationError,
@@ -12,6 +11,7 @@ import {
   updateSessionDraft,
 } from "@/session/session-drafts";
 import { publishSession } from "@/session/publish-session";
+import { cancelPublishedSession, updatePublishedSession } from "@/session/published-session";
 
 export type SessionDraftFormState = {
   fieldErrors?: Record<string, string[] | undefined>;
@@ -28,20 +28,7 @@ export type SessionDraftFormState = {
 };
 
 export type PublishSessionState = { error?: string };
-
-export async function cancelSessionAction(slug: string, sessionId: string, _previous: { error?: string }) {
-  void _previous;
-  try {
-    const result = await cancelSession(await requireAuthenticatedActor(), slug, sessionId);
-    if (result.status === "not-found") return { error: "That session is no longer available." };
-    revalidatePath(`/communities/${slug}`);
-    revalidatePath(`/communities/${slug}/settings`);
-    revalidatePath(`/communities/${slug}/sessions/${sessionId}`);
-    return {};
-  } catch {
-    return { error: "The session could not be cancelled. Please try again." };
-  }
-}
+export type CancelSessionState = { error?: string };
 
 function submittedValues(formData: FormData): NonNullable<SessionDraftFormState["values"]> {
   const value = (name: string) => String(formData.get(name) ?? "");
@@ -116,13 +103,17 @@ export async function updateSessionDraftAction(
   if (!parsed.success) return { fieldErrors: z.flattenError(parsed.error).fieldErrors, values };
   let updated = false;
   try {
-    const result = await updateSessionDraft(
-      await requireAuthenticatedActor(),
+    const actor = await requireAuthenticatedActor();
+    const draftResult = await updateSessionDraft(
+      actor,
       slug,
       sessionId,
       parsed.data,
     );
-    if (result.status !== "updated") {
+    const resultStatus = draftResult.status === "not-found"
+      ? (await updatePublishedSession(actor, slug, sessionId, parsed.data)).status
+      : draftResult.status;
+    if (resultStatus !== "updated") {
       return { formError: "You no longer have permission to edit this draft.", values };
     }
     updated = true;
@@ -134,6 +125,20 @@ export async function updateSessionDraftAction(
   }
   if (updated) redirect(`/communities/${encodeURIComponent(slug)}/sessions/${sessionId}`);
   return { formError: "The session draft could not be saved.", values };
+}
+
+export async function cancelSessionAction(slug: string, sessionId: string): Promise<CancelSessionState> {
+  try {
+    const result = await cancelPublishedSession(await requireAuthenticatedActor(), slug, sessionId);
+    if (result.status === "forbidden") return { error: "You no longer have permission to cancel this session." };
+    if (result.status !== "cancelled") return { error: "This session can no longer be cancelled." };
+    revalidatePath(`/communities/${slug}`);
+    revalidatePath(`/communities/${slug}/sessions/${sessionId}`);
+  } catch (error) {
+    if (error instanceof AuthenticationRequiredError) return { error: "Your session expired. Sign in and try again." };
+    return { error: "The session could not be cancelled. Please try again." };
+  }
+  redirect(`/communities/${encodeURIComponent(slug)}/sessions/${sessionId}`);
 }
 
 export async function publishSessionAction(
@@ -160,5 +165,5 @@ export async function publishSessionAction(
     }
     return { error: "The session could not be published. Please try again." };
   }
-  redirect(`/communities/${encodeURIComponent(slug)}?published=1`);
+  redirect(`/communities/${encodeURIComponent(slug)}/sessions/${sessionId}`);
 }
