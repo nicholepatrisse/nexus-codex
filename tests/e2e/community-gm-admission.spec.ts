@@ -21,6 +21,7 @@ const suffix = randomUUID();
 const database = getDb();
 const authUserIds: string[] = [];
 const communityIds: string[] = [];
+const appHostname = new URL(process.env.BETTER_AUTH_URL ?? "http://127.0.0.1:3000").hostname;
 
 async function identity(label: string) {
   const now = new Date();
@@ -53,6 +54,15 @@ function sessionCookie(token: string) {
   if (!secret) throw new Error("BETTER_AUTH_SECRET is required for GM browser tests.");
   const signature = createHmac("sha256", secret).update(token).digest("base64");
   return encodeURIComponent(`${token}.${signature}`);
+}
+
+function sessionCookies(token: string) {
+  const value = sessionCookie(token);
+  const shared = { value, domain: appHostname, path: "/", httpOnly: true, sameSite: "Lax" as const };
+  return [
+    { ...shared, name: "better-auth.session_token" },
+    { ...shared, name: "__Secure-better-auth.session_token", secure: true },
+  ];
 }
 
 test.describe.serial("community GM admission", () => {
@@ -92,13 +102,13 @@ test.describe.serial("community GM admission", () => {
   });
 
   test("requests, approves, and revokes approved-only GM access", async ({ page, context }) => {
-    await context.addCookies([{ name: "better-auth.session_token", value: sessionCookie(member.token), domain: "127.0.0.1", path: "/", httpOnly: true, sameSite: "Lax" }]);
+    await context.addCookies(sessionCookies(member.token));
     await page.goto(`/communities/${approvedSlug}`);
     await page.getByRole("button", { name: "Request GM access" }).click();
-    await expect(page.getByText("awaiting owner review", { exact: false })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Cancel GM request" })).toBeVisible();
 
     await context.clearCookies();
-    await context.addCookies([{ name: "better-auth.session_token", value: sessionCookie(owner.token), domain: "127.0.0.1", path: "/", httpOnly: true, sameSite: "Lax" }]);
+    await context.addCookies(sessionCookies(owner.token));
     await page.goto(`/communities/${approvedSlug}/settings`);
     page.once("dialog", (dialog) => dialog.accept());
     await page.getByRole("button", { name: "Approve" }).click();
@@ -109,14 +119,14 @@ test.describe.serial("community GM admission", () => {
     await expect(memberGrant.getByText("revoked", { exact: true })).toBeVisible();
 
     await context.clearCookies();
-    await context.addCookies([{ name: "better-auth.session_token", value: sessionCookie(member.token), domain: "127.0.0.1", path: "/", httpOnly: true, sameSite: "Lax" }]);
+    await context.addCookies(sessionCookies(member.token));
     await page.goto(`/communities/${approvedSlug}`);
     await expect(page.getByText("previous GM access was revoked", { exact: false })).toBeVisible();
     await expect(page.getByRole("button", { name: "Request GM access" })).toBeVisible();
   });
 
   test("denies standalone recovery under self-service after revocation", async ({ page, context }) => {
-    await context.addCookies([{ name: "better-auth.session_token", value: sessionCookie(member.token), domain: "127.0.0.1", path: "/", httpOnly: true, sameSite: "Lax" }]);
+    await context.addCookies(sessionCookies(member.token));
     await page.goto(`/communities/${selfServiceSlug}`);
     await expect(page.getByText("cannot be restored through self-service", { exact: false })).toBeVisible();
     await expect(page.getByRole("button", { name: "Request GM access" })).toHaveCount(0);
