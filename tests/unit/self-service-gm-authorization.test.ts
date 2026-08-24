@@ -5,7 +5,9 @@ describe("self-service GM authorization matrix", () => {
   it("does not turn GM authority into community administration", () => {
     expect(canPerformSessionOperation("gm", "session.create")).toBe(true);
     expect(canPerformSessionOperation("gm", "session.manage.assigned")).toBe(true);
+    expect(canPerformSessionOperation("gm", "session.publish.assigned")).toBe(true);
     expect(canPerformSessionOperation("gm", "session.manage.any")).toBe(false);
+    expect(canPerformSessionOperation("gm", "session.publish.any")).toBe(false);
     expect(canPerformSessionOperation("gm", "session.staff.any")).toBe(false);
     expect(canPerformSessionOperation("gm", "session.capacity.override")).toBe(false);
     expect(canPerformCommunityOperation("gm", "membership.manage", { visibility: "private", scheduleVisibility: "members" })).toBe(false);

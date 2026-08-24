@@ -10,6 +10,7 @@ import {
   sessionDraftInputSchema,
   updateSessionDraft,
 } from "@/session/session-drafts";
+import { publishSession } from "@/session/publish-session";
 
 export type SessionDraftFormState = {
   fieldErrors?: Record<string, string[] | undefined>;
@@ -24,6 +25,8 @@ export type SessionDraftFormState = {
     locationType: string;
   };
 };
+
+export type PublishSessionState = { error?: string };
 
 function submittedValues(formData: FormData): NonNullable<SessionDraftFormState["values"]> {
   const value = (name: string) => String(formData.get(name) ?? "");
@@ -116,4 +119,31 @@ export async function updateSessionDraftAction(
   }
   if (updated) redirect(`/communities/${encodeURIComponent(slug)}/sessions/${sessionId}`);
   return { formError: "The session draft could not be saved.", values };
+}
+
+export async function publishSessionAction(
+  slug: string,
+  sessionId: string,
+  _previous: PublishSessionState,
+  _formData: FormData,
+): Promise<PublishSessionState> {
+  void _previous;
+  void _formData;
+  try {
+    const result = await publishSession(await requireAuthenticatedActor(), slug, sessionId);
+    if (result.status === "forbidden") {
+      return { error: "You no longer have permission to publish this session." };
+    }
+    if (result.status !== "published") {
+      return { error: "This session can no longer be published." };
+    }
+    revalidatePath(`/communities/${slug}`);
+    revalidatePath(`/communities/${slug}/sessions/${sessionId}`);
+  } catch (error) {
+    if (error instanceof AuthenticationRequiredError) {
+      return { error: "Your session expired. Sign in and try again." };
+    }
+    return { error: "The session could not be published. Please try again." };
+  }
+  redirect(`/communities/${encodeURIComponent(slug)}?published=1`);
 }

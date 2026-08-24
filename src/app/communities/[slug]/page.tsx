@@ -1,16 +1,18 @@
 import { notFound } from "next/navigation";
 import { getAuthenticatedActor } from "@/auth/actor";
 import { authorizeCommunityBySlug } from "@/authorization/community-guard";
+import { canPerformCommunityOperation, type CommunityRole } from "@/authorization/policy";
 import { CommunityProfile } from "./community-profile";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { getDb } from "@/db/client";
-import { contentItems, communityGmRequests, communityMembershipRequests, communityRoleGrants, sessions } from "@/db/schema";
+import { contentItems, communityGmRequests, communityMembershipRequests, communityRoleGrants, people, sessions } from "@/db/schema";
 
 interface CommunityPageProps {
   params: Promise<{ slug: string }>;
+  searchParams?: Promise<{ published?: string }>;
 }
 
-export default async function CommunityPage({ params }: CommunityPageProps) {
+export default async function CommunityPage({ params, searchParams }: CommunityPageProps) {
   const actor = await getAuthenticatedActor();
 
   const authorization = await authorizeCommunityBySlug({
@@ -21,6 +23,17 @@ export default async function CommunityPage({ params }: CommunityPageProps) {
   if (authorization.status !== "authorized") notFound();
   const community = authorization.access.community;
   const isOwner = authorization.access.roles.includes("owner");
+  const role: CommunityRole = isOwner
+    ? "owner"
+    : authorization.access.roles.includes("gm")
+      ? "gm"
+      : authorization.access.isActiveMember
+        ? "member"
+        : "visitor";
+  const canViewSchedule = canPerformCommunityOperation(role, "schedule.view", {
+    visibility: community.visibility === "public" ? "public" : "private",
+    scheduleVisibility: community.scheduleVisibility === "public" ? "public" : "members",
+  });
   const [pendingRequest] = actor && !authorization.access.isActiveMember
     ? await getDb()
         .select({ id: communityMembershipRequests.id })
@@ -43,6 +56,9 @@ export default async function CommunityPage({ params }: CommunityPageProps) {
   const drafts = actor && authorization.access.isActiveMember && (isOwner || gmGrant?.status === "active")
     ? await getDb().select({ id: sessions.id, code: contentItems.code, title: contentItems.title, startsAt: sessions.startsAt, gmPersonId: sessions.gmPersonId }).from(sessions).innerJoin(contentItems, eq(contentItems.id, sessions.contentItemId)).where(and(eq(sessions.communityId, community.id), eq(sessions.status, "draft"), isOwner ? undefined : eq(sessions.gmPersonId, actor.personId))).orderBy(asc(sessions.startsAt))
     : [];
+  const publishedSessions = canViewSchedule
+    ? await getDb().select({ id: sessions.id, code: contentItems.code, title: contentItems.title, startsAt: sessions.startsAt, gmName: people.displayName }).from(sessions).innerJoin(contentItems, eq(contentItems.id, sessions.contentItemId)).innerJoin(people, eq(people.id, sessions.gmPersonId)).where(and(eq(sessions.communityId, community.id), eq(sessions.status, "published"))).orderBy(asc(sessions.startsAt))
+    : [];
 
-  return <CommunityProfile community={community} isOwner={isOwner} isSignedIn={Boolean(actor)} isMember={authorization.access.isActiveMember} pendingRequestId={pendingRequest?.id} gmAdmission={community.gmAdmission === "self_service" ? "self_service" : "approved_only"} gmState={gmState} pendingGmRequestId={gmRequest?.status === "pending" ? gmRequest.id : undefined} drafts={drafts.map((draft) => ({ ...draft, startsAt: draft.startsAt.toISOString() }))} />;
+  return <CommunityProfile community={community} isOwner={isOwner} isSignedIn={Boolean(actor)} isMember={authorization.access.isActiveMember} pendingRequestId={pendingRequest?.id} gmAdmission={community.gmAdmission === "self_service" ? "self_service" : "approved_only"} gmState={gmState} pendingGmRequestId={gmRequest?.status === "pending" ? gmRequest.id : undefined} drafts={drafts.map((draft) => ({ ...draft, startsAt: draft.startsAt.toISOString() }))} sessions={publishedSessions.map((session) => ({ ...session, startsAt: session.startsAt.toISOString() }))} published={(await searchParams)?.published === "1"} />;
 }

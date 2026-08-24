@@ -38,6 +38,8 @@ const sessionOperations: SessionOperation[] = [
   "session.create",
   "session.manage.assigned",
   "session.manage.any",
+  "session.publish.assigned",
+  "session.publish.any",
   "session.staff.any",
   "session.capacity.override",
 ];
@@ -119,7 +121,7 @@ describe("session authorization policy", () => {
     const expected: Record<CommunityRole, SessionOperation[]> = {
       visitor: [],
       member: [],
-      gm: ["session.create", "session.manage.assigned"],
+      gm: ["session.create", "session.manage.assigned", "session.publish.assigned"],
       owner: sessionOperations,
     };
 
@@ -144,6 +146,7 @@ describe("session authorization policy", () => {
     }
 
     expect(canPerformSessionOperation("gm", "session.manage.any")).toBe(false);
+    expect(canPerformSessionOperation("gm", "session.publish.any")).toBe(false);
     expect(canPerformSessionOperation("gm", "session.staff.any")).toBe(false);
     expect(canPerformSessionOperation("gm", "session.capacity.override")).toBe(false);
   });

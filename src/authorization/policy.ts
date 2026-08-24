@@ -23,6 +23,8 @@ export type SessionOperation =
   | "session.create"
   | "session.manage.assigned"
   | "session.manage.any"
+  | "session.publish.assigned"
+  | "session.publish.any"
   | "session.staff.any"
   | "session.capacity.override";
 
@@ -52,11 +54,13 @@ const communityPermissions = {
 const sessionPermissions = {
   visitor: [],
   member: [],
-  gm: ["session.create", "session.manage.assigned"],
+  gm: ["session.create", "session.manage.assigned", "session.publish.assigned"],
   owner: [
     "session.create",
     "session.manage.assigned",
     "session.manage.any",
+    "session.publish.assigned",
+    "session.publish.any",
     "session.staff.any",
     "session.capacity.override",
   ],
