@@ -26,6 +26,7 @@ import {
   updateSessionDraft,
 } from "@/session/session-drafts";
 import { publishSession } from "@/session/publish-session";
+import { cancelPublishedSession, updatePublishedSession } from "@/session/published-session";
 
 const describeWithDatabase = process.env.CI ? describe : describe.skip;
 const suffix = crypto.randomUUID();
@@ -256,5 +257,32 @@ describeWithDatabase("session drafts", () => {
     const [stored] = await getDb().select({ status: sessions.status })
       .from(sessions).where(eq(sessions.id, created.sessionId));
     expect(stored?.status).toBe("draft");
+  });
+
+  it("edits a published session without changing its stable identity", async () => {
+    const created = await createSessionDraft(owner, community.slug, { ...draftInput(), gmPersonId: gmTwo.personId });
+    if (created.status !== "created") throw new Error("fixture was not created");
+    await publishSession(owner, community.slug, created.sessionId);
+    await expect(updatePublishedSession(gmTwo, community.slug, created.sessionId, {
+      ...draftInput(), notes: "Updated after publication",
+    })).resolves.toEqual({ status: "updated", sessionId: created.sessionId });
+    const [stored] = await getDb().select({ id: sessions.id, status: sessions.status, notes: sessions.notes })
+      .from(sessions).where(eq(sessions.id, created.sessionId));
+    expect(stored).toEqual({ id: created.sessionId, status: "published", notes: "Updated after publication" });
+    await expect(updatePublishedSession(gmOne, community.slug, created.sessionId, draftInput()))
+      .resolves.toEqual({ status: "forbidden" });
+  });
+
+  it("cancels without deleting identity and makes cancellation idempotent", async () => {
+    const created = await createSessionDraft(owner, community.slug, { ...draftInput(), gmPersonId: gmTwo.personId });
+    if (created.status !== "created") throw new Error("fixture was not created");
+    await publishSession(owner, community.slug, created.sessionId);
+    await expect(cancelPublishedSession(gmTwo, community.slug, created.sessionId))
+      .resolves.toEqual({ status: "cancelled", sessionId: created.sessionId, replayed: false });
+    await expect(cancelPublishedSession(owner, community.slug, created.sessionId))
+      .resolves.toEqual({ status: "cancelled", sessionId: created.sessionId, replayed: true });
+    const [stored] = await getDb().select({ id: sessions.id, status: sessions.status })
+      .from(sessions).where(eq(sessions.id, created.sessionId));
+    expect(stored).toEqual({ id: created.sessionId, status: "cancelled" });
   });
 });

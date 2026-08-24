@@ -1,6 +1,14 @@
-import { and, count, desc, eq, isNull } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { getDb } from "@/db/client";
-import { communities, communityMembershipRequests, communityMemberships, communityRoleGrants } from "@/db/schema";
+import {
+  communities,
+  communityAuditEvents,
+  communityMembershipRequests,
+  communityMemberships,
+  communityRoleGrants,
+  contentItems,
+  sessions,
+} from "@/db/schema";
 import { applicantNotificationDestination, type AppNotification } from "@/notifications/model";
 
 const applicantMessages: Record<string, string> = {
@@ -10,7 +18,7 @@ const applicantMessages: Record<string, string> = {
 
 /** Produces only notifications the person is currently authorized to know about. */
 export async function listNotificationsForPerson(personId: string, database = getDb()) {
-  const [ownerRows, applicantRows] = await Promise.all([
+  const [ownerRows, applicantRows, sessionRows] = await Promise.all([
     database.select({ communityId: communities.id, communityName: communities.name, communitySlug: communities.slug, pendingCount: count(communityMembershipRequests.id) })
       .from(communityRoleGrants).innerJoin(communities, eq(communities.id, communityRoleGrants.communityId))
       .innerJoin(communityMembershipRequests, and(eq(communityMembershipRequests.communityId, communities.id), eq(communityMembershipRequests.status, "pending")))
@@ -24,6 +32,36 @@ export async function listNotificationsForPerson(personId: string, database = ge
       .leftJoin(communityMemberships, and(eq(communityMemberships.communityId, communities.id), eq(communityMemberships.personId, personId), eq(communityMemberships.status, "active")))
       .where(eq(communityMembershipRequests.personId, personId))
       .orderBy(communityMembershipRequests.communityId, desc(communityMembershipRequests.requestedAt), desc(communityMembershipRequests.id)),
+    database.select({
+      eventId: communityAuditEvents.id,
+      eventType: communityAuditEvents.eventType,
+      occurredAt: communityAuditEvents.occurredAt,
+      communityName: communities.name,
+      communitySlug: communities.slug,
+      sessionId: sessions.id,
+      scenarioCode: contentItems.code,
+      scenarioTitle: contentItems.title,
+    }).from(communityAuditEvents)
+      .innerJoin(communities, and(
+        eq(communities.id, communityAuditEvents.communityId),
+        eq(communities.lifecycleStatus, "active"),
+      ))
+      .innerJoin(communityMemberships, and(
+        eq(communityMemberships.communityId, communities.id),
+        eq(communityMemberships.personId, personId),
+        eq(communityMemberships.status, "active"),
+      ))
+      .innerJoin(sessions, and(
+        eq(sessions.communityId, communities.id),
+        eq(sessions.id, sql<string>`${communityAuditEvents.details}->>'sessionId'`),
+      ))
+      .innerJoin(contentItems, eq(contentItems.id, sessions.contentItemId))
+      .where(and(
+        inArray(communityAuditEvents.eventType, ["session.published.updated", "session.cancelled"]),
+        ne(communityAuditEvents.actorPersonId, personId),
+      ))
+      .orderBy(desc(communityAuditEvents.occurredAt))
+      .limit(50),
   ]);
 
   const ownerNotifications: AppNotification[] = ownerRows.map((row) => ({
@@ -37,5 +75,18 @@ export async function listNotificationsForPerson(personId: string, database = ge
     href: applicantNotificationDestination(row.communityVisibility, Boolean(row.activeMembershipId), row.communitySlug),
     occurredAt: row.updatedAt, actionable: row.status === "pending",
   }));
-  return [...ownerNotifications, ...applicantNotifications].sort((a, b) => Number(b.actionable) - Number(a.actionable) || b.occurredAt.getTime() - a.occurredAt.getTime());
+  const sessionNotifications: AppNotification[] = sessionRows.map((row) => {
+    const cancelled = row.eventType === "session.cancelled";
+    return {
+      id: `session-lifecycle:${row.eventId}`,
+      kind: cancelled ? "session.cancelled" : "session.changed",
+      title: row.communityName,
+      message: `${row.scenarioCode} — ${row.scenarioTitle} was ${cancelled ? "cancelled" : "changed"}.`,
+      href: `/communities/${encodeURIComponent(row.communitySlug)}/sessions/${row.sessionId}`,
+      occurredAt: row.occurredAt,
+      actionable: false,
+    };
+  });
+  return [...ownerNotifications, ...applicantNotifications, ...sessionNotifications]
+    .sort((a, b) => Number(b.actionable) - Number(a.actionable) || b.occurredAt.getTime() - a.occurredAt.getTime());
 }
