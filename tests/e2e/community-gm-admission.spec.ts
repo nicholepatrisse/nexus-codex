@@ -110,6 +110,7 @@ test.describe.serial("community GM admission", () => {
     await context.clearCookies();
     await context.addCookies(sessionCookies(owner.token));
     await page.goto(`/communities/${approvedSlug}/settings`);
+    await page.getByRole("tab", { name: /People/ }).click();
     page.once("dialog", (dialog) => dialog.accept());
     await page.getByRole("button", { name: "Approve" }).click();
     const memberGrant = page.getByRole("listitem").filter({ hasText: "Member" });
