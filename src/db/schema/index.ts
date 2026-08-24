@@ -423,6 +423,43 @@ export const sessions = pgTable(
   ],
 );
 
+export const sessionSignups = pgTable(
+  "session_signups",
+  {
+    id: text("id").primaryKey(),
+    sessionId: text("session_id")
+      .notNull()
+      .references(() => sessions.id, { onDelete: "restrict" }),
+    personId: text("person_id")
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
+    status: text("status").notNull(),
+    waitlistPosition: integer("waitlist_position"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true, mode: "date" }),
+  },
+  (table) => [
+    uniqueIndex("session_signups_live_person_unique")
+      .on(table.sessionId, table.personId)
+      .where(sql`${table.status} in ('confirmed', 'waitlisted')`),
+    uniqueIndex("session_signups_waitlist_position_unique")
+      .on(table.sessionId, table.waitlistPosition)
+      .where(sql`${table.status} = 'waitlisted'`),
+    index("session_signups_session_status_idx").on(table.sessionId, table.status),
+    check(
+      "session_signups_status_check",
+      sql`${table.status} in ('confirmed', 'waitlisted', 'cancelled')`,
+    ),
+    check(
+      "session_signups_lifecycle_check",
+      sql`coalesce((${table.status} = 'confirmed' and ${table.waitlistPosition} is null and ${table.cancelledAt} is null)
+        or (${table.status} = 'waitlisted' and ${table.waitlistPosition} is not null and ${table.waitlistPosition} > 0 and ${table.cancelledAt} is null)
+        or (${table.status} = 'cancelled' and ${table.cancelledAt} is not null), false)`,
+    ),
+  ],
+);
+
 /** A reusable community share link. Only a one-way digest of its bearer token is persisted. */
 export const communityInvitations = pgTable(
   "community_invitations",

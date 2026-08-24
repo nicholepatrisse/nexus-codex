@@ -7,6 +7,7 @@ import {
   communityMemberships,
   communityRoleGrants,
   contentItems,
+  sessionSignups,
   sessions,
 } from "@/db/schema";
 import { applicantNotificationDestination, type AppNotification } from "@/notifications/model";
@@ -46,14 +47,14 @@ export async function listNotificationsForPerson(personId: string, database = ge
         eq(communities.id, communityAuditEvents.communityId),
         eq(communities.lifecycleStatus, "active"),
       ))
-      .innerJoin(communityMemberships, and(
-        eq(communityMemberships.communityId, communities.id),
-        eq(communityMemberships.personId, personId),
-        eq(communityMemberships.status, "active"),
-      ))
       .innerJoin(sessions, and(
         eq(sessions.communityId, communities.id),
         eq(sessions.id, sql<string>`${communityAuditEvents.details}->>'sessionId'`),
+      ))
+      .innerJoin(sessionSignups, and(
+        eq(sessionSignups.sessionId, sessions.id),
+        eq(sessionSignups.personId, personId),
+        inArray(sessionSignups.status, ["confirmed", "waitlisted"]),
       ))
       .innerJoin(contentItems, eq(contentItems.id, sessions.contentItemId))
       .where(and(

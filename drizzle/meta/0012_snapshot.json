@@ -1,6 +1,6 @@
 {
-  "id": "2bd11114-b327-4701-acec-dac5f772eca1",
-  "prevId": "ab2f896f-1973-4e22-bae1-683cac17986d",
+  "id": "af9bc036-ac5a-48f3-b693-11cb8de41ea1",
+  "prevId": "2bd11114-b327-4701-acec-dac5f772eca1",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -687,7 +687,7 @@
       "checkConstraints": {
         "community_audit_events_type_check": {
           "name": "community_audit_events_type_check",
-          "value": "\"community_audit_events\".\"event_type\" in ('community.settings.updated', 'community.archived', 'community.restored', 'community.invitation.created', 'community.invitation.accepted', 'community.invitation.revoked', 'community.invitation.expired', 'community.membership.requested', 'community.membership.approved', 'community.membership.rejected', 'community.membership.cancelled', 'community.gm.requested', 'community.gm.approved', 'community.gm.rejected', 'community.gm.cancelled', 'community.gm.revoked', 'community.gm.self_service_promoted', 'session.draft.created', 'session.draft.updated', 'session.gm.reassigned', 'session.published', 'session.signup.confirmed', 'session.signup.waitlisted', 'session.signup.cancelled', 'session.signup.promoted')"
+          "value": "\"community_audit_events\".\"event_type\" in ('community.settings.updated', 'community.archived', 'community.restored', 'community.invitation.created', 'community.invitation.accepted', 'community.invitation.revoked', 'community.invitation.expired', 'community.membership.requested', 'community.membership.approved', 'community.membership.rejected', 'community.membership.cancelled', 'community.gm.requested', 'community.gm.approved', 'community.gm.rejected', 'community.gm.cancelled', 'community.gm.revoked', 'community.gm.self_service_promoted', 'session.draft.created', 'session.draft.updated', 'session.gm.reassigned', 'session.published', 'session.published.updated', 'session.cancelled', 'session.signup.confirmed', 'session.signup.waitlisted', 'session.signup.cancelled', 'session.signup.promoted')"
         },
         "community_audit_events_details_object_check": {
           "name": "community_audit_events_details_object_check",
