@@ -1,10 +1,13 @@
-import { AuthControls } from "@/app/auth-controls";
 import { MyCommunities } from "@/app/my-communities";
+import { SignInButton } from "@/app/sign-in/sign-in-button";
+import { getAuthenticatedActor } from "@/auth/actor";
 
-export default function Home() {
+export default async function Home() {
+  const signedIn = Boolean(await getAuthenticatedActor());
+
   return (
-    <main className="mx-auto min-h-screen max-w-5xl px-6 py-20">
-      <section className="max-w-3xl pt-8 sm:pt-16">
+    <main className={`mx-auto min-h-screen max-w-5xl px-6 ${signedIn ? "py-10" : "py-20"}`}>
+      {!signedIn ? <section className="max-w-3xl pt-8 sm:pt-16">
         <p className="mb-5 text-sm font-semibold tracking-[0.24em] text-[var(--accent)] uppercase">
           Society operations, connected
         </p>
@@ -16,9 +19,9 @@ export default function Home() {
           auditable from play to Society record.
         </p>
         <div className="mt-10">
-          <AuthControls />
+          <SignInButton label="Get started" />
         </div>
-      </section>
+      </section> : null}
       <MyCommunities />
     </main>
   );
