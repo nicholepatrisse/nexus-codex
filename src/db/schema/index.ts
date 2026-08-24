@@ -359,7 +359,7 @@ export const communityAuditEvents = pgTable(
     index("community_audit_events_actor_person_id_idx").on(table.actorPersonId),
     check(
       "community_audit_events_type_check",
-      sql`${table.eventType} in ('community.settings.updated', 'community.archived', 'community.restored', 'community.invitation.created', 'community.invitation.accepted', 'community.invitation.revoked', 'community.invitation.expired', 'community.membership.requested', 'community.membership.approved', 'community.membership.rejected', 'community.membership.cancelled', 'community.gm.requested', 'community.gm.approved', 'community.gm.rejected', 'community.gm.cancelled', 'community.gm.revoked', 'community.gm.self_service_promoted', 'session.draft.created', 'session.draft.updated', 'session.gm.reassigned', 'session.published')`,
+      sql`${table.eventType} in ('community.settings.updated', 'community.archived', 'community.restored', 'community.invitation.created', 'community.invitation.accepted', 'community.invitation.revoked', 'community.invitation.expired', 'community.membership.requested', 'community.membership.approved', 'community.membership.rejected', 'community.membership.cancelled', 'community.gm.requested', 'community.gm.approved', 'community.gm.rejected', 'community.gm.cancelled', 'community.gm.revoked', 'community.gm.self_service_promoted', 'session.draft.created', 'session.draft.updated', 'session.gm.reassigned', 'session.published', 'session.signup.confirmed', 'session.signup.waitlisted', 'session.signup.cancelled', 'session.signup.promoted')`,
     ),
     check("community_audit_events_details_object_check", sql`jsonb_typeof(${table.details}) = 'object'`),
   ],
@@ -420,6 +420,43 @@ export const sessions = pgTable(
     check("sessions_capacity_check", sql`${table.playerCapacity} = 6`),
     check("sessions_notes_length_check", sql`${table.notes} is null or length(${table.notes}) <= 4000`),
     check("sessions_location_type_check", sql`${table.locationType} in ('virtual', 'physical')`),
+  ],
+);
+
+export const sessionSignups = pgTable(
+  "session_signups",
+  {
+    id: text("id").primaryKey(),
+    sessionId: text("session_id")
+      .notNull()
+      .references(() => sessions.id, { onDelete: "restrict" }),
+    personId: text("person_id")
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
+    status: text("status").notNull(),
+    waitlistPosition: integer("waitlist_position"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true, mode: "date" }),
+  },
+  (table) => [
+    uniqueIndex("session_signups_live_person_unique")
+      .on(table.sessionId, table.personId)
+      .where(sql`${table.status} in ('confirmed', 'waitlisted')`),
+    uniqueIndex("session_signups_waitlist_position_unique")
+      .on(table.sessionId, table.waitlistPosition)
+      .where(sql`${table.status} = 'waitlisted'`),
+    index("session_signups_session_status_idx").on(table.sessionId, table.status),
+    check(
+      "session_signups_status_check",
+      sql`${table.status} in ('confirmed', 'waitlisted', 'cancelled')`,
+    ),
+    check(
+      "session_signups_lifecycle_check",
+      sql`coalesce((${table.status} = 'confirmed' and ${table.waitlistPosition} is null and ${table.cancelledAt} is null)
+        or (${table.status} = 'waitlisted' and ${table.waitlistPosition} is not null and ${table.waitlistPosition} > 0 and ${table.cancelledAt} is null)
+        or (${table.status} = 'cancelled' and ${table.cancelledAt} is not null), false)`,
+    ),
   ],
 );
 
