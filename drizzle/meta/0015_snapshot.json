@@ -1,6 +1,6 @@
 {
-  "id": "f0fc582e-6fec-4405-b205-f1b541b07b9d",
-  "prevId": "fd5ff486-f085-485e-bab0-f27d148c2a93",
+  "id": "177d7ab1-fdeb-45d6-8b6c-b4df3a07d0f0",
+  "prevId": "759eb99d-2d08-4512-a2a3-574ca7f76505",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2163,6 +2163,18 @@
           "primaryKey": false,
           "notNull": true
         },
+        "discord_handle": {
+          "name": "discord_handle",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "society_play_number": {
+          "name": "society_play_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -2213,7 +2225,20 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "people_display_name_not_blank": {
+          "name": "people_display_name_not_blank",
+          "value": "length(btrim(\"people\".\"display_name\")) > 0"
+        },
+        "people_discord_handle_length_check": {
+          "name": "people_discord_handle_length_check",
+          "value": "\"people\".\"discord_handle\" is null or length(\"people\".\"discord_handle\") <= 100"
+        },
+        "people_society_play_number_length_check": {
+          "name": "people_society_play_number_length_check",
+          "value": "\"people\".\"society_play_number\" is null or length(\"people\".\"society_play_number\") <= 50"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.rulesets": {

@@ -1,5 +1,5 @@
 {
-  "id": "fd5ff486-f085-485e-bab0-f27d148c2a93",
+  "id": "759eb99d-2d08-4512-a2a3-574ca7f76505",
   "prevId": "092a2c8c-c37b-4a24-ac9a-7b757b4988a5",
   "version": "7",
   "dialect": "postgresql",
@@ -1950,89 +1950,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.notification_reads": {
-      "name": "notification_reads",
-      "schema": "",
-      "columns": {
-        "person_id": {
-          "name": "person_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "notification_id": {
-          "name": "notification_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "read_at": {
-          "name": "read_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "notification_reads_person_notification_unique": {
-          "name": "notification_reads_person_notification_unique",
-          "columns": [
-            {
-              "expression": "person_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "notification_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "notification_reads_person_id_idx": {
-          "name": "notification_reads_person_id_idx",
-          "columns": [
-            {
-              "expression": "person_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "notification_reads_person_id_people_id_fk": {
-          "name": "notification_reads_person_id_people_id_fk",
-          "tableFrom": "notification_reads",
-          "tableTo": "people",
-          "columnsFrom": [
-            "person_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.organized_play_programs": {
       "name": "organized_play_programs",
       "schema": "",
@@ -2157,6 +2074,18 @@
           "primaryKey": false,
           "notNull": true
         },
+        "discord_handle": {
+          "name": "discord_handle",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "society_play_number": {
+          "name": "society_play_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -2207,7 +2136,20 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "people_display_name_not_blank": {
+          "name": "people_display_name_not_blank",
+          "value": "length(btrim(\"people\".\"display_name\")) > 0"
+        },
+        "people_discord_handle_length_check": {
+          "name": "people_discord_handle_length_check",
+          "value": "\"people\".\"discord_handle\" is null or length(\"people\".\"discord_handle\") <= 100"
+        },
+        "people_society_play_number_length_check": {
+          "name": "people_society_play_number_length_check",
+          "value": "\"people\".\"society_play_number\" is null or length(\"people\".\"society_play_number\") <= 50"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.rulesets": {
