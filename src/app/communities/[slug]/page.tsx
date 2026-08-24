@@ -4,7 +4,7 @@ import { authorizeCommunityBySlug } from "@/authorization/community-guard";
 import { CommunityProfile } from "./community-profile";
 import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "@/db/client";
-import { communityMembershipRequests } from "@/db/schema";
+import { communityGmRequests, communityMembershipRequests, communityRoleGrants } from "@/db/schema";
 
 interface CommunityPageProps {
   params: Promise<{ slug: string }>;
@@ -33,6 +33,13 @@ export default async function CommunityPage({ params }: CommunityPageProps) {
         .orderBy(desc(communityMembershipRequests.requestedAt))
         .limit(1)
     : [];
+  const [gmGrant] = actor && authorization.access.isActiveMember
+    ? await getDb().select({ status: communityRoleGrants.status }).from(communityRoleGrants).where(and(eq(communityRoleGrants.communityId, community.id), eq(communityRoleGrants.personId, actor.personId), eq(communityRoleGrants.role, "gm"))).orderBy(desc(communityRoleGrants.grantedAt)).limit(1)
+    : [];
+  const [gmRequest] = actor && authorization.access.isActiveMember && !isOwner && gmGrant?.status !== "active"
+    ? await getDb().select({ id: communityGmRequests.id, status: communityGmRequests.status }).from(communityGmRequests).where(and(eq(communityGmRequests.communityId, community.id), eq(communityGmRequests.personId, actor.personId))).orderBy(desc(communityGmRequests.requestedAt)).limit(1)
+    : [];
+  const gmState = gmGrant?.status === "active" ? "active" as const : gmRequest?.status === "pending" ? "pending" as const : gmRequest?.status === "rejected" ? "rejected" as const : gmGrant?.status === "revoked" ? "revoked" as const : actor && authorization.access.isActiveMember && !isOwner ? "eligible" as const : undefined;
 
-  return <CommunityProfile community={community} isOwner={isOwner} isSignedIn={Boolean(actor)} isMember={authorization.access.isActiveMember} pendingRequestId={pendingRequest?.id} />;
+  return <CommunityProfile community={community} isOwner={isOwner} isSignedIn={Boolean(actor)} isMember={authorization.access.isActiveMember} pendingRequestId={pendingRequest?.id} gmAdmission={community.gmAdmission === "self_service" ? "self_service" : "approved_only"} gmState={gmState} pendingGmRequestId={gmRequest?.status === "pending" ? gmRequest.id : undefined} />;
 }
