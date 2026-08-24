@@ -22,7 +22,11 @@ import {
 import { createSessionDraft } from "@/session/session-drafts";
 import { publishSession } from "@/session/publish-session";
 import { cancelPublishedSession, updatePublishedSession } from "@/session/published-session";
-import { cancelOwnSessionSignup, signupForSession } from "@/session/session-signups";
+import {
+  cancelOwnSessionSignup,
+  listUpcomingSignedUpGames,
+  signupForSession,
+} from "@/session/session-signups";
 
 const describeWithDatabase = process.env.CI ? describe : describe.skip;
 const suffix = crypto.randomUUID();
@@ -128,6 +132,58 @@ describeWithDatabase("session signups", () => {
     expect(result).toMatchObject({ status: "confirmed", replayed: true });
     const rows = await getDb().select().from(sessionSignups).where(eq(sessionSignups.personId, confirmedActor.personId));
     expect(rows).toHaveLength(1);
+  });
+
+  it("lists only the person's authorized upcoming games in chronological order", async () => {
+    const [confirmed] = await getDb().select({ personId: sessionSignups.personId })
+      .from(sessionSignups).where(and(
+        eq(sessionSignups.sessionId, publishedSessionId),
+        eq(sessionSignups.status, "confirmed"),
+      )).limit(1);
+    const laterSessionId = `later-session-${suffix}`;
+    const laterSignupId = `later-signup-${suffix}`;
+    await getDb().insert(sessions).values({
+      id: laterSessionId,
+      communityId: community.id,
+      contentItemId: scenarioId,
+      gmPersonId: gm.personId,
+      status: "published",
+      startsAt: new Date("2030-09-03T01:00:00Z"),
+      endsAt: new Date("2030-09-03T05:00:00Z"),
+      displayTimeZone: "America/Phoenix",
+      locationType: "physical",
+      createdByPersonId: owner.personId,
+      updatedByPersonId: owner.personId,
+    });
+    await getDb().insert(sessionSignups).values({
+      id: laterSignupId,
+      sessionId: laterSessionId,
+      personId: confirmed!.personId,
+      status: "confirmed",
+    });
+
+    const games = await listUpcomingSignedUpGames(
+      confirmed!.personId,
+      new Date("2030-01-01T00:00:00Z"),
+    );
+    expect(games.map(({ sessionId }) => sessionId)).toEqual([publishedSessionId, laterSessionId]);
+    expect(games[0]).toMatchObject({
+      communityName: expect.any(String),
+      scenarioTitle: "Signup scenario",
+      signupStatus: "confirmed",
+    });
+    await expect(listUpcomingSignedUpGames(crypto.randomUUID(), new Date("2030-01-01T00:00:00Z")))
+      .resolves.toEqual([]);
+
+    await getDb().update(communities).set({ visibility: "private", scheduleVisibility: "members" })
+      .where(eq(communities.id, community.id));
+    await expect(listUpcomingSignedUpGames(confirmed!.personId, new Date("2030-01-01T00:00:00Z")))
+      .resolves.toEqual([]);
+    await getDb().update(communities).set({ visibility: "public", scheduleVisibility: "public" })
+      .where(eq(communities.id, community.id));
+
+    await getDb().delete(sessionSignups).where(eq(sessionSignups.id, laterSignupId));
+    await getDb().delete(sessions).where(eq(sessions.id, laterSessionId));
   });
 
   it("promotes the first waitlisted user when a confirmed player cancels", async () => {

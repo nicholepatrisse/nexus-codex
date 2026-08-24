@@ -13,3 +13,9 @@ test("protects the community creation form", async ({ page }) => {
   await expect(page).toHaveURL(/\/sign-in\?callbackURL=%2Fcommunities%2Fnew$/);
   await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
 });
+
+test("protects the all-games view and preserves its return path", async ({ page }) => {
+  await page.goto("/games");
+  await expect(page).toHaveURL(/\/sign-in\?callbackURL=%2Fgames$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
+});
