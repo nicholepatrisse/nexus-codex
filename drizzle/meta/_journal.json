@@ -71,6 +71,13 @@
       "when": 1787586809520,
       "tag": "0009_gifted_mac_gargan",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1787595278984,
+      "tag": "0010_brainy_harrier",
+      "breakpoints": true
     }
   ]
 }

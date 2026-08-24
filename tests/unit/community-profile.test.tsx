@@ -67,4 +67,24 @@ describe("community profile", () => {
     );
     expect(markup).not.toMatch(/request membership|cancel membership request/i);
   });
+
+  it("renders published sessions supplied by the visibility-aware page query", () => {
+    const markup = renderToStaticMarkup(
+      <CommunityProfile
+        community={publicCommunity}
+        isOwner={false}
+        sessions={[{
+          id: "session-1",
+          code: "1-01",
+          title: "The Commencement",
+          startsAt: "2030-09-02T01:00:00.000Z",
+          gmName: "Radaszam",
+        }]}
+      />,
+    );
+
+    expect(markup).toContain("Published sessions");
+    expect(markup).toContain("1-01 — The Commencement");
+    expect(markup).toContain("GM: Radaszam");
+  });
 });

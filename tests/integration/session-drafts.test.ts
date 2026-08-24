@@ -25,6 +25,7 @@ import {
   SessionDraftValidationError,
   updateSessionDraft,
 } from "@/session/session-drafts";
+import { publishSession } from "@/session/publish-session";
 
 const describeWithDatabase = process.env.CI ? describe : describe.skip;
 const suffix = crypto.randomUUID();
@@ -165,5 +166,95 @@ describeWithDatabase("session drafts", () => {
     await getDb().update(communities).set({ lifecycleStatus: "active" }).where(eq(communities.id, community.id));
     await expect(updateSessionDraft(owner, community.slug, created.sessionId, { ...draftInput(), gmPersonId: gmTwo.personId }))
       .resolves.toMatchObject({ status: "updated" });
+  });
+
+  it("publishes a complete draft for its owner or assigned GM", async () => {
+    const ownerDraft = await createSessionDraft(owner, community.slug, {
+      ...draftInput(), gmPersonId: gmOne.personId,
+    });
+    const gmDraft = await createSessionDraft(owner, community.slug, {
+      ...draftInput(), gmPersonId: gmOne.personId,
+    });
+    if (ownerDraft.status !== "created" || gmDraft.status !== "created") {
+      throw new Error("publication fixtures were not created");
+    }
+    await expect(publishSession(owner, community.slug, ownerDraft.sessionId))
+      .resolves.toEqual({ status: "published", sessionId: ownerDraft.sessionId, replayed: false });
+    await expect(publishSession(gmOne, community.slug, gmDraft.sessionId))
+      .resolves.toEqual({ status: "published", sessionId: gmDraft.sessionId, replayed: false });
+
+    const stored = await getDb().select({ id: sessions.id, status: sessions.status })
+      .from(sessions).where(inArray(sessions.id, [ownerDraft.sessionId, gmDraft.sessionId]));
+    expect(stored).toEqual(expect.arrayContaining([
+      { id: ownerDraft.sessionId, status: "published" },
+      { id: gmDraft.sessionId, status: "published" },
+    ]));
+  });
+
+  it("rejects unauthorized publication while allowing a draft with location intent only", async () => {
+    const created = await createSessionDraft(owner, community.slug, {
+      ...draftInput(), gmPersonId: gmOne.personId,
+    });
+    if (created.status !== "created") throw new Error("publication fixture was not created");
+
+    await expect(publishSession(gmTwo, community.slug, created.sessionId))
+      .resolves.toEqual({ status: "forbidden" });
+    await expect(publishSession(owner, community.slug, created.sessionId))
+      .resolves.toEqual({ status: "published", sessionId: created.sessionId, replayed: false });
+
+    const [stored] = await getDb().select({ status: sessions.status })
+      .from(sessions).where(eq(sessions.id, created.sessionId));
+    expect(stored?.status).toBe("published");
+  });
+
+  it("makes publication replay and concurrency produce one audit event", async () => {
+    const created = await createSessionDraft(owner, community.slug, {
+      ...draftInput(), gmPersonId: gmOne.personId,
+    });
+    if (created.status !== "created") throw new Error("publication fixture was not created");
+    const results = await Promise.all([
+      publishSession(owner, community.slug, created.sessionId),
+      publishSession(owner, community.slug, created.sessionId),
+    ]);
+    expect(results).toEqual(expect.arrayContaining([
+      { status: "published", sessionId: created.sessionId, replayed: false },
+      { status: "published", sessionId: created.sessionId, replayed: true },
+    ]));
+    await expect(publishSession(owner, community.slug, created.sessionId))
+      .resolves.toEqual({ status: "published", sessionId: created.sessionId, replayed: true });
+
+    const events = await getDb().select({ details: communityAuditEvents.details })
+      .from(communityAuditEvents).where(and(
+        eq(communityAuditEvents.communityId, community.id),
+        eq(communityAuditEvents.eventType, "session.published"),
+      ));
+    expect(events.filter(({ details }) => details.sessionId === created.sessionId))
+      .toEqual([{ details: { sessionId: created.sessionId } }]);
+  });
+
+  it("rechecks community lifecycle and the assigned GM's current grant", async () => {
+    const created = await createSessionDraft(owner, community.slug, {
+      ...draftInput(), gmPersonId: gmOne.personId,
+    });
+    if (created.status !== "created") throw new Error("publication fixture was not created");
+    await getDb().update(communities).set({ lifecycleStatus: "archived" })
+      .where(eq(communities.id, community.id));
+    await expect(publishSession(owner, community.slug, created.sessionId))
+      .resolves.toEqual({ status: "not-found" });
+    await getDb().update(communities).set({ lifecycleStatus: "active" })
+      .where(eq(communities.id, community.id));
+
+    await getDb().update(communityRoleGrants).set({
+      status: "revoked",
+      revokedAt: new Date(),
+      revokedByPersonId: owner.personId,
+      revocationReason: "Publication authorization regression test",
+    }).where(eq(communityRoleGrants.id, grantIds[0]!));
+    await expect(publishSession(gmOne, community.slug, created.sessionId))
+      .resolves.toEqual({ status: "forbidden" });
+
+    const [stored] = await getDb().select({ status: sessions.status })
+      .from(sessions).where(eq(sessions.id, created.sessionId));
+    expect(stored?.status).toBe("draft");
   });
 });
