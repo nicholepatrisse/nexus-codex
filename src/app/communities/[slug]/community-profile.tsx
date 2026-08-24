@@ -16,10 +16,11 @@ export type CommunityProfileProps = Readonly<{
   gmAdmission?: "approved_only" | "self_service";
   gmState?: "eligible" | "pending" | "active" | "rejected" | "revoked";
   pendingGmRequestId?: string;
+  drafts?: { id: string; code: string; title: string; startsAt: string; gmPersonId: string }[];
 }>;
 
 /** Public/member profile deliberately limited to approved, non-operational fields. */
-export function CommunityProfile({ community, isOwner, isSignedIn = false, isMember = false, pendingRequestId, gmAdmission = "approved_only", gmState, pendingGmRequestId }: CommunityProfileProps) {
+export function CommunityProfile({ community, isOwner, isSignedIn = false, isMember = false, pendingRequestId, gmAdmission = "approved_only", gmState, pendingGmRequestId, drafts = [] }: CommunityProfileProps) {
   const isPublic = community.visibility === "public";
 
   return (
@@ -43,13 +44,14 @@ export function CommunityProfile({ community, isOwner, isSignedIn = false, isMem
             : "This community is private and visible only to active members."}
         </p>
         {isOwner ? (
-          <Link
+          <div className="mt-8 flex flex-wrap gap-3"><Link
             href={`/communities/${encodeURIComponent(community.slug)}/settings`}
-            className="mt-8 inline-flex rounded-full border border-white/15 px-5 py-2.5 text-sm font-semibold hover:border-[var(--accent)] hover:text-[var(--accent)]"
+            className="inline-flex rounded-full border border-white/15 px-5 py-2.5 text-sm font-semibold hover:border-[var(--accent)] hover:text-[var(--accent)]"
           >
             Community settings
-          </Link>
+          </Link><Link href={`/communities/${encodeURIComponent(community.slug)}/sessions/new`} className="inline-flex rounded-full bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-[#07110f]">Create session draft</Link></div>
         ) : null}
+        {!isOwner && isMember && (gmState === "active" || (gmState === "eligible" && gmAdmission === "self_service")) ? <Link href={`/communities/${encodeURIComponent(community.slug)}/sessions/new`} className="mt-8 inline-flex rounded-full bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-[#07110f]">Create session draft</Link> : null}
         {isPublic && !isMember && !isOwner ? (
           isSignedIn ? (
             <AdmissionForm slug={community.slug} pendingRequestId={pendingRequestId} />
@@ -64,6 +66,7 @@ export function CommunityProfile({ community, isOwner, isSignedIn = false, isMem
         ) : null}
         {isMember && !isOwner && gmState ? <section className="mt-8 border-t border-white/10 pt-6"><h2 className="text-lg font-semibold">Game Master access</h2>{gmState === "active" ? <p className="mt-2 text-sm text-emerald-200">You’re an approved GM.</p> : gmState === "pending" ? <GmAdmissionForm slug={community.slug} pendingRequestId={pendingGmRequestId} /> : gmState === "revoked" ? <><p className="mt-2 text-sm text-[var(--muted)]">Your previous GM access was revoked. It cannot be restored through self-service.</p>{gmAdmission === "approved_only" ? <GmAdmissionForm slug={community.slug} /> : null}</> : gmAdmission === "self_service" ? <p className="mt-2 text-sm text-[var(--muted)]">GM access is granted when you create a game that you will GM. There is no separate request.</p> : gmState === "rejected" ? <><p className="mt-2 text-sm text-[var(--muted)]">Your previous GM request was not approved. You may submit a new request.</p><GmAdmissionForm slug={community.slug} /></> : <GmAdmissionForm slug={community.slug} />}</section> : null}
       </section>
+      {drafts.length ? <section className="mt-8 rounded-3xl border border-white/10 bg-black/20 p-8"><h2 className="text-2xl font-semibold">Session drafts</h2><p className="mt-2 text-sm text-[var(--muted)]">Drafts are visible only to authorized community staff.</p><ul className="mt-5 space-y-3">{drafts.map((draft) => <li key={draft.id} className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-white/10 p-4"><div><p className="font-semibold">{draft.code} — {draft.title}</p><p className="mt-1 text-sm text-[var(--muted)]">{new Date(draft.startsAt).toLocaleString()}</p></div><Link href={`/communities/${encodeURIComponent(community.slug)}/sessions/${draft.id}`} className="rounded-full border border-white/15 px-4 py-2 text-sm font-semibold hover:border-[var(--accent)]">View draft</Link></li>)}</ul></section> : null}
     </main>
   );
 }

@@ -328,9 +328,9 @@ export const communityRoleGrants = pgTable(
     ),
     check(
       "community_role_grants_lifecycle_check",
-      sql`(${table.role} = 'owner' and ${table.status} = 'active' and ${table.revokedByPersonId} is null and ${table.revocationReason} is null)
+      sql`coalesce((${table.role} = 'owner' and ${table.status} = 'active' and ${table.revokedByPersonId} is null and ${table.revocationReason} is null)
         or (${table.role} = 'gm' and ${table.status} = 'active' and ${table.revokedAt} is null and ${table.revokedByPersonId} is null and ${table.revocationReason} is null)
-        or (${table.role} = 'gm' and ${table.status} = 'revoked' and ${table.revokedAt} is not null and (${table.revokedByPersonId} is not null or (${table.revokedByPersonId} is null and ${table.revocationReason} = 'Legacy revocation: actor unavailable')))`,
+        or (${table.role} = 'gm' and ${table.status} = 'revoked' and ${table.revokedAt} is not null and (${table.revokedByPersonId} is not null or (${table.revokedByPersonId} is null and ${table.revocationReason} = 'Legacy revocation: actor unavailable'))), false)`,
     ),
   ],
 );
@@ -359,9 +359,67 @@ export const communityAuditEvents = pgTable(
     index("community_audit_events_actor_person_id_idx").on(table.actorPersonId),
     check(
       "community_audit_events_type_check",
-      sql`${table.eventType} in ('community.settings.updated', 'community.archived', 'community.restored', 'community.invitation.created', 'community.invitation.accepted', 'community.invitation.revoked', 'community.invitation.expired', 'community.membership.requested', 'community.membership.approved', 'community.membership.rejected', 'community.membership.cancelled', 'community.gm.requested', 'community.gm.approved', 'community.gm.rejected', 'community.gm.cancelled', 'community.gm.revoked', 'community.gm.self_service_promoted')`,
+      sql`${table.eventType} in ('community.settings.updated', 'community.archived', 'community.restored', 'community.invitation.created', 'community.invitation.accepted', 'community.invitation.revoked', 'community.invitation.expired', 'community.membership.requested', 'community.membership.approved', 'community.membership.rejected', 'community.membership.cancelled', 'community.gm.requested', 'community.gm.approved', 'community.gm.rejected', 'community.gm.cancelled', 'community.gm.revoked', 'community.gm.self_service_promoted', 'session.draft.created', 'session.draft.updated', 'session.gm.reassigned')`,
     ),
     check("community_audit_events_details_object_check", sql`jsonb_typeof(${table.details}) = 'object'`),
+  ],
+);
+
+/** M0 session drafts. Location details and additional staff roles are added by later milestones. */
+export const sessions = pgTable(
+  "sessions",
+  {
+    id: text("id").primaryKey(),
+    communityId: text("community_id")
+      .notNull()
+      .references(() => communities.id, { onDelete: "restrict" }),
+    contentItemId: text("content_item_id")
+      .notNull()
+      .references(() => contentItems.id, { onDelete: "restrict" }),
+    gmPersonId: text("gm_person_id")
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
+    status: text("status").notNull().default("draft"),
+    startsAt: timestamp("starts_at", { withTimezone: true, mode: "date" }).notNull(),
+    endsAt: timestamp("ends_at", { withTimezone: true, mode: "date" }).notNull(),
+    displayTimeZone: text("display_time_zone").notNull(),
+    playerCapacity: integer("player_capacity").notNull().default(6),
+    notes: text("notes"),
+    locationType: text("location_type").notNull(),
+    createdByPersonId: text("created_by_person_id")
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
+    updatedByPersonId: text("updated_by_person_id")
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.communityId, table.gmPersonId],
+      foreignColumns: [communityMemberships.communityId, communityMemberships.personId],
+      name: "sessions_gm_membership_fk",
+    }).onDelete("restrict"),
+    index("sessions_community_status_starts_at_idx").on(
+      table.communityId,
+      table.status,
+      table.startsAt,
+    ),
+    index("sessions_gm_status_starts_at_idx").on(table.gmPersonId, table.status, table.startsAt),
+    check("sessions_status_check", sql`${table.status} in ('draft', 'published', 'cancelled')`),
+    check("sessions_time_order_check", sql`${table.endsAt} > ${table.startsAt}`),
+    check(
+      "sessions_display_time_zone_check",
+      sql`length(${table.displayTimeZone}) <= 100 and ${table.displayTimeZone} ~ '^(UTC|[A-Za-z][A-Za-z0-9._+-]*(/[A-Za-z][A-Za-z0-9._+-]*)+)$'`,
+    ),
+    check("sessions_capacity_check", sql`${table.playerCapacity} = 6`),
+    check("sessions_notes_length_check", sql`${table.notes} is null or length(${table.notes}) <= 4000`),
+    check("sessions_location_type_check", sql`${table.locationType} in ('virtual', 'physical')`),
   ],
 );
 
