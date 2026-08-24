@@ -19,7 +19,7 @@ export default async function SessionPage({ params }: { params: Promise<{ slug: 
   const actor = await getAuthenticatedActor();
   const access = await resolveCommunityAccessBySlug(slug, actor?.personId ?? null);
   if (access.status !== "available") notFound();
-  const [session] = await getDb().select({ id: sessions.id, status: sessions.status, gmPersonId: sessions.gmPersonId, gmName: people.displayName, scenarioCode: contentItems.code, scenarioTitle: contentItems.title, startsAt: sessions.startsAt, endsAt: sessions.endsAt, displayTimeZone: sessions.displayTimeZone, playerCapacity: sessions.playerCapacity, notes: sessions.notes, locationType: sessions.locationType }).from(sessions).innerJoin(contentItems, eq(contentItems.id, sessions.contentItemId)).innerJoin(people, eq(people.id, sessions.gmPersonId)).where(and(eq(sessions.id, sessionId), eq(sessions.communityId, access.community.id))).limit(1);
+  const [session] = await getDb().select({ id: sessions.id, status: sessions.status, gmPersonId: sessions.gmPersonId, gmName: people.displayName, gmDiscordHandle: people.discordHandle, scenarioCode: contentItems.code, scenarioTitle: contentItems.title, startsAt: sessions.startsAt, endsAt: sessions.endsAt, displayTimeZone: sessions.displayTimeZone, playerCapacity: sessions.playerCapacity, notes: sessions.notes, locationType: sessions.locationType }).from(sessions).innerJoin(contentItems, eq(contentItems.id, sessions.contentItemId)).innerJoin(people, eq(people.id, sessions.gmPersonId)).where(and(eq(sessions.id, sessionId), eq(sessions.communityId, access.community.id))).limit(1);
   if (!session) notFound();
   const isOwner = access.roles.includes("owner");
   const isAssignedGm = Boolean(actor) && access.roles.includes("gm") && session.gmPersonId === actor!.personId;
@@ -32,10 +32,10 @@ export default async function SessionPage({ params }: { params: Promise<{ slug: 
   let waitlistedCount = 0;
   let roster: SessionRosterEntry[] | undefined;
   if (session.status !== "draft") {
-    const rows = await getDb().select({ id: sessionSignups.id, status: sessionSignups.status, waitlistPosition: sessionSignups.waitlistPosition, personName: people.displayName }).from(sessionSignups).innerJoin(people, eq(people.id, sessionSignups.personId)).where(and(eq(sessionSignups.sessionId, session.id), inArray(sessionSignups.status, ["confirmed", "waitlisted"]))).orderBy(asc(sessionSignups.waitlistPosition), asc(sessionSignups.createdAt));
+    const rows = await getDb().select({ id: sessionSignups.id, status: sessionSignups.status, waitlistPosition: sessionSignups.waitlistPosition, personName: people.displayName, discordHandle: people.discordHandle, societyPlayNumber: people.societyPlayNumber }).from(sessionSignups).innerJoin(people, eq(people.id, sessionSignups.personId)).where(and(eq(sessionSignups.sessionId, session.id), inArray(sessionSignups.status, ["confirmed", "waitlisted"]))).orderBy(asc(sessionSignups.waitlistPosition), asc(sessionSignups.createdAt));
     confirmedCount = rows.filter(({ status }) => status === "confirmed").length;
     waitlistedCount = rows.filter(({ status }) => status === "waitlisted").length;
-    roster = rows.map((row) => ({ id: row.id, personName: row.personName, status: row.status === "confirmed" ? "confirmed" : "waitlisted", ...(row.waitlistPosition ? { waitlistPosition: row.waitlistPosition } : {}) }));
+    roster = isManager ? rows.map((row) => ({ id: row.id, personName: row.personName, discordHandle: row.discordHandle, societyPlayNumber: row.societyPlayNumber, status: row.status === "confirmed" ? "confirmed" : "waitlisted", ...(row.waitlistPosition ? { waitlistPosition: row.waitlistPosition } : {}) })) : undefined;
   }
   const cancelled = session.status === "cancelled";
   const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone;

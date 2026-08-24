@@ -99,6 +99,13 @@
       "when": 1787602734604,
       "tag": "0013_equal_jane_foster",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1787605042825,
+      "tag": "0014_whole_captain_marvel",
+      "breakpoints": true
     }
   ]
 }
