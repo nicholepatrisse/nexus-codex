@@ -6,4 +6,5 @@ test("browses public communities without signing in", async ({ page }) => {
   await expect(page.getByRole("heading", { level: 1, name: "Public communities" })).toBeVisible();
   await expect(page.getByRole("searchbox")).toHaveCount(0);
   await expect(page.locator("body")).not.toContainText(/private community|archived community/i);
+  await expect(page.getByRole("button", { name: /request gm|approve|reject|revoke/i })).toHaveCount(0);
 });

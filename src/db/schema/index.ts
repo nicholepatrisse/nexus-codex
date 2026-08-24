@@ -293,7 +293,15 @@ export const communityRoleGrants = pgTable(
     grantedAt: timestamp("granted_at", { withTimezone: true, mode: "date" })
       .notNull()
       .defaultNow(),
+    status: text("status").notNull().default("active"),
     revokedAt: timestamp("revoked_at", { withTimezone: true, mode: "date" }),
+    revokedByPersonId: text("revoked_by_person_id").references(() => people.id, {
+      onDelete: "restrict",
+    }),
+    revocationReason: text("revocation_reason"),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
   },
   (table) => [
     foreignKey({
@@ -307,8 +315,22 @@ export const communityRoleGrants = pgTable(
     index("community_role_grants_person_id_idx").on(table.personId),
     check("community_role_grants_role_check", sql`${table.role} in ('owner', 'gm')`),
     check(
+      "community_role_grants_status_check",
+      sql`${table.status} in ('active', 'revoked')`,
+    ),
+    check(
+      "community_role_grants_reason_length_check",
+      sql`${table.revocationReason} is null or length(${table.revocationReason}) <= 500`,
+    ),
+    check(
       "community_role_grants_revocation_time_check",
       sql`${table.revokedAt} is null or ${table.revokedAt} >= ${table.grantedAt}`,
+    ),
+    check(
+      "community_role_grants_lifecycle_check",
+      sql`(${table.role} = 'owner' and ${table.status} = 'active' and ${table.revokedByPersonId} is null and ${table.revocationReason} is null)
+        or (${table.role} = 'gm' and ${table.status} = 'active' and ${table.revokedAt} is null and ${table.revokedByPersonId} is null and ${table.revocationReason} is null)
+        or (${table.role} = 'gm' and ${table.status} = 'revoked' and ${table.revokedAt} is not null and (${table.revokedByPersonId} is not null or (${table.revokedByPersonId} is null and ${table.revocationReason} = 'Legacy revocation: actor unavailable')))`,
     ),
   ],
 );
@@ -337,7 +359,7 @@ export const communityAuditEvents = pgTable(
     index("community_audit_events_actor_person_id_idx").on(table.actorPersonId),
     check(
       "community_audit_events_type_check",
-      sql`${table.eventType} in ('community.settings.updated', 'community.archived', 'community.restored', 'community.invitation.created', 'community.invitation.accepted', 'community.invitation.revoked', 'community.invitation.expired', 'community.membership.requested', 'community.membership.approved', 'community.membership.rejected', 'community.membership.cancelled')`,
+      sql`${table.eventType} in ('community.settings.updated', 'community.archived', 'community.restored', 'community.invitation.created', 'community.invitation.accepted', 'community.invitation.revoked', 'community.invitation.expired', 'community.membership.requested', 'community.membership.approved', 'community.membership.rejected', 'community.membership.cancelled', 'community.gm.requested', 'community.gm.approved', 'community.gm.rejected', 'community.gm.cancelled', 'community.gm.revoked', 'community.gm.self_service_promoted')`,
     ),
     check("community_audit_events_details_object_check", sql`jsonb_typeof(${table.details}) = 'object'`),
   ],
@@ -448,6 +470,60 @@ export const communityMembershipRequests = pgTable(
       "community_membership_requests_terminal_state_check",
       sql`(${table.status} = 'pending' and ${table.decidedAt} is null and ${table.decidedByPersonId} is null and ${table.decisionReason} is null and ${table.cancelledAt} is null)
         or (${table.status} = 'approved' and ${table.decidedAt} is not null and ${table.cancelledAt} is null and ((${table.approvalPolicy} = 'manual' and ${table.decidedByPersonId} is not null) or (${table.approvalPolicy} = 'automatic' and ${table.decidedByPersonId} is null)))
+        or (${table.status} = 'rejected' and ${table.decidedAt} is not null and ${table.decidedByPersonId} is not null and ${table.cancelledAt} is null)
+        or (${table.status} = 'cancelled' and ${table.cancelledAt} is not null and ${table.decidedAt} is null and ${table.decidedByPersonId} is null and ${table.decisionReason} is null)`,
+    ),
+  ],
+);
+
+/** Requests for community-wide GM authority, separate from ordinary membership admission. */
+export const communityGmRequests = pgTable(
+  "community_gm_requests",
+  {
+    id: text("id").primaryKey(),
+    communityId: text("community_id")
+      .notNull()
+      .references(() => communities.id, { onDelete: "restrict" }),
+    personId: text("person_id")
+      .notNull()
+      .references(() => people.id, { onDelete: "restrict" }),
+    status: text("status").notNull().default("pending"),
+    admissionPolicy: text("admission_policy").notNull(),
+    decidedByPersonId: text("decided_by_person_id").references(() => people.id, {
+      onDelete: "restrict",
+    }),
+    decisionReason: text("decision_reason"),
+    requestedAt: timestamp("requested_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+    decidedAt: timestamp("decided_at", { withTimezone: true, mode: "date" }),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true, mode: "date" }),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("community_gm_requests_live_person_unique")
+      .on(table.communityId, table.personId)
+      .where(sql`${table.status} = 'pending'`),
+    index("community_gm_requests_community_status_idx").on(table.communityId, table.status),
+    index("community_gm_requests_person_id_idx").on(table.personId),
+    check(
+      "community_gm_requests_status_check",
+      sql`${table.status} in ('pending', 'approved', 'rejected', 'cancelled')`,
+    ),
+    check(
+      "community_gm_requests_admission_policy_check",
+      sql`${table.admissionPolicy} in ('approved_only', 'self_service')`,
+    ),
+    check(
+      "community_gm_requests_decision_reason_length_check",
+      sql`${table.decisionReason} is null or length(${table.decisionReason}) <= 500`,
+    ),
+    check(
+      "community_gm_requests_terminal_state_check",
+      sql`(${table.status} = 'pending' and ${table.decidedAt} is null and ${table.decidedByPersonId} is null and ${table.decisionReason} is null and ${table.cancelledAt} is null)
+        or (${table.status} = 'approved' and ${table.decidedAt} is not null and ${table.cancelledAt} is null and ((${table.admissionPolicy} = 'approved_only' and ${table.decidedByPersonId} is not null) or (${table.admissionPolicy} = 'self_service' and ${table.decidedByPersonId} is null)))
         or (${table.status} = 'rejected' and ${table.decidedAt} is not null and ${table.decidedByPersonId} is not null and ${table.cancelledAt} is null)
         or (${table.status} = 'cancelled' and ${table.cancelledAt} is not null and ${table.decidedAt} is null and ${table.decidedByPersonId} is null and ${table.decisionReason} is null)`,
     ),

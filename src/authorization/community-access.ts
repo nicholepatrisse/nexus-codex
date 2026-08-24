@@ -15,6 +15,7 @@ export type CommunityAccessResult =
         description?: string | null;
         visibility: string;
         scheduleVisibility: string;
+        gmAdmission?: string;
       };
       isActiveMember: boolean;
       roles: CommunityRole[];
@@ -41,6 +42,7 @@ export async function resolveCommunityAccessBySlug(
       description: communities.description,
       visibility: communities.visibility,
       scheduleVisibility: communities.scheduleVisibility,
+      gmAdmission: communities.gmAdmission,
     })
     .from(communities)
     .where(and(eq(communities.slug, slug), eq(communities.lifecycleStatus, "active")))
@@ -79,6 +81,7 @@ export async function resolveCommunityAccessBySlug(
       and(
         eq(communityRoleGrants.communityId, community.id),
         eq(communityRoleGrants.personId, personId),
+        eq(communityRoleGrants.status, "active"),
         isNull(communityRoleGrants.revokedAt),
       ),
     );

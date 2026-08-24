@@ -185,9 +185,15 @@ describeWithDatabase("community authorization queries", () => {
   });
 
   it("applies membership and role revocation on the next query", async () => {
+    const revokedAt = new Date();
     await getDb()
       .update(communityRoleGrants)
-      .set({ revokedAt: new Date() })
+      .set({
+        status: "revoked",
+        revokedAt,
+        revokedByPersonId: personIds.owner,
+        updatedAt: revokedAt,
+      })
       .where(
         and(
           eq(communityRoleGrants.communityId, privateCommunityId),

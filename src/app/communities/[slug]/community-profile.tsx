@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AdmissionForm } from "./admission-form";
+import { GmAdmissionForm } from "./gm-admission-form";
 
 export type CommunityProfileProps = Readonly<{
   community: {
@@ -12,10 +13,13 @@ export type CommunityProfileProps = Readonly<{
   isSignedIn?: boolean;
   isMember?: boolean;
   pendingRequestId?: string;
+  gmAdmission?: "approved_only" | "self_service";
+  gmState?: "eligible" | "pending" | "active" | "rejected" | "revoked";
+  pendingGmRequestId?: string;
 }>;
 
 /** Public/member profile deliberately limited to approved, non-operational fields. */
-export function CommunityProfile({ community, isOwner, isSignedIn = false, isMember = false, pendingRequestId }: CommunityProfileProps) {
+export function CommunityProfile({ community, isOwner, isSignedIn = false, isMember = false, pendingRequestId, gmAdmission = "approved_only", gmState, pendingGmRequestId }: CommunityProfileProps) {
   const isPublic = community.visibility === "public";
 
   return (
@@ -58,6 +62,7 @@ export function CommunityProfile({ community, isOwner, isSignedIn = false, isMem
             </Link>
           )
         ) : null}
+        {isMember && !isOwner && gmState ? <section className="mt-8 border-t border-white/10 pt-6"><h2 className="text-lg font-semibold">Game Master access</h2>{gmState === "active" ? <p className="mt-2 text-sm text-emerald-200">You’re an approved GM.</p> : gmState === "pending" ? <GmAdmissionForm slug={community.slug} pendingRequestId={pendingGmRequestId} /> : gmState === "revoked" ? <><p className="mt-2 text-sm text-[var(--muted)]">Your previous GM access was revoked. It cannot be restored through self-service.</p>{gmAdmission === "approved_only" ? <GmAdmissionForm slug={community.slug} /> : null}</> : gmAdmission === "self_service" ? <p className="mt-2 text-sm text-[var(--muted)]">GM access is granted when you create a game that you will GM. There is no separate request.</p> : gmState === "rejected" ? <><p className="mt-2 text-sm text-[var(--muted)]">Your previous GM request was not approved. You may submit a new request.</p><GmAdmissionForm slug={community.slug} /></> : <GmAdmissionForm slug={community.slug} />}</section> : null}
       </section>
     </main>
   );
