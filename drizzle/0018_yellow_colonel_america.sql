@@ -1,0 +1,2 @@
+ALTER TABLE "session_signups" ADD COLUMN "character_id" text;--> statement-breakpoint
+ALTER TABLE "session_signups" ADD CONSTRAINT "session_signups_character_id_characters_id_fk" FOREIGN KEY ("character_id") REFERENCES "public"."characters"("id") ON DELETE restrict ON UPDATE no action;

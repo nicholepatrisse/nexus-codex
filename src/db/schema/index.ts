@@ -477,6 +477,8 @@ export const sessionSignups = pgTable(
     personId: text("person_id")
       .notNull()
       .references(() => people.id, { onDelete: "restrict" }),
+    characterId: text("character_id")
+      .references(() => characters.id, { onDelete: "restrict" }),
     status: text("status").notNull(),
     waitlistPosition: integer("waitlist_position"),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),

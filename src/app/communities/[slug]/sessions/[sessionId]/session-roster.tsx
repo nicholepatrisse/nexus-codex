@@ -1,7 +1,7 @@
-export type SessionRosterEntry = { id: string; personName: string; discordHandle?: string | null; societyPlayNumber?: string | null; status: "confirmed" | "waitlisted"; waitlistPosition?: number };
+export type SessionRosterEntry = { id: string; personName: string; discordHandle?: string | null; societyPlayNumber?: string | null; characterName?: string | null; characterSocietyNumber?: string | null; status: "confirmed" | "waitlisted"; waitlistPosition?: number };
 
 function Player({ entry }: { entry: SessionRosterEntry }) {
-  return <><span className="font-semibold">{entry.personName}</span>{entry.discordHandle ? <span className="mt-1 block text-[var(--muted)]">Discord: {entry.discordHandle}</span> : null}{entry.societyPlayNumber ? <span className="block text-[var(--muted)]">Society #: {entry.societyPlayNumber}</span> : null}</>;
+  return <><span className="font-semibold">{entry.personName}</span>{entry.characterName ? <span className="mt-1 block">Character: {entry.characterName}{entry.characterSocietyNumber ? ` — ${entry.characterSocietyNumber}` : ""}</span> : null}{entry.discordHandle ? <span className="mt-1 block text-[var(--muted)]">Discord: {entry.discordHandle}</span> : null}{entry.societyPlayNumber ? <span className="block text-[var(--muted)]">Society #: {entry.societyPlayNumber}</span> : null}</>;
 }
 
 export function SessionRoster({ capacity, confirmedCount, waitlistedCount, entries }: { capacity: number; confirmedCount: number; waitlistedCount: number; entries?: SessionRosterEntry[] }) {

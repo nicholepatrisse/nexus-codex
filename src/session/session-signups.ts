@@ -6,11 +6,14 @@ import { canPerformCommunityOperation, type CommunityRole } from "@/authorizatio
 import { getDb } from "@/db/client";
 import {
   communities,
+  characters,
   communityAuditEvents,
   communityMemberships,
   contentItems,
   sessionSignups,
   sessions,
+  organizedPlayPrograms,
+  rulesets,
 } from "@/db/schema";
 
 type Database = ReturnType<typeof getDb>;
@@ -115,6 +118,7 @@ export async function signupForSession(
   actor: AuthenticatedActor,
   slug: string,
   sessionId: string,
+  characterId: string,
   database: Database = getDb(),
 ): Promise<SessionSignupResult> {
   return database.transaction(async (transaction) => {
@@ -125,8 +129,13 @@ export async function signupForSession(
       id: sessions.id,
       capacity: sessions.playerCapacity,
       gmPersonId: sessions.gmPersonId,
+      gameSystemId: rulesets.gameSystemId,
     })
-      .from(sessions).where(and(
+      .from(sessions)
+      .innerJoin(contentItems, eq(contentItems.id, sessions.contentItemId))
+      .innerJoin(organizedPlayPrograms, eq(organizedPlayPrograms.id, contentItems.programId))
+      .innerJoin(rulesets, eq(rulesets.id, organizedPlayPrograms.rulesetId))
+      .where(and(
         eq(sessions.id, sessionId),
         eq(sessions.communityId, access.community.id),
         eq(sessions.status, "published"),
@@ -134,16 +143,28 @@ export async function signupForSession(
     if (!session) return { status: "not-found" };
     if (session.gmPersonId === actor.personId) return { status: "unavailable" };
 
+    const [character] = await transaction.select({ id: characters.id }).from(characters).where(and(
+      eq(characters.id, characterId),
+      eq(characters.personId, actor.personId),
+      eq(characters.gameSystemId, session.gameSystemId),
+    )).limit(1);
+    if (!character) return { status: "unavailable" };
+
     const [existing] = await transaction.select({
       id: sessionSignups.id,
       status: sessionSignups.status,
       waitlistPosition: sessionSignups.waitlistPosition,
+      characterId: sessionSignups.characterId,
     }).from(sessionSignups).where(and(
       eq(sessionSignups.sessionId, session.id),
       eq(sessionSignups.personId, actor.personId),
       inArray(sessionSignups.status, ["confirmed", "waitlisted"]),
     )).limit(1).for("update");
     if (existing && (existing.status === "confirmed" || existing.status === "waitlisted")) {
+      if (!existing.characterId) {
+        await transaction.update(sessionSignups).set({ characterId: character.id, updatedAt: new Date() })
+          .where(eq(sessionSignups.id, existing.id));
+      }
       return {
         status: existing.status,
         signupId: existing.id,
@@ -176,6 +197,7 @@ export async function signupForSession(
       id: signupId,
       sessionId: session.id,
       personId: actor.personId,
+      characterId: character.id,
       status,
       waitlistPosition,
       createdAt: now,
@@ -184,7 +206,7 @@ export async function signupForSession(
     await transaction.insert(communityAuditEvents).values({
       id: randomUUID(), communityId: access.community.id, actorPersonId: actor.personId,
       eventType: status === "confirmed" ? "session.signup.confirmed" : "session.signup.waitlisted",
-      details: { sessionId: session.id, signupId }, occurredAt: now,
+      details: { sessionId: session.id, signupId, characterId: character.id }, occurredAt: now,
     });
     return { status, signupId, replayed: false, ...(waitlistPosition ? { waitlistPosition } : {}) };
   });
