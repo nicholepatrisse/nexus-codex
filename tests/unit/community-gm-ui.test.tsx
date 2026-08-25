@@ -55,6 +55,8 @@ describe("community GM UI", () => {
       />,
     );
     expect(markup).toContain("GM access is granted when you create a game");
+    expect(markup).toContain('href="/communities/absalom-lodge/sessions/new"');
+    expect(markup).toContain("New Session");
     expect(markup).not.toContain("Request GM access");
   });
 

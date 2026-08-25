@@ -61,7 +61,7 @@ export function SessionsOverview({ slug, sessions, readOnly = false }: { slug: s
   const cancelled = sessions.filter(({ status }) => status === "cancelled");
   return (
     <section className="mt-8 rounded-3xl border border-white/10 bg-black/20 p-8">
-      <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-2xl font-semibold">Sessions</h2><p className="mt-2 text-sm text-[var(--muted)]">Upcoming and cancelled games are separated for quick review.</p></div>{readOnly ? null : <Link href={`/communities/${encodeURIComponent(slug)}/sessions/new`} className="rounded-full bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-[#07110f]">Create session</Link>}</div>
+      <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-2xl font-semibold">Sessions</h2><p className="mt-2 text-sm text-[var(--muted)]">Upcoming and cancelled games are separated for quick review.</p></div>{readOnly ? null : <Link href={`/communities/${encodeURIComponent(slug)}/sessions/new`} className="rounded-full bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-[#07110f]">New Session</Link>}</div>
       <h3 className="mt-8 text-lg font-semibold">Upcoming sessions</h3>
       <SessionList slug={slug} sessions={upcoming} empty="No upcoming sessions." />
       <h3 className="mt-8 text-lg font-semibold">Cancelled sessions</h3>
