@@ -2,10 +2,55 @@
 
 :root {
   color-scheme: dark;
-  --background: #080b12;
-  --foreground: #f4f5f7;
-  --muted: #a4adbd;
-  --accent: #78d9c8;
+
+  /* Nexus Codex semantic palette. Override these values to create a theme. */
+  --theme-background: #0e1724;
+  --theme-brand: #2f6fed;
+  --theme-brand-hover: #4ca0f3;
+  --theme-brand-muted: #16324f;
+  --theme-accent: #55d9f6;
+  --theme-accent-secondary: #805ad5;
+  --theme-surface: #131b28;
+  --theme-surface-raised: #1b2636;
+  --theme-surface-hover: #223044;
+  --theme-border: #314158;
+  --theme-border-strong: #49617e;
+  --theme-text-primary: #f4f7fa;
+  --theme-text-muted: #aab7c8;
+  --theme-text-subtle: #718096;
+
+  /* Status colors intentionally remain independent of the brand palette. */
+  --theme-success: #53b987;
+  --theme-warning: #e0ae57;
+  --theme-danger: #e56670;
+  --theme-info: #4ca0f3;
+
+  /* Compatibility aliases for components that predate semantic utilities. */
+  --background: var(--theme-background);
+  --foreground: var(--theme-text-primary);
+  --muted: var(--theme-text-muted);
+  --accent: var(--theme-accent);
+}
+
+@theme inline {
+  --color-background: var(--theme-background);
+  --color-brand: var(--theme-brand);
+  --color-brand-hover: var(--theme-brand-hover);
+  --color-brand-muted: var(--theme-brand-muted);
+  --color-accent: var(--theme-accent);
+  --color-accent-secondary: var(--theme-accent-secondary);
+  --color-surface: var(--theme-surface);
+  --color-surface-raised: var(--theme-surface-raised);
+  --color-surface-hover: var(--theme-surface-hover);
+  --color-border: var(--theme-border);
+  --color-border-strong: var(--theme-border-strong);
+  --color-text-primary: var(--theme-text-primary);
+  --color-text-muted: var(--theme-text-muted);
+  --color-text-subtle: var(--theme-text-subtle);
+  --color-success: var(--theme-success);
+  --color-warning: var(--theme-warning);
+  --color-danger: var(--theme-danger);
+  --color-info: var(--theme-info);
 }
 
 * { box-sizing: border-box; }
@@ -13,7 +58,7 @@
 body {
   min-height: 100vh;
   margin: 0;
-  background: radial-gradient(circle at 15% 10%, rgb(28 64 74 / 45%), transparent 32rem), var(--background);
-  color: var(--foreground);
+  background: radial-gradient(circle at 15% 10%, rgb(28 64 74 / 45%), transparent 32rem), var(--theme-background);
+  color: var(--theme-text-primary);
   font-family: Arial, Helvetica, sans-serif;
 }
