@@ -28,11 +28,8 @@ export function CommunityProfile({ community, isOwner, isSignedIn = false, isMem
 
   return (
     <main className="mx-auto min-h-screen max-w-4xl px-6 py-16 sm:py-24">
-      <Link href="/" className="text-sm text-[var(--accent)] hover:underline">
-        ← Nexus Codex
-      </Link>
-      {published ? <p className="mt-8 rounded-xl border border-emerald-300/30 bg-emerald-300/10 p-4 text-sm text-emerald-100" role="status">Session published.</p> : null}
-      <section className="mt-8 rounded-3xl border border-white/10 bg-black/20 p-8 sm:p-12">
+      {published ? <p className="mb-8 rounded-xl border border-emerald-300/30 bg-emerald-300/10 p-4 text-sm text-emerald-100" role="status">Session published.</p> : null}
+      <section className="rounded-3xl border border-white/10 bg-black/20 p-8 sm:p-12">
         <p className="text-sm font-semibold tracking-[0.2em] text-[var(--accent)] uppercase">
           {isPublic ? "Public community" : "Private community"}
         </p>

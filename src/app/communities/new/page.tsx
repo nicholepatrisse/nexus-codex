@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { getAuthenticatedActor } from "@/auth/actor";
 import { CreateCommunityForm } from "@/app/communities/new/create-community-form";
 
@@ -9,10 +8,7 @@ export default async function NewCommunityPage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-2xl px-6 py-16 sm:py-24">
-      <Link href="/" className="text-sm text-[var(--accent)] hover:underline">
-        ← Nexus Codex
-      </Link>
-      <section className="mt-8 rounded-3xl border border-white/10 bg-black/20 p-7 shadow-2xl sm:p-10">
+      <section className="rounded-3xl border border-white/10 bg-black/20 p-7 shadow-2xl sm:p-10">
         <p className="text-sm font-semibold tracking-[0.2em] text-[var(--accent)] uppercase">
           New community
         </p>

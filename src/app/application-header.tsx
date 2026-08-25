@@ -2,14 +2,15 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { authClient } from "@/auth/client";
 import { signOutAndRefresh } from "@/auth/sign-out";
 import { clearNotificationsAction, markNotificationsReadAction } from "@/app/notification-actions";
 import { notificationBadgeCount, type AppNotification } from "@/notifications/model";
 
-export function ApplicationHeader({ notifications, notificationsError = false, displayName }: { notifications: AppNotification[]; notificationsError?: boolean; displayName: string }) {
+export function ApplicationHeader({ notifications, notificationsError = false, displayName, initiallySignedIn }: { notifications: AppNotification[]; notificationsError?: boolean; displayName: string; initiallySignedIn: boolean }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { data: session, isPending } = authClient.useSession();
   const [open, setOpen] = useState(false);
   const [readIds, setReadIds] = useState<Set<string>>(
@@ -23,6 +24,8 @@ export function ApplicationHeader({ notifications, notificationsError = false, d
     isRead: item.isRead || readIds.has(item.id),
   })), [notifications, readIds, clearedIds]);
   const badgeCount = useMemo(() => notificationBadgeCount(displayedNotifications), [displayedNotifications]);
+  const signedIn = isPending ? initiallySignedIn : Boolean(session);
+  if (pathname === "/" && !signedIn) return null;
   function toggleNotifications() {
     const nextOpen = !open; setOpen(nextOpen);
     if (!nextOpen) return;

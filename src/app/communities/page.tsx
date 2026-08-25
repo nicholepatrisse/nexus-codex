@@ -16,10 +16,7 @@ export default async function CommunitiesPage({ searchParams }: CommunitiesPageP
   if (!result) {
     return (
       <main className="mx-auto min-h-screen max-w-5xl px-6 py-16 sm:py-24">
-        <Link href="/" className="text-sm text-[var(--accent)] hover:underline">
-          ← Nexus Codex
-        </Link>
-        <section className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-7">
+        <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-7">
           <h1 className="text-3xl font-semibold">Community directory unavailable</h1>
           <p className="mt-3 text-[var(--muted)]">Please try again in a moment.</p>
         </section>
@@ -31,11 +28,7 @@ export default async function CommunitiesPage({ searchParams }: CommunitiesPageP
 
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-6 py-16 sm:py-24">
-      <Link href="/" className="text-sm text-[var(--accent)] hover:underline">
-        ← Nexus Codex
-      </Link>
-
-      <section className="mt-8">
+      <section>
         <p className="text-sm font-semibold tracking-[0.2em] text-[var(--accent)] uppercase">
           Community directory
         </p>
