@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, max, ne, sql } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import {
   communities,
@@ -7,6 +7,7 @@ import {
   communityMemberships,
   communityRoleGrants,
   contentItems,
+  notificationReads,
   sessionSignups,
   sessions,
 } from "@/db/schema";
@@ -20,7 +21,13 @@ const applicantMessages: Record<string, string> = {
 /** Produces only notifications the person is currently authorized to know about. */
 export async function listNotificationsForPerson(personId: string, database = getDb()) {
   const [ownerRows, applicantRows, sessionRows] = await Promise.all([
-    database.select({ communityId: communities.id, communityName: communities.name, communitySlug: communities.slug, pendingCount: count(communityMembershipRequests.id) })
+    database.select({
+      communityId: communities.id,
+      communityName: communities.name,
+      communitySlug: communities.slug,
+      pendingCount: count(communityMembershipRequests.id),
+      latestPendingAt: max(communityMembershipRequests.requestedAt),
+    })
       .from(communityRoleGrants).innerJoin(communities, eq(communities.id, communityRoleGrants.communityId))
       .innerJoin(communityMembershipRequests, and(eq(communityMembershipRequests.communityId, communities.id), eq(communityMembershipRequests.status, "pending")))
       .where(and(eq(communityRoleGrants.personId, personId), eq(communityRoleGrants.role, "owner"), eq(communityRoleGrants.status, "active"), isNull(communityRoleGrants.revokedAt)))
@@ -66,15 +73,15 @@ export async function listNotificationsForPerson(personId: string, database = ge
   ]);
 
   const ownerNotifications: AppNotification[] = ownerRows.map((row) => ({
-    id: `owner-membership:${row.communityId}`, kind: "owner.membership.pending", title: row.communityName,
+    id: `owner-membership:${row.communityId}:${row.pendingCount}:${row.latestPendingAt?.toISOString() ?? "unknown"}`, kind: "owner.membership.pending", title: row.communityName,
     message: `${row.pendingCount} membership ${row.pendingCount === 1 ? "request needs" : "requests need"} review.`,
-    href: `/communities/${encodeURIComponent(row.communitySlug)}/settings`, occurredAt: new Date(0), actionable: true,
+    href: `/communities/${encodeURIComponent(row.communitySlug)}/settings`, occurredAt: new Date(0), actionable: true, isRead: false,
   }));
   const applicantNotifications: AppNotification[] = applicantRows.map((row) => ({
     id: `applicant-membership:${row.requestId}:${row.status}`, kind: "applicant.membership.status", title: row.communityName,
     message: applicantMessages[row.status] ?? "Your membership request changed status.",
     href: applicantNotificationDestination(row.communityVisibility, Boolean(row.activeMembershipId), row.communitySlug),
-    occurredAt: row.updatedAt, actionable: row.status === "pending",
+    occurredAt: row.updatedAt, actionable: row.status === "pending", isRead: false,
   }));
   const sessionNotifications: AppNotification[] = sessionRows.map((row) => {
     const cancelled = row.eventType === "session.cancelled";
@@ -85,9 +92,38 @@ export async function listNotificationsForPerson(personId: string, database = ge
       message: `${row.scenarioCode} — ${row.scenarioTitle} was ${cancelled ? "cancelled" : "changed"}.`,
       href: `/communities/${encodeURIComponent(row.communitySlug)}/sessions/${row.sessionId}`,
       occurredAt: row.occurredAt,
-      actionable: false,
+      actionable: false, isRead: false,
     };
   });
-  return [...ownerNotifications, ...applicantNotifications, ...sessionNotifications]
+  const notifications = [...ownerNotifications, ...applicantNotifications, ...sessionNotifications];
+  const readRows = notifications.length === 0 ? [] : await database
+    .select({ notificationId: notificationReads.notificationId, clearedAt: notificationReads.clearedAt })
+    .from(notificationReads)
+    .where(and(eq(notificationReads.personId, personId), inArray(notificationReads.notificationId, notifications.map(({ id }) => id))));
+  const visibleReadIds = new Set(readRows.filter(({ clearedAt }) => clearedAt === null).map(({ notificationId }) => notificationId));
+  const clearedIds = new Set(readRows.filter(({ clearedAt }) => clearedAt !== null).map(({ notificationId }) => notificationId));
+  return notifications
+    .filter(({ id }) => !clearedIds.has(id))
+    .map((notification) => ({ ...notification, isRead: visibleReadIds.has(notification.id) }))
     .sort((a, b) => Number(b.actionable) - Number(a.actionable) || b.occurredAt.getTime() - a.occurredAt.getTime());
+}
+
+export async function clearNotifications(personId: string, notificationIds: string[], database = getDb()) {
+  const uniqueIds = [...new Set(notificationIds)].filter(Boolean);
+  if (uniqueIds.length === 0) return;
+  const clearedAt = new Date();
+  await database.insert(notificationReads)
+    .values(uniqueIds.map((notificationId) => ({ personId, notificationId, clearedAt })))
+    .onConflictDoUpdate({
+      target: [notificationReads.personId, notificationReads.notificationId],
+      set: { clearedAt },
+    });
+}
+
+export async function markNotificationsRead(personId: string, notificationIds: string[], database = getDb()) {
+  const uniqueIds = [...new Set(notificationIds)].filter(Boolean);
+  if (uniqueIds.length === 0) return;
+  await database.insert(notificationReads)
+    .values(uniqueIds.map((notificationId) => ({ personId, notificationId })))
+    .onConflictDoNothing();
 }

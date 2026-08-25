@@ -58,6 +58,21 @@ export const people = pgTable(
   ],
 );
 
+/** Per-person state for synthesized in-app notifications. */
+export const notificationReads = pgTable(
+  "notification_reads",
+  {
+    personId: text("person_id").notNull().references(() => people.id, { onDelete: "cascade" }),
+    notificationId: text("notification_id").notNull(),
+    readAt: timestamp("read_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    clearedAt: timestamp("cleared_at", { withTimezone: true, mode: "date" }),
+  },
+  (table) => [
+    uniqueIndex("notification_reads_person_notification_unique").on(table.personId, table.notificationId),
+    index("notification_reads_person_id_idx").on(table.personId),
+  ],
+);
+
 export const authSessions = pgTable(
   "auth_sessions",
   {

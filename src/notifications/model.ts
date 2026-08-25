@@ -12,10 +12,11 @@ export interface AppNotification {
   href: string | null;
   occurredAt: Date;
   actionable: boolean;
+  isRead: boolean;
 }
 
-export function notificationBadgeCount(notifications: AppNotification[], seen: ReadonlySet<string>) {
-  return notifications.filter((item) => item.actionable || !seen.has(item.id)).length;
+export function notificationBadgeCount(notifications: AppNotification[]) {
+  return notifications.filter((item) => !item.isRead).length;
 }
 
 export function applicantNotificationDestination(

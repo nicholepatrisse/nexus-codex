@@ -8,6 +8,7 @@ import {
 const notification = (id: string, actionable: boolean): AppNotification => ({
   id,
   actionable,
+  isRead: false,
   kind: "applicant.membership.status",
   title: "Lodge",
   message: "Updated",
@@ -16,10 +17,10 @@ const notification = (id: string, actionable: boolean): AppNotification => ({
 });
 
 describe("notifications", () => {
-  it("keeps actionable items counted after they are seen and clears informational updates", () => {
+  it("counts only unread notifications", () => {
     const items = [notification("pending", true), notification("approved", false)];
-    expect(notificationBadgeCount(items, new Set())).toBe(2);
-    expect(notificationBadgeCount(items, new Set(["pending", "approved"]))).toBe(1);
+    expect(notificationBadgeCount(items)).toBe(2);
+    expect(notificationBadgeCount(items.map((item) => ({ ...item, isRead: true })))).toBe(0);
   });
 
   it("does not link a private community until the applicant has authorized member access", () => {
