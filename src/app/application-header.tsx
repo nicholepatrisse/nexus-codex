@@ -28,7 +28,7 @@ export function ApplicationHeader({ notifications, notificationsError = false, d
     const result = await signOutAndRefresh(() => authClient.signOut(), () => router.refresh());
     if (result.error) { setSignOutError(true); setSignOutPending(false); }
   }
-  return <header className="border-b border-white/10 bg-[#080b12]/90 backdrop-blur"><div className="mx-auto flex min-h-16 max-w-5xl items-center justify-between gap-4 px-6">
+  return <header className="sticky top-0 z-50 border-b border-white/10 bg-[#080b12]/90 backdrop-blur"><div className="mx-auto flex min-h-16 max-w-5xl items-center justify-between gap-4 px-6">
     <Link href="/" className="font-semibold tracking-tight text-[var(--accent)]">Nexus Codex</Link><nav aria-label="Account" className="flex items-center gap-3">
       {isPending ? <span className="text-sm text-[var(--muted)]" role="status">Checking your session…</span> : null}
       {!isPending && !session ? <Link href="/sign-in" className="rounded-full border border-white/15 px-4 py-2 text-sm font-semibold hover:border-[var(--accent)]">Sign in</Link> : null}
