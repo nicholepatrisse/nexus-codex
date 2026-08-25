@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, gt, isNull, ne } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, ne } from "drizzle-orm";
 import { z } from "zod";
 import type { AuthenticatedActor } from "@/auth/actor";
 import { resolveCommunityAccessBySlug } from "@/authorization/community-access";
@@ -92,7 +92,7 @@ async function lockAndValidateAssignedGm(
     .where(and(
       eq(communityRoleGrants.communityId, communityId),
       eq(communityRoleGrants.personId, gmPersonId),
-      eq(communityRoleGrants.role, "gm"),
+      inArray(communityRoleGrants.role, ["owner", "gm"]),
       eq(communityRoleGrants.status, "active"),
       isNull(communityRoleGrants.revokedAt),
     ))

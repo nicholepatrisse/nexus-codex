@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { AuthenticatedActor } from "@/auth/actor";
 import { resolveCommunityAccessBySlug } from "@/authorization/community-access";
@@ -101,17 +101,34 @@ export async function revokeCommunityGmGrant(
       .limit(1);
     if (!activeMembership) return { status: "not-found" };
 
-    let impact: FutureGmSessionImpact;
-    try {
-      impact = await options.inspectFutureSessions({
-        communityId,
-        gmPersonId: grant.personId,
-        transaction,
-      });
-    } catch {
-      impact = { status: "unavailable" };
+    const [ownerGrant] = await transaction
+      .select({ id: communityRoleGrants.id })
+      .from(communityRoleGrants)
+      .where(and(
+        eq(communityRoleGrants.communityId, communityId),
+        eq(communityRoleGrants.personId, grant.personId),
+        eq(communityRoleGrants.role, "owner"),
+        eq(communityRoleGrants.status, "active"),
+        isNull(communityRoleGrants.revokedAt),
+      ))
+      .limit(1)
+      .for("update");
+
+    // Removing a redundant explicit GM grant cannot strand an owner's sessions:
+    // ownership itself continues to provide GM authority.
+    if (!ownerGrant) {
+      let impact: FutureGmSessionImpact;
+      try {
+        impact = await options.inspectFutureSessions({
+          communityId,
+          gmPersonId: grant.personId,
+          transaction,
+        });
+      } catch {
+        impact = { status: "unavailable" };
+      }
+      if (impact.status !== "clear") return { status: "blocked", impact };
     }
-    if (impact.status !== "clear") return { status: "blocked", impact };
 
     const [revoked] = await transaction
       .update(communityRoleGrants)

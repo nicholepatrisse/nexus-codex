@@ -118,6 +118,29 @@ describeWithDatabase("GM grant revocation", () => {
     expect(grant?.status).toBe("active");
   });
 
+  it("removes an owner's redundant GM grant without removing GM authority", async () => {
+    const ownerGmGrantId = crypto.randomUUID();
+    await getDb().insert(communityRoleGrants).values({
+      id: ownerGmGrantId,
+      communityId: community.id,
+      personId: owner.personId,
+      role: "gm",
+      status: "active",
+      grantedByPersonId: owner.personId,
+    });
+
+    await expect(
+      revokeCommunityGmGrant(owner, community.slug, ownerGmGrantId, {}, {
+        inspectFutureSessions: async () => { throw new Error("must not inspect owner sessions"); },
+      }),
+    ).resolves.toEqual({ status: "revoked", grantId: ownerGmGrantId });
+
+    const access = await resolveCommunityAccessBySlug(community.slug, owner.personId);
+    expect(access.status).toBe("available");
+    expect(access.status === "available" ? access.roles : []).toContain("owner");
+    expect(access.status === "available" ? access.roles : []).not.toContain("gm");
+  });
+
   it("allows one race-safe terminal transition, retains history, and removes authority immediately", async () => {
     const now = new Date(Date.now() + 1_000);
     const results = await Promise.all([
@@ -150,10 +173,11 @@ describeWithDatabase("GM grant revocation", () => {
           eq(communityAuditEvents.eventType, "community.gm.revoked"),
         ),
       );
-    expect(audits).toHaveLength(1);
-    expect(audits[0]?.details).toEqual({ grantId });
-    expect(JSON.stringify(audits[0]?.details)).not.toContain("Access ended");
-    expect(JSON.stringify(audits[0]?.details)).not.toContain(gm.personId);
+    const matchingAudits = audits.filter(({ details }) => details.grantId === grantId);
+    expect(matchingAudits).toHaveLength(1);
+    expect(matchingAudits[0]?.details).toEqual({ grantId });
+    expect(JSON.stringify(matchingAudits[0]?.details)).not.toContain("Access ended");
+    expect(JSON.stringify(matchingAudits[0]?.details)).not.toContain(gm.personId);
   });
 
   it("collapses unauthorized and cross-community operations", async () => {
