@@ -17,6 +17,7 @@ import type {
   CommunityLifecycleFormState,
   CommunitySettingsFormState,
 } from "./state";
+import { SUPPORTED_GAME_SYSTEM } from "@/game-system/config";
 
 export async function updateCommunitySettingsAction(
   currentSlug: string,
@@ -27,7 +28,7 @@ export async function updateCommunitySettingsAction(
     name: formData.get("name"),
     requestedSlug: formData.get("requestedSlug"),
     description: formData.get("description") || null,
-    supportedProgramIds: formData.getAll("supportedProgramIds"),
+    supportedProgramIds: [SUPPORTED_GAME_SYSTEM.organizedPlayProgramId],
     visibility: formData.get("visibility"),
     membershipApproval: formData.get("membershipApproval"),
     gmAdmission: formData.get("gmAdmission"),

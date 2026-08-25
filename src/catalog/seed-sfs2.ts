@@ -4,10 +4,11 @@ import { prepareContentItem } from "@/catalog/content-item";
 import { sfs2CatalogSnapshotSchema } from "@/catalog/paizo";
 import { getDb } from "@/db/client";
 import { contentItems, gameSystems, organizedPlayPrograms, rulesets } from "@/db/schema";
+import { SUPPORTED_GAME_SYSTEM } from "@/game-system/config";
 
-export const STARFINDER_SYSTEM_ID = "game-system-starfinder";
+export const STARFINDER_SYSTEM_ID = SUPPORTED_GAME_SYSTEM.id;
 export const SF2E_RULESET_ID = "ruleset-starfinder-2e";
-export const SFS2_PROGRAM_ID = "program-starfinder-society-2e";
+export const SFS2_PROGRAM_ID = SUPPORTED_GAME_SYSTEM.organizedPlayProgramId;
 
 export const sfs2CatalogSnapshot = sfs2CatalogSnapshotSchema.parse(snapshotData);
 
@@ -15,7 +16,7 @@ export async function seedSfs2Catalog(database = getDb()) {
   return database.transaction(async (transaction) => {
     const [system] = await transaction
       .insert(gameSystems)
-      .values({ id: STARFINDER_SYSTEM_ID, code: "starfinder", name: "Starfinder 2E" })
+      .values({ id: STARFINDER_SYSTEM_ID, code: SUPPORTED_GAME_SYSTEM.code, name: SUPPORTED_GAME_SYSTEM.name })
       .onConflictDoUpdate({
         target: gameSystems.code,
         set: { name: "Starfinder 2E" },

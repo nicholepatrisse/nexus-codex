@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { getAuthenticatedActor } from "@/auth/actor";
 import { getDb } from "@/db/client";
 import { listCommunityInvitations } from "@/community/community-invitations";
-import { communities, communityGmRequests, communityMembershipRequests, communityMemberships, communityRoleGrants, communitySupportedPrograms, contentItems, organizedPlayPrograms, people, sessions } from "@/db/schema";
+import { communities, communityGmRequests, communityMembershipRequests, communityMemberships, communityRoleGrants, contentItems, people, sessions } from "@/db/schema";
 import { authorizeOwnerSettings } from "./access";
 import { CommunityLifecycleForm } from "./lifecycle-form";
 import { CommunitySettingsForm } from "./settings-form";
@@ -23,9 +23,7 @@ export default async function CommunitySettingsPage({ params }: { params: Promis
   const database = getDb();
   const [settings] = await database.select().from(communities).where(eq(communities.id, authorization.access.community.id)).limit(1);
   if (!settings) notFound();
-  const [programs, selected, invitationResult, pendingRequests, pendingGmRequests, gmGrants, memberRows, activeRoleRows, futureSessions] = await Promise.all([
-    database.select({ id: organizedPlayPrograms.id, name: organizedPlayPrograms.name }).from(organizedPlayPrograms).orderBy(asc(organizedPlayPrograms.name)),
-    database.select({ id: communitySupportedPrograms.programId }).from(communitySupportedPrograms).where(eq(communitySupportedPrograms.communityId, settings.id)),
+  const [invitationResult, pendingRequests, pendingGmRequests, gmGrants, memberRows, activeRoleRows, futureSessions] = await Promise.all([
     listCommunityInvitations(actor, slug, { database }),
     database.select({ id: communityMembershipRequests.id, displayName: people.displayName, requestedAt: communityMembershipRequests.requestedAt }).from(communityMembershipRequests).innerJoin(people, eq(people.id, communityMembershipRequests.personId)).where(and(eq(communityMembershipRequests.communityId, settings.id), eq(communityMembershipRequests.status, "pending"))).orderBy(asc(communityMembershipRequests.requestedAt)),
     database.select({ id: communityGmRequests.id, displayName: people.displayName, requestedAt: communityGmRequests.requestedAt }).from(communityGmRequests).innerJoin(people, eq(people.id, communityGmRequests.personId)).where(and(eq(communityGmRequests.communityId, settings.id), eq(communityGmRequests.status, "pending"))).orderBy(asc(communityGmRequests.requestedAt)),
@@ -38,7 +36,7 @@ export default async function CommunitySettingsPage({ params }: { params: Promis
   const members = memberRows.map((member) => ({ ...member, roles: activeRoleRows.filter(({ personId }) => personId === member.personId).map(({ role }) => role) }));
   const grantsWithImpact = gmGrants.map((grant) => ({ ...grant, futureSessions: grant.status === "active" ? futureSessions.filter(({ gmPersonId }) => gmPersonId === grant.personId).map((session) => ({ id: session.id, label: `${session.code} — ${session.title}` })) : [] }));
 
-  const profile = <section className="mt-8 rounded-3xl border border-white/10 bg-black/20 p-8"><h2 className="mb-6 text-2xl font-semibold">Profile, policies, and lifecycle state</h2><p className="mb-6 text-sm capitalize text-[var(--muted)]">Status: {settings.lifecycleStatus}</p>{archived ? <p className="text-sm text-[var(--muted)]">Restore this community from the Lifecycle tab to edit its profile and policies.</p> : <CommunitySettingsForm settings={settings} programs={programs} selectedProgramIds={selected.map(({ id }) => id)} />}</section>;
+  const profile = <section className="mt-8 rounded-3xl border border-white/10 bg-black/20 p-8"><h2 className="mb-6 text-2xl font-semibold">Profile, policies, and lifecycle state</h2><p className="mb-6 text-sm capitalize text-[var(--muted)]">Status: {settings.lifecycleStatus}</p>{archived ? <p className="text-sm text-[var(--muted)]">Restore this community from the Lifecycle tab to edit its profile and policies.</p> : <CommunitySettingsForm settings={settings} />}</section>;
   const peopleTab = <><MembersOverview members={members} />{archived ? null : <><AdmissionManagement slug={settings.slug} invitations={invitationResult.status === "found" ? invitationResult.invitations : []} requests={pendingRequests} /><GmManagement slug={settings.slug} requests={pendingGmRequests} grants={grantsWithImpact} /></>}</>;
   const lifecycle = <section className="mt-8 rounded-3xl border border-red-300/20 bg-red-950/10 p-8"><h2 className="text-2xl font-semibold">{archived ? "Restore community" : "Archive community"}</h2><p className="mt-3 text-[var(--muted)]">{archived ? "Restoring makes this community active again. Its memberships and records are preserved." : "Archiving hides this community and prevents normal use. It does not permanently delete any data."}</p><CommunityLifecycleForm slug={settings.slug} action={archived ? "restore" : "archive"} /></section>;
 

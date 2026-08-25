@@ -6,7 +6,7 @@ import { CharacterCreationError, createCharacter, createCharacterInputSchema } f
 import { societyPlayNumberSchema, updateSocietyPlayNumber } from "@/profile/profile";
 export interface CreateCharacterFormState { fieldErrors?: Record<string, string[] | undefined>; formError?: string }
 export async function createCharacterAction(_state: CreateCharacterFormState, formData: FormData): Promise<CreateCharacterFormState> {
-  const parsed = createCharacterInputSchema.safeParse({ name: formData.get("name"), gameSystemId: formData.get("gameSystemId"), characterNumber: formData.get("characterNumber") });
+  const parsed = createCharacterInputSchema.safeParse({ name: formData.get("name"), characterNumber: formData.get("characterNumber") });
   if (!parsed.success) return { fieldErrors: z.flattenError(parsed.error).fieldErrors };
   try { await createCharacter(await requireAuthenticatedActor(), parsed.data); }
   catch (error) {

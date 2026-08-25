@@ -10,6 +10,7 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { SUPPORTED_GAME_SYSTEM } from "@/game-system/config";
 import { sql } from "drizzle-orm";
 
 /** Infrastructure metadata only. Product tables begin with the M0 domain change. */
@@ -145,7 +146,7 @@ export const characters = pgTable(
   {
     id: text("id").primaryKey(),
     personId: text("person_id").notNull().references(() => people.id, { onDelete: "cascade" }),
-    gameSystemId: text("game_system_id").notNull().references(() => gameSystems.id, { onDelete: "restrict" }),
+    gameSystemId: text("game_system_id").notNull().default(SUPPORTED_GAME_SYSTEM.id).references(() => gameSystems.id, { onDelete: "restrict" }),
     name: text("name").notNull(),
     societyNumber: text("society_number").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
@@ -420,6 +421,10 @@ export const sessions = pgTable(
     contentItemId: text("content_item_id")
       .notNull()
       .references(() => contentItems.id, { onDelete: "restrict" }),
+    gameSystemId: text("game_system_id")
+      .notNull()
+      .default(SUPPORTED_GAME_SYSTEM.id)
+      .references(() => gameSystems.id, { onDelete: "restrict" }),
     gmPersonId: text("gm_person_id")
       .notNull()
       .references(() => people.id, { onDelete: "restrict" }),
@@ -455,6 +460,7 @@ export const sessions = pgTable(
       table.startsAt,
     ),
     index("sessions_gm_status_starts_at_idx").on(table.gmPersonId, table.status, table.startsAt),
+    index("sessions_game_system_id_idx").on(table.gameSystemId),
     check("sessions_status_check", sql`${table.status} in ('draft', 'published', 'cancelled')`),
     check("sessions_time_order_check", sql`${table.endsAt} > ${table.startsAt}`),
     check(
