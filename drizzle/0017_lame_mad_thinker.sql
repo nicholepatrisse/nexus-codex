@@ -1,0 +1,2 @@
+ALTER TABLE "characters" DROP CONSTRAINT "characters_society_number_format";--> statement-breakpoint
+ALTER TABLE "characters" ADD CONSTRAINT "characters_society_number_format" CHECK ("characters"."society_number" ~ '^[0-9]+-[0-9]+$');

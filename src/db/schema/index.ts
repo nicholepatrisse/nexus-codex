@@ -140,6 +140,27 @@ export const gameSystems = pgTable("game_systems", {
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 });
 
+export const characters = pgTable(
+  "characters",
+  {
+    id: text("id").primaryKey(),
+    personId: text("person_id").notNull().references(() => people.id, { onDelete: "cascade" }),
+    gameSystemId: text("game_system_id").notNull().references(() => gameSystems.id, { onDelete: "restrict" }),
+    name: text("name").notNull(),
+    societyNumber: text("society_number").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("characters_person_id_idx").on(table.personId),
+    index("characters_game_system_id_idx").on(table.gameSystemId),
+    uniqueIndex("characters_person_society_number_unique").on(table.personId, table.societyNumber),
+    check("characters_name_not_blank", sql`length(btrim(${table.name})) > 0`),
+    check("characters_name_length_check", sql`length(${table.name}) <= 100`),
+    check("characters_society_number_format", sql`${table.societyNumber} ~ '^[0-9]+-[0-9]+$'`),
+  ],
+);
+
 export const rulesets = pgTable(
   "rulesets",
   {

@@ -15,10 +15,10 @@ export async function seedSfs2Catalog(database = getDb()) {
   return database.transaction(async (transaction) => {
     const [system] = await transaction
       .insert(gameSystems)
-      .values({ id: STARFINDER_SYSTEM_ID, code: "starfinder", name: "Starfinder" })
+      .values({ id: STARFINDER_SYSTEM_ID, code: "starfinder", name: "Starfinder 2E" })
       .onConflictDoUpdate({
         target: gameSystems.code,
-        set: { name: "Starfinder" },
+        set: { name: "Starfinder 2E" },
       })
       .returning({ id: gameSystems.id });
     if (!system) throw new Error("Failed to seed the Starfinder game system.");
