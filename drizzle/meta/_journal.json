@@ -113,6 +113,20 @@
       "when": 1787612209532,
       "tag": "0015_loving_the_fallen",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1787677347111,
+      "tag": "0016_woozy_goblin_queen",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1787678321917,
+      "tag": "0017_lame_mad_thinker",
+      "breakpoints": true
     }
   ]
 }

@@ -17,6 +17,16 @@ export const updateProfileInputSchema = z.object({
 
 export type UpdateProfileInput = z.output<typeof updateProfileInputSchema>;
 
+export const societyPlayNumberSchema = z.string().trim().regex(/^\d+$/, "Enter your numeric society number.").max(50);
+
+export async function updateSocietyPlayNumber(actor: AuthenticatedActor, value: string) {
+  const societyPlayNumber = societyPlayNumberSchema.parse(value);
+  const [updated] = await getDb().update(people).set({ societyPlayNumber, updatedAt: new Date() })
+    .where(eq(people.id, actor.personId)).returning({ societyPlayNumber: people.societyPlayNumber });
+  if (!updated) throw new Error("Profile not found.");
+  return updated.societyPlayNumber!;
+}
+
 export async function getProfile(actor: AuthenticatedActor) {
   const [profile] = await getDb()
     .select({
