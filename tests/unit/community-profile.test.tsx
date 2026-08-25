@@ -43,6 +43,8 @@ describe("community profile", () => {
 
     expect(markup).toContain('href="/communities/absalom-station/settings"');
     expect(markup).toContain("Community settings");
+    expect(markup).toContain('href="/communities/absalom-station/sessions/new"');
+    expect(markup).toContain("New Session");
   });
 
   it("offers signed-out visitors a sign-in return path", () => {

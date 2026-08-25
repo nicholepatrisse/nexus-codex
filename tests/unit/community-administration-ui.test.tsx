@@ -14,10 +14,12 @@ describe("community administration overview", () => {
     expect(markup).toContain("Cancelled sessions");
     expect(markup).toContain("SFS 1-01");
     expect(markup).toContain("SFS 1-02");
+    expect(markup).toContain('href="/communities/absalom/sessions/new"');
+    expect(markup).toContain("New Session");
   });
 
   it("removes mutation links in archived read-only mode", () => {
     const markup = renderToStaticMarkup(<AdministrationOverview slug="archived" members={[]} sessions={[]} readOnly />);
-    expect(markup).not.toContain("Create session");
+    expect(markup).not.toContain("New Session");
   });
 });
