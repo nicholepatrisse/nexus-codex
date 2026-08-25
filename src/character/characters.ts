@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 import type { AuthenticatedActor } from "@/auth/actor";
+import { resolveCommunityAccessBySlug } from "@/authorization/community-access";
+import { canPerformCommunityOperation, type CommunityRole } from "@/authorization/policy";
 import { getDb } from "@/db/client";
-import { characters, gameSystems, people } from "@/db/schema";
+import { characters, communities, contentItems, gameSystems, people, sessionSignups, sessions } from "@/db/schema";
 
 export const createCharacterInputSchema = z.object({
   name: z.string().trim().min(1, "Enter a character name.").max(100, "Character name must be 100 characters or fewer."),
@@ -43,6 +45,37 @@ export async function listCharacters(actor: AuthenticatedActor, database: Databa
   return database.select({ id: characters.id, name: characters.name, societyNumber: characters.societyNumber, gameSystemId: characters.gameSystemId, gameSystemName: gameSystems.name })
     .from(characters).innerJoin(gameSystems, eq(gameSystems.id, characters.gameSystemId))
     .where(eq(characters.personId, actor.personId)).orderBy(asc(characters.name));
+}
+export interface CharacterSession { id: string; communityName: string; communitySlug: string; scenarioCode: string; scenarioTitle: string; startsAt: Date; displayTimeZone: string; signupStatus: "confirmed" | "waitlisted" | "cancelled"; }
+export interface CharacterDetail { id: string; name: string; societyNumber: string; gameSystemName: string; isOwner: boolean; upcomingSessions: CharacterSession[]; pastSessions: CharacterSession[]; }
+function communityRole(access: { isActiveMember: boolean; roles: ("owner" | "gm")[] }): CommunityRole | "member" | "visitor" {
+  if (access.roles.includes("owner")) return "owner";
+  if (access.roles.includes("gm")) return "gm";
+  return access.isActiveMember ? "member" : "visitor";
+}
+/** Returns only character and game data the actor is authorized to see. */
+export async function getCharacterDetail(actor: AuthenticatedActor, characterId: string, now: Date = new Date(), database: Database = getDb()): Promise<CharacterDetail | null> {
+  const [character] = await database.select({ id: characters.id, personId: characters.personId, name: characters.name, societyNumber: characters.societyNumber, gameSystemName: gameSystems.name }).from(characters).innerJoin(gameSystems, eq(gameSystems.id, characters.gameSystemId)).where(eq(characters.id, characterId)).limit(1);
+  if (!character) return null;
+  const isOwner = character.personId === actor.personId;
+  if (!isOwner) {
+    const [managedSignup] = await database.select({ id: sessionSignups.id }).from(sessionSignups).innerJoin(sessions, eq(sessions.id, sessionSignups.sessionId)).where(and(eq(sessionSignups.characterId, character.id), eq(sessions.gmPersonId, actor.personId))).limit(1);
+    if (!managedSignup) return null;
+  }
+  const rows = await database.select({ id: sessions.id, gmPersonId: sessions.gmPersonId, status: sessions.status, communityName: communities.name, communitySlug: communities.slug, scenarioCode: contentItems.code, scenarioTitle: contentItems.title, startsAt: sessions.startsAt, displayTimeZone: sessions.displayTimeZone, signupStatus: sessionSignups.status }).from(sessionSignups).innerJoin(sessions, eq(sessions.id, sessionSignups.sessionId)).innerJoin(communities, eq(communities.id, sessions.communityId)).innerJoin(contentItems, eq(contentItems.id, sessions.contentItemId)).where(eq(sessionSignups.characterId, character.id));
+  const visible = (await Promise.all(rows.map(async (row) => {
+    if (row.status !== "published" && row.status !== "cancelled") return null;
+    if (!isOwner && row.gmPersonId !== actor.personId) return null;
+    const access = await resolveCommunityAccessBySlug(row.communitySlug, actor.personId, database);
+    if (access.status !== "available") return null;
+    if (!canPerformCommunityOperation(communityRole(access), "schedule.view", { visibility: access.community.visibility === "public" ? "public" : "private", scheduleVisibility: access.community.scheduleVisibility === "public" ? "public" : "members" })) return null;
+    if (row.signupStatus !== "confirmed" && row.signupStatus !== "waitlisted" && row.signupStatus !== "cancelled") return null;
+    return { id: row.id, communityName: row.communityName, communitySlug: row.communitySlug, scenarioCode: row.scenarioCode, scenarioTitle: row.scenarioTitle, startsAt: row.startsAt, displayTimeZone: row.displayTimeZone, signupStatus: row.signupStatus };
+  }))).filter((session): session is CharacterSession => session !== null);
+  const upcomingSessions = visible.filter((session) => session.startsAt >= now && session.signupStatus !== "cancelled").sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
+  const pastSessions = visible.filter((session) => session.startsAt < now).sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime());
+  if (!isOwner && visible.length === 0) return null;
+  return { id: character.id, name: character.name, societyNumber: character.societyNumber, gameSystemName: character.gameSystemName, isOwner, upcomingSessions, pastSessions };
 }
 export async function createCharacter(actor: AuthenticatedActor, rawInput: CreateCharacterInput, database: Database = getDb()) {
   const input = createCharacterInputSchema.parse(rawInput);

@@ -54,7 +54,7 @@ export default async function SessionPage({ params }: { params: Promise<{ slug: 
       eligibleCharacters = await getDb().select({ id: characters.id, name: characters.name, societyNumber: characters.societyNumber }).from(characters).where(and(eq(characters.personId, actor!.personId), eq(characters.gameSystemId, persistedOwnSignup.gameSystemId))).orderBy(asc(characters.name));
       ownSignup.characters = eligibleCharacters;
     }
-    roster = isManager ? rows.map((row) => ({ id: row.id, personName: row.personName, discordHandle: row.discordHandle, societyPlayNumber: row.societyPlayNumber, characterName: row.characterName, characterSocietyNumber: row.characterSocietyNumber, status: row.status === "confirmed" ? "confirmed" : "waitlisted", ...(row.waitlistPosition ? { waitlistPosition: row.waitlistPosition } : {}) })) : undefined;
+    roster = isManager ? rows.map((row) => ({ id: row.id, personName: row.personName, characterId: isAssignedGm ? row.characterId : null, discordHandle: row.discordHandle, societyPlayNumber: row.societyPlayNumber, characterName: row.characterName, characterSocietyNumber: row.characterSocietyNumber, status: row.status === "confirmed" ? "confirmed" : "waitlisted", ...(row.waitlistPosition ? { waitlistPosition: row.waitlistPosition } : {}) })) : undefined;
   }
   const cancelled = session.status === "cancelled";
   const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
