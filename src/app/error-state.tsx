@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ReportIssueLink } from "@/app/report-issue-link";
 
 interface ErrorStateProps {
   errorId: string;
@@ -40,6 +41,7 @@ export function ErrorState({ errorId, onRetry, global = false }: ErrorStateProps
           >
             Return home
           </Link>
+          <ReportIssueLink className="inline-flex items-center gap-2 rounded-md border border-white/20 px-5 py-3 font-semibold text-[var(--foreground)] hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]" />
         </div>
       </section>
     </main>
