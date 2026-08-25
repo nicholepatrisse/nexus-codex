@@ -12,6 +12,7 @@ const game: SignedUpGame = {
   startsAt: new Date("2030-09-01T18:00:00-07:00"),
   displayTimeZone: "America/Phoenix",
   sessionStatus: "published",
+  participationRole: "player",
   signupStatus: "waitlisted",
   waitlistPosition: 2,
 };
@@ -31,8 +32,21 @@ describe("signed-up games", () => {
     expect(markup).toContain("Absalom Lodge");
     expect(markup).toContain("1-01 — Invasion&#x27;s Edge");
     expect(markup).toContain("Waitlisted · #2");
+    expect(markup).toContain(">Player<");
     expect(markup).toContain('dateTime="2030-09-02T01:00:00.000Z"');
     expect(markup).toContain('href="/communities/absalom%20lodge/sessions/session%2Fone"');
+  });
+
+  it("labels GM games without showing a player signup status", () => {
+    const markup = renderToStaticMarkup(<SignedUpGamesList games={[{
+      ...game,
+      participationRole: "gm",
+      signupStatus: null,
+      waitlistPosition: null,
+    }]} />);
+    expect(markup).toContain(">GM<");
+    expect(markup).not.toContain("Waitlisted");
+    expect(markup).not.toContain("Confirmed");
   });
 
   it("visibly and audibly distinguishes cancelled games", () => {
