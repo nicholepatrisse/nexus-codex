@@ -18,6 +18,7 @@ describe("community profile", () => {
     expect(markup).toContain("Public community");
     expect(markup).toContain("Absalom Station Lodge");
     expect(markup).toContain("Public games in the Pact Worlds.");
+    expect(markup).not.toContain('href="/"');
     expect(markup).not.toContain("Community settings");
     expect(markup).not.toMatch(/member count|invitation|audit|location/i);
   });
