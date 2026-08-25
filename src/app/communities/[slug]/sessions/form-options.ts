@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import {
   communityMemberships,
@@ -24,7 +24,7 @@ export async function loadSessionFormOptions(communityId: string) {
       .where(eq(contentItems.contentType, "scenario"))
       .orderBy(asc(contentItems.normalizedCode)),
     database
-      .select({ id: people.id, label: people.displayName })
+      .selectDistinct({ id: people.id, label: people.displayName })
       .from(communityRoleGrants)
       .innerJoin(people, eq(people.id, communityRoleGrants.personId))
       .innerJoin(
@@ -37,7 +37,7 @@ export async function loadSessionFormOptions(communityId: string) {
       )
       .where(and(
         eq(communityRoleGrants.communityId, communityId),
-        eq(communityRoleGrants.role, "gm"),
+        inArray(communityRoleGrants.role, ["owner", "gm"]),
         eq(communityRoleGrants.status, "active"),
         isNull(communityRoleGrants.revokedAt),
       ))

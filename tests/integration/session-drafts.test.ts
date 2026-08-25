@@ -129,6 +129,33 @@ describeWithDatabase("session drafts", () => {
       .resolves.toMatchObject({ status: "updated" });
   });
 
+  it("treats the owner as an assignable GM without an explicit GM grant", async () => {
+    const [explicitOwnerGmGrant] = await getDb().select({ id: communityRoleGrants.id })
+      .from(communityRoleGrants).where(and(
+        eq(communityRoleGrants.communityId, community.id),
+        eq(communityRoleGrants.personId, owner.personId),
+        eq(communityRoleGrants.role, "gm"),
+      ));
+    expect(explicitOwnerGmGrant).toBeUndefined();
+
+    const created = await createSessionDraft(owner, community.slug, {
+      ...draftInput(), gmPersonId: owner.personId,
+    });
+    expect(created.status).toBe("created");
+    if (created.status !== "created") throw new Error("owner GM draft was not created");
+
+    const [stored] = await getDb().select({ gmPersonId: sessions.gmPersonId })
+      .from(sessions).where(eq(sessions.id, created.sessionId));
+    expect(stored?.gmPersonId).toBe(owner.personId);
+    await expect(publishSession(owner, community.slug, created.sessionId))
+      .resolves.toMatchObject({ status: "published", sessionId: created.sessionId });
+    await expect(updatePublishedSession(owner, community.slug, created.sessionId, {
+      ...draftInput(), gmPersonId: owner.personId, notes: "Managed by the owner GM",
+    })).resolves.toEqual({ status: "updated", sessionId: created.sessionId });
+    await expect(cancelPublishedSession(owner, community.slug, created.sessionId))
+      .resolves.toMatchObject({ status: "cancelled", sessionId: created.sessionId });
+  });
+
   it("keeps a GM self-assigned and rejects unsupported scenarios", async () => {
     await expect(createSessionDraft(gmOne, community.slug, { ...draftInput(), gmPersonId: gmTwo.personId }))
       .resolves.toEqual({ status: "forbidden" });
