@@ -161,6 +161,12 @@ describeWithDatabase("session signups", () => {
       personId: confirmed!.personId,
       status: "confirmed",
     });
+    await getDb().insert(sessionSignups).values({
+      id: `gm-later-signup-${suffix}`,
+      sessionId: laterSessionId,
+      personId: gm.personId,
+      status: "confirmed",
+    });
 
     const games = await listUpcomingSignedUpGames(
       confirmed!.personId,
@@ -170,8 +176,22 @@ describeWithDatabase("session signups", () => {
     expect(games[0]).toMatchObject({
       communityName: expect.any(String),
       scenarioTitle: "Signup scenario",
+      participationRole: "player",
       signupStatus: "confirmed",
     });
+    await expect(listUpcomingSignedUpGames(gm.personId, new Date("2030-01-01T00:00:00Z")))
+      .resolves.toEqual([
+        expect.objectContaining({
+          sessionId: publishedSessionId,
+          participationRole: "gm",
+          signupStatus: null,
+        }),
+        expect.objectContaining({
+          sessionId: laterSessionId,
+          participationRole: "gm",
+          signupStatus: "confirmed",
+        }),
+      ]);
     await expect(listUpcomingSignedUpGames(crypto.randomUUID(), new Date("2030-01-01T00:00:00Z")))
       .resolves.toEqual([]);
 
@@ -182,7 +202,7 @@ describeWithDatabase("session signups", () => {
     await getDb().update(communities).set({ visibility: "public", scheduleVisibility: "public" })
       .where(eq(communities.id, community.id));
 
-    await getDb().delete(sessionSignups).where(eq(sessionSignups.id, laterSignupId));
+    await getDb().delete(sessionSignups).where(eq(sessionSignups.sessionId, laterSessionId));
     await getDb().delete(sessions).where(eq(sessions.id, laterSessionId));
   });
 

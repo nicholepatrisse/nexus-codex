@@ -32,11 +32,12 @@ export interface SignedUpGame {
   startsAt: Date;
   displayTimeZone: string;
   sessionStatus: "published" | "cancelled";
-  signupStatus: "confirmed" | "waitlisted";
+  participationRole: "gm" | "player";
+  signupStatus: "confirmed" | "waitlisted" | null;
   waitlistPosition: number | null;
 }
 
-/** Upcoming live signups that the person is still authorized to open. */
+/** Upcoming games the person can still open, either as the GM or as a signed-up player. */
 export async function listUpcomingSignedUpGames(
   personId: string,
   now: Date = new Date(),
@@ -44,6 +45,7 @@ export async function listUpcomingSignedUpGames(
 ): Promise<SignedUpGame[]> {
   const rows = await database.select({
     sessionId: sessions.id,
+    gmPersonId: sessions.gmPersonId,
     communityName: communities.name,
     communitySlug: communities.slug,
     scenarioCode: contentItems.code,
@@ -53,8 +55,12 @@ export async function listUpcomingSignedUpGames(
     sessionStatus: sessions.status,
     signupStatus: sessionSignups.status,
     waitlistPosition: sessionSignups.waitlistPosition,
-  }).from(sessionSignups)
-    .innerJoin(sessions, eq(sessions.id, sessionSignups.sessionId))
+  }).from(sessions)
+    .leftJoin(sessionSignups, and(
+      eq(sessionSignups.sessionId, sessions.id),
+      eq(sessionSignups.personId, personId),
+      inArray(sessionSignups.status, ["confirmed", "waitlisted"]),
+    ))
     .innerJoin(communities, eq(communities.id, sessions.communityId))
     .innerJoin(contentItems, eq(contentItems.id, sessions.contentItemId))
     .leftJoin(communityMemberships, and(
@@ -63,8 +69,7 @@ export async function listUpcomingSignedUpGames(
       eq(communityMemberships.status, "active"),
     ))
     .where(and(
-      eq(sessionSignups.personId, personId),
-      inArray(sessionSignups.status, ["confirmed", "waitlisted"]),
+      or(eq(sessions.gmPersonId, personId), isNotNull(sessionSignups.id)),
       inArray(sessions.status, ["published", "cancelled"]),
       eq(communities.lifecycleStatus, "active"),
       or(
@@ -75,9 +80,18 @@ export async function listUpcomingSignedUpGames(
     ))
     .orderBy(asc(sessions.startsAt), asc(sessions.id));
 
-  return rows.filter((row): row is SignedUpGame =>
-    (row.sessionStatus === "published" || row.sessionStatus === "cancelled") &&
-    (row.signupStatus === "confirmed" || row.signupStatus === "waitlisted"));
+  return rows.flatMap((row): SignedUpGame[] => {
+    if (row.sessionStatus !== "published" && row.sessionStatus !== "cancelled") return [];
+    if (row.signupStatus !== null && row.signupStatus !== "confirmed" && row.signupStatus !== "waitlisted") return [];
+    const { gmPersonId, ...game } = row;
+    const participationRole = gmPersonId === personId ? "gm" as const : "player" as const;
+    return [{
+      ...game,
+      sessionStatus: row.sessionStatus,
+      signupStatus: row.signupStatus,
+      participationRole,
+    }];
+  });
 }
 
 function effectiveRole(access: { isActiveMember: boolean; roles: ("owner" | "gm")[] }): CommunityRole {
