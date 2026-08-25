@@ -15,6 +15,7 @@ const game: SignedUpGame = {
   participationRole: "player",
   signupStatus: "waitlisted",
   waitlistPosition: 2,
+  characterName: "Navasi",
 };
 
 describe("signed-up games", () => {
@@ -32,7 +33,9 @@ describe("signed-up games", () => {
     expect(markup).toContain("Absalom Lodge");
     expect(markup).toContain("1-01 — Invasion&#x27;s Edge");
     expect(markup).toContain("Waitlisted · #2");
-    expect(markup).toContain(">Player<");
+    expect(markup).not.toContain(">Player<");
+    expect(markup).toContain(">Navasi<");
+    expect(markup).toContain("border-sky-200/30");
     expect(markup).toContain('dateTime="2030-09-02T01:00:00.000Z"');
     expect(markup).toContain('href="/communities/absalom%20lodge/sessions/session%2Fone"');
   });
@@ -47,6 +50,7 @@ describe("signed-up games", () => {
     expect(markup).toContain(">GM<");
     expect(markup).not.toContain("Waitlisted");
     expect(markup).not.toContain("Confirmed");
+    expect(markup).not.toContain(">Navasi<");
   });
 
   it("visibly and audibly distinguishes cancelled games", () => {

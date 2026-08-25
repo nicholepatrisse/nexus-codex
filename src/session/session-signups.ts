@@ -93,6 +93,7 @@ export interface SignedUpGame {
   participationRole: "gm" | "player";
   signupStatus: "confirmed" | "waitlisted" | null;
   waitlistPosition: number | null;
+  characterName?: string | null;
 }
 
 /** Upcoming games the person can still open, either as the GM or as a signed-up player. */
@@ -113,12 +114,14 @@ export async function listUpcomingSignedUpGames(
     sessionStatus: sessions.status,
     signupStatus: sessionSignups.status,
     waitlistPosition: sessionSignups.waitlistPosition,
+    characterName: characters.name,
   }).from(sessions)
     .leftJoin(sessionSignups, and(
       eq(sessionSignups.sessionId, sessions.id),
       eq(sessionSignups.personId, personId),
       inArray(sessionSignups.status, ["confirmed", "waitlisted"]),
     ))
+    .leftJoin(characters, eq(characters.id, sessionSignups.characterId))
     .innerJoin(communities, eq(communities.id, sessions.communityId))
     .innerJoin(contentItems, eq(contentItems.id, sessions.contentItemId))
     .leftJoin(communityMemberships, and(

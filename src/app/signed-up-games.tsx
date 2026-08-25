@@ -38,14 +38,14 @@ export function SignedUpGamesList({
         const signupLabel = game.signupStatus === "waitlisted"
           ? `Waitlisted${game.waitlistPosition ? ` · #${game.waitlistPosition}` : ""}`
           : "Confirmed";
-        const roleLabel = game.participationRole === "gm" ? "GM" : "Player";
         return <li key={game.sessionId}>
           <Link href={`/communities/${encodeURIComponent(game.communitySlug)}/sessions/${encodeURIComponent(game.sessionId)}`} className={`block h-full rounded-2xl border p-5 transition focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--accent)] ${cancelled ? "border-red-200/20 bg-red-300/[0.04] hover:border-red-200/50" : "border-white/10 bg-white/5 hover:border-[var(--accent)]"}`}>
             <span className="flex items-start justify-between gap-4">
               <span className="font-semibold text-white">{game.scenarioCode} — {game.scenarioTitle}</span>
               <span className="flex shrink-0 flex-wrap justify-end gap-2">
-                <span className="rounded-full border border-sky-200/30 bg-sky-300/10 px-2.5 py-1 text-xs font-semibold text-sky-100">{roleLabel}</span>
+                {game.participationRole === "gm" ? <span className="rounded-full border border-sky-200/30 bg-sky-300/10 px-2.5 py-1 text-xs font-semibold text-sky-100">GM</span> : null}
                 {game.participationRole === "player" ? <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${game.signupStatus === "waitlisted" ? "border-amber-200/30 bg-amber-300/10 text-amber-100" : "border-emerald-200/30 bg-emerald-300/10 text-emerald-100"}`}>{signupLabel}</span> : null}
+                {game.participationRole === "player" && game.characterName ? <span className="rounded-full border border-sky-200/30 bg-sky-300/10 px-2.5 py-1 text-xs font-semibold text-sky-100">{game.characterName}</span> : null}
                 {cancelled ? <span className="rounded-full border border-red-200/30 bg-red-300/10 px-2.5 py-1 text-xs font-semibold text-red-100">Cancelled</span> : null}
               </span>
             </span>
