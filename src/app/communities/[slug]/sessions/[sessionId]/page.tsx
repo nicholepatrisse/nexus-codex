@@ -5,7 +5,7 @@ import { getAuthenticatedActor } from "@/auth/actor";
 import { resolveCommunityAccessBySlug } from "@/authorization/community-access";
 import { canPerformCommunityOperation, type CommunityRole } from "@/authorization/policy";
 import { getDb } from "@/db/client";
-import { contentItems, people, sessionSignups, sessions } from "@/db/schema";
+import { characters, contentItems, people, sessionSignups, sessions } from "@/db/schema";
 import { CancelSessionButton } from "./cancel-session-button";
 import { PublishSessionButton } from "./publish-session-button";
 import { SessionRoster, type SessionRosterEntry } from "./session-roster";
@@ -32,10 +32,10 @@ export default async function SessionPage({ params }: { params: Promise<{ slug: 
   let waitlistedCount = 0;
   let roster: SessionRosterEntry[] | undefined;
   if (session.status !== "draft") {
-    const rows = await getDb().select({ id: sessionSignups.id, status: sessionSignups.status, waitlistPosition: sessionSignups.waitlistPosition, personName: people.displayName, discordHandle: people.discordHandle, societyPlayNumber: people.societyPlayNumber }).from(sessionSignups).innerJoin(people, eq(people.id, sessionSignups.personId)).where(and(eq(sessionSignups.sessionId, session.id), inArray(sessionSignups.status, ["confirmed", "waitlisted"]))).orderBy(asc(sessionSignups.waitlistPosition), asc(sessionSignups.createdAt));
+    const rows = await getDb().select({ id: sessionSignups.id, status: sessionSignups.status, waitlistPosition: sessionSignups.waitlistPosition, personName: people.displayName, discordHandle: people.discordHandle, societyPlayNumber: people.societyPlayNumber, characterName: characters.name, characterSocietyNumber: characters.societyNumber }).from(sessionSignups).innerJoin(people, eq(people.id, sessionSignups.personId)).leftJoin(characters, eq(characters.id, sessionSignups.characterId)).where(and(eq(sessionSignups.sessionId, session.id), inArray(sessionSignups.status, ["confirmed", "waitlisted"]))).orderBy(asc(sessionSignups.waitlistPosition), asc(sessionSignups.createdAt));
     confirmedCount = rows.filter(({ status }) => status === "confirmed").length;
     waitlistedCount = rows.filter(({ status }) => status === "waitlisted").length;
-    roster = isManager ? rows.map((row) => ({ id: row.id, personName: row.personName, discordHandle: row.discordHandle, societyPlayNumber: row.societyPlayNumber, status: row.status === "confirmed" ? "confirmed" : "waitlisted", ...(row.waitlistPosition ? { waitlistPosition: row.waitlistPosition } : {}) })) : undefined;
+    roster = isManager ? rows.map((row) => ({ id: row.id, personName: row.personName, discordHandle: row.discordHandle, societyPlayNumber: row.societyPlayNumber, characterName: row.characterName, characterSocietyNumber: row.characterSocietyNumber, status: row.status === "confirmed" ? "confirmed" : "waitlisted", ...(row.waitlistPosition ? { waitlistPosition: row.waitlistPosition } : {}) })) : undefined;
   }
   const cancelled = session.status === "cancelled";
   const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone;

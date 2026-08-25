@@ -14,12 +14,13 @@ export async function signupForSessionAction(
   slug: string,
   sessionId: string,
   _previous: SessionSignupActionState,
-  _formData: FormData,
+  formData: FormData,
 ): Promise<SessionSignupActionState> {
   void _previous;
-  void _formData;
   try {
-    const result = await signupForSession(await requireAuthenticatedActor(), slug, sessionId);
+    const characterId = formData.get("characterId");
+    if (typeof characterId !== "string" || !characterId) return { error: "Choose a character to sign up." };
+    const result = await signupForSession(await requireAuthenticatedActor(), slug, sessionId, characterId);
     if (result.status !== "confirmed" && result.status !== "waitlisted") {
       return { error: "This session is not available for signup." };
     }

@@ -7,6 +7,7 @@ import { getDb } from "@/db/client";
 import { listNotificationsForPerson } from "@/notifications/repository";
 import {
   authUsers,
+  characters,
   communities,
   communityAuditEvents,
   communityMemberships,
@@ -40,6 +41,7 @@ const systemId = `signup-system-${suffix}`;
 const rulesetId = `signup-rules-${suffix}`;
 const programId = `signup-program-${suffix}`;
 const scenarioId = `signup-scenario-${suffix}`;
+const characterIdFor = (actor: AuthenticatedActor) => `signup-character-${actor.personId}`;
 
 async function identity(label: string) {
   const created = await createTestIdentity({
@@ -72,6 +74,10 @@ describeWithDatabase("session signups", () => {
       grantedByPersonId: owner.personId,
     });
     await getDb().insert(gameSystems).values({ id: systemId, code: systemId, name: "Signup Test" });
+    await getDb().insert(characters).values(actors.map((actor, index) => ({
+      id: characterIdFor(actor), personId: actor.personId, gameSystemId: systemId,
+      name: `Signup character ${index + 1}`, societyNumber: `${index + 1}-1`,
+    })));
     await getDb().insert(rulesets).values({
       id: rulesetId, gameSystemId: systemId, code: "test", name: "Test", edition: "2",
     });
@@ -109,17 +115,31 @@ describeWithDatabase("session signups", () => {
     await getDb().delete(contentItems).where(eq(contentItems.id, scenarioId));
     await getDb().delete(organizedPlayPrograms).where(eq(organizedPlayPrograms.id, programId));
     await getDb().delete(rulesets).where(eq(rulesets.id, rulesetId));
+    await getDb().delete(characters).where(eq(characters.gameSystemId, systemId));
     await getDb().delete(gameSystems).where(eq(gameSystems.id, systemId));
     await getDb().delete(authUsers).where(inArray(authUsers.id, authUserIds));
   });
 
+  it("rejects a character owned by another player", async () => {
+    await expect(signupForSession(
+      actors[2]!, community.slug, publishedSessionId, characterIdFor(actors[3]!),
+    )).resolves.toEqual({ status: "unavailable" });
+    await expect(getDb().select().from(sessionSignups).where(and(
+      eq(sessionSignups.sessionId, publishedSessionId),
+      eq(sessionSignups.personId, actors[2]!.personId),
+    ))).resolves.toEqual([]);
+  });
+
   it("confirms only capacity seats and orders concurrent overflow on the waitlist", async () => {
     const results = await Promise.all(actors.slice(2, 9).map((actor) =>
-      signupForSession(actor, community.slug, publishedSessionId)));
+      signupForSession(actor, community.slug, publishedSessionId, characterIdFor(actor))));
     expect(results.filter(({ status }) => status === "confirmed")).toHaveLength(6);
     expect(results.filter(({ status }) => status === "waitlisted")).toHaveLength(1);
     const waitlisted = results.find(({ status }) => status === "waitlisted");
     expect(waitlisted).toMatchObject({ status: "waitlisted", waitlistPosition: 1, replayed: false });
+    const persisted = await getDb().select({ personId: sessionSignups.personId, characterId: sessionSignups.characterId })
+      .from(sessionSignups).where(eq(sessionSignups.sessionId, publishedSessionId));
+    expect(persisted.every((signup) => signup.characterId === characterIdFor(actors.find(({ personId }) => personId === signup.personId)!))).toBe(true);
   });
 
   it("replays a live signup without creating a duplicate", async () => {
@@ -128,7 +148,7 @@ describeWithDatabase("session signups", () => {
       eq(sessionSignups.status, "confirmed"),
     ));
     const confirmedActor = actors.find(({ personId }) => personId === confirmed?.personId)!;
-    const result = await signupForSession(confirmedActor, community.slug, publishedSessionId);
+    const result = await signupForSession(confirmedActor, community.slug, publishedSessionId, characterIdFor(confirmedActor));
     expect(result).toMatchObject({ status: "confirmed", replayed: true });
     const rows = await getDb().select().from(sessionSignups).where(eq(sessionSignups.personId, confirmedActor.personId));
     expect(rows).toHaveLength(1);
@@ -225,7 +245,7 @@ describeWithDatabase("session signups", () => {
   });
 
   it("puts the next signup into the newly available waitlist position only when full", async () => {
-    const result = await signupForSession(actors[9]!, community.slug, publishedSessionId);
+    const result = await signupForSession(actors[9]!, community.slug, publishedSessionId, characterIdFor(actors[9]!));
     expect(result).toMatchObject({ status: "waitlisted", waitlistPosition: 1, replayed: false });
   });
 
