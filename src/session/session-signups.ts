@@ -24,7 +24,62 @@ export type SessionSignupResult =
 
 export type CancelSessionSignupResult =
   | { status: "cancelled"; promotedSignupId?: string }
-  | { status: "not-found" };
+  | { status: "not-found" | "unavailable" };
+
+export type UpdateSessionSignupResult =
+  | { status: "updated"; signupId: string }
+  | { status: "not-found" | "unavailable" };
+
+export async function updateOwnSessionSignup(
+  actor: AuthenticatedActor,
+  slug: string,
+  sessionId: string,
+  characterId: string,
+  database: Database = getDb(),
+): Promise<UpdateSessionSignupResult> {
+  return database.transaction(async (transaction) => {
+    const [session] = await transaction.select({
+      id: sessions.id,
+      communityId: sessions.communityId,
+      gameSystemId: rulesets.gameSystemId,
+    }).from(sessions)
+      .innerJoin(communities, eq(communities.id, sessions.communityId))
+      .innerJoin(contentItems, eq(contentItems.id, sessions.contentItemId))
+      .innerJoin(organizedPlayPrograms, eq(organizedPlayPrograms.id, contentItems.programId))
+      .innerJoin(rulesets, eq(rulesets.id, organizedPlayPrograms.rulesetId))
+      .where(and(
+        eq(sessions.id, sessionId),
+        eq(communities.slug, slug),
+        eq(sessions.status, "published"),
+        gte(sessions.startsAt, new Date()),
+      )).limit(1).for("update");
+    if (!session) return { status: "unavailable" };
+
+    const [character] = await transaction.select({ id: characters.id }).from(characters).where(and(
+      eq(characters.id, characterId),
+      eq(characters.personId, actor.personId),
+      eq(characters.gameSystemId, session.gameSystemId),
+    )).limit(1);
+    if (!character) return { status: "unavailable" };
+
+    const [signup] = await transaction.select({ id: sessionSignups.id }).from(sessionSignups).where(and(
+      eq(sessionSignups.sessionId, session.id),
+      eq(sessionSignups.personId, actor.personId),
+      inArray(sessionSignups.status, ["confirmed", "waitlisted"]),
+    )).limit(1).for("update");
+    if (!signup) return { status: "not-found" };
+
+    const now = new Date();
+    await transaction.update(sessionSignups).set({ characterId: character.id, updatedAt: now })
+      .where(eq(sessionSignups.id, signup.id));
+    await transaction.insert(communityAuditEvents).values({
+      id: randomUUID(), communityId: session.communityId, actorPersonId: actor.personId,
+      eventType: "session.signup.updated",
+      details: { sessionId: session.id, signupId: signup.id, characterId: character.id }, occurredAt: now,
+    });
+    return { status: "updated", signupId: signup.id };
+  });
+}
 
 export interface SignedUpGame {
   sessionId: string;
@@ -221,10 +276,11 @@ export async function cancelOwnSessionSignup(
   return database.transaction(async (transaction) => {
     const [session] = await transaction.select({ id: sessions.id, communityId: sessions.communityId })
       .from(sessions).innerJoin(communities, eq(communities.id, sessions.communityId)).where(and(
-        eq(sessions.id, sessionId), eq(communities.slug, slug),
+        eq(sessions.id, sessionId), eq(communities.slug, slug), eq(sessions.status, "published"),
+        gte(sessions.startsAt, new Date()),
       ))
       .limit(1).for("update");
-    if (!session) return { status: "not-found" };
+    if (!session) return { status: "unavailable" };
     const [signup] = await transaction.select({ id: sessionSignups.id, status: sessionSignups.status })
       .from(sessionSignups).where(and(
         eq(sessionSignups.sessionId, session.id),

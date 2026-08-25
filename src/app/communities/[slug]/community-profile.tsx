@@ -18,7 +18,7 @@ export type CommunityProfileProps = Readonly<{
   gmState?: "eligible" | "pending" | "active" | "rejected" | "revoked";
   pendingGmRequestId?: string;
   drafts?: { id: string; code: string; title: string; startsAt: string; gmPersonId: string }[];
-  sessions?: { id: string; code: string; title: string; startsAt: string; gmName: string; canSignUp?: boolean; signupStatus?: "confirmed" | "waitlisted"; signupCharacterName?: string; eligibleCharacters?: { id: string; name: string; societyNumber: string }[] }[];
+  sessions?: { id: string; code: string; title: string; startsAt: string; gmName: string; canSignUp?: boolean; signupStatus?: "confirmed" | "waitlisted"; signupCharacterId?: string; signupCharacterName?: string; eligibleCharacters?: { id: string; name: string; societyNumber: string }[] }[];
   canViewSchedule?: boolean;
   now?: string;
   published?: boolean;
@@ -43,7 +43,7 @@ function SessionList({ communitySlug, sessions, isSignedIn }: Readonly<{
   sessions: CommunitySession[];
   isSignedIn: boolean;
 }>) {
-  return <ul className="mt-5 space-y-3">{sessions.map((session) => <li key={session.id} className="rounded-xl border border-white/10 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><Link href={`/communities/${encodeURIComponent(communitySlug)}/sessions/${session.id}`} className="font-semibold hover:text-[var(--accent)] hover:underline">{session.code} — {session.title}</Link><p className="mt-1 text-sm text-[var(--muted)]">{new Date(session.startsAt).toLocaleString()}</p><p className="mt-1 text-sm text-[var(--muted)]">GM: {session.gmName}</p></div><span className="rounded-full bg-emerald-300/10 px-3 py-1 text-xs font-semibold text-emerald-100">Published</span></div>{isSignedIn && session.canSignUp !== false ? <SessionSignupControl slug={communitySlug} sessionId={session.id} initialStatus={session.signupStatus} initialCharacterName={session.signupCharacterName} characters={session.eligibleCharacters ?? []} /> : !isSignedIn ? <Link href={`/sign-in?callbackURL=${encodeURIComponent(`/communities/${communitySlug}`)}`} className="mt-4 inline-flex text-sm font-semibold text-[var(--accent)] hover:underline">Sign in to sign up</Link> : null}</li>)}</ul>;
+  return <ul className="mt-5 space-y-3">{sessions.map((session) => <li key={session.id} className="rounded-xl border border-white/10 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><Link href={`/communities/${encodeURIComponent(communitySlug)}/sessions/${session.id}`} className="font-semibold hover:text-[var(--accent)] hover:underline">{session.code} — {session.title}</Link><p className="mt-1 text-sm text-[var(--muted)]">{new Date(session.startsAt).toLocaleString()}</p><p className="mt-1 text-sm text-[var(--muted)]">GM: {session.gmName}</p></div><span className="rounded-full bg-emerald-300/10 px-3 py-1 text-xs font-semibold text-emerald-100">Published</span></div>{isSignedIn && session.canSignUp !== false ? <SessionSignupControl slug={communitySlug} sessionId={session.id} initialStatus={session.signupStatus} initialCharacterId={session.signupCharacterId} initialCharacterName={session.signupCharacterName} characters={session.eligibleCharacters ?? []} /> : !isSignedIn ? <Link href={`/sign-in?callbackURL=${encodeURIComponent(`/communities/${communitySlug}`)}`} className="mt-4 inline-flex text-sm font-semibold text-[var(--accent)] hover:underline">Sign in to sign up</Link> : null}</li>)}</ul>;
 }
 
 /** Public/member profile deliberately limited to approved, non-operational fields. */

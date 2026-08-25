@@ -1,9 +1,10 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import {
   cancelSessionSignupAction,
   signupForSessionAction,
+  updateSessionSignupAction,
   type SessionSignupActionState,
 } from "./session-signup-actions";
 
@@ -12,12 +13,14 @@ export function SessionSignupControl({
   sessionId,
   initialStatus,
   initialCharacterName,
+  initialCharacterId,
   characters,
 }: {
   slug: string;
   sessionId: string;
   initialStatus?: "confirmed" | "waitlisted";
   initialCharacterName?: string;
+  initialCharacterId?: string;
   characters: { id: string; name: string; societyNumber: string }[];
 }) {
   const [signupState, signupAction, signupPending] = useActionState<SessionSignupActionState, FormData>(
@@ -28,13 +31,18 @@ export function SessionSignupControl({
     cancelSessionSignupAction.bind(null, slug, sessionId),
     {},
   );
+  const [updateState, updateAction, updatePending] = useActionState<SessionSignupActionState, FormData>(
+    updateSessionSignupAction.bind(null, slug, sessionId),
+    {},
+  );
+  const [editing, setEditing] = useState(false);
   const status = cancelState.status === "cancelled"
     ? undefined
     : signupState.status ?? initialStatus;
-  const error = cancelState.error ?? signupState.error;
+  const error = cancelState.error ?? updateState.error ?? signupState.error;
 
   return <div className="mt-4">
-    {status ? <div className="flex flex-wrap items-center gap-3"><p className="text-sm text-emerald-100">{status === "confirmed" ? "You’re confirmed" : `You’re waitlisted${signupState.waitlistPosition ? ` at position ${signupState.waitlistPosition}` : ""}`}{initialCharacterName ? ` as ${initialCharacterName}` : ""}.</p><form action={cancelAction}><button type="submit" disabled={cancelPending} className="text-sm font-semibold text-[var(--accent)] hover:underline disabled:opacity-60">{cancelPending ? "Cancelling…" : "Cancel signup"}</button></form></div> : characters.length ? <form action={signupAction} className="flex flex-wrap items-end gap-3"><label className="text-sm font-semibold"><span className="mb-1 block">Character</span><select name="characterId" required defaultValue="" className="rounded-lg border border-white/15 bg-[#101817] px-3 py-2 font-normal"><option value="" disabled>Choose a character</option>{characters.map((character) => <option key={character.id} value={character.id}>{character.name} — {character.societyNumber}</option>)}</select></label><button type="submit" disabled={signupPending} className="rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-[#07110f] disabled:opacity-60">{signupPending ? "Signing up…" : "Sign up"}</button></form> : <p className="text-sm text-[var(--muted)]">You need an eligible character before you can sign up. <a href="/characters/new" className="font-semibold text-[var(--accent)] hover:underline">Add a character</a></p>}
+    {status ? <div><div className="flex flex-wrap items-center gap-3"><p className="text-sm text-emerald-100">{status === "confirmed" ? "You’re confirmed" : `You’re waitlisted${signupState.waitlistPosition ? ` at position ${signupState.waitlistPosition}` : ""}`}{initialCharacterName ? ` as ${initialCharacterName}` : ""}.</p><button type="button" onClick={() => setEditing((value) => !value)} className="text-sm font-semibold text-[var(--accent)] hover:underline">Edit signup</button><form action={cancelAction} onSubmit={(event) => { if (!window.confirm("Cancel your signup? This will remove you from the game/session.")) event.preventDefault(); }}><button type="submit" disabled={cancelPending} className="text-sm font-semibold text-red-200 hover:underline disabled:opacity-60">{cancelPending ? "Cancelling…" : "Cancel signup"}</button></form></div>{editing ? <form action={updateAction} className="mt-3 flex flex-wrap items-end gap-3"><label className="text-sm font-semibold"><span className="mb-1 block">Character</span><select name="characterId" required defaultValue={initialCharacterId} className="rounded-lg border border-white/15 bg-[#101817] px-3 py-2 font-normal">{characters.map((character) => <option key={character.id} value={character.id}>{character.name} — {character.societyNumber}</option>)}</select></label><button type="submit" disabled={updatePending} className="rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-[#07110f] disabled:opacity-60">{updatePending ? "Saving…" : "Save signup"}</button>{updateState.status === "updated" ? <p role="status" className="text-sm text-emerald-100">Signup updated.</p> : null}</form> : null}</div> : characters.length ? <form action={signupAction} className="flex flex-wrap items-end gap-3"><label className="text-sm font-semibold"><span className="mb-1 block">Character</span><select name="characterId" required defaultValue="" className="rounded-lg border border-white/15 bg-[#101817] px-3 py-2 font-normal"><option value="" disabled>Choose a character</option>{characters.map((character) => <option key={character.id} value={character.id}>{character.name} — {character.societyNumber}</option>)}</select></label><button type="submit" disabled={signupPending} className="rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-[#07110f] disabled:opacity-60">{signupPending ? "Signing up…" : "Sign up"}</button></form> : <p className="text-sm text-[var(--muted)]">You need an eligible character before you can sign up. <a href="/characters/new" className="font-semibold text-[var(--accent)] hover:underline">Add a character</a></p>}
     {error ? <p className="mt-2 text-sm text-red-200" role="alert">{error}</p> : null}
   </div>;
 }
