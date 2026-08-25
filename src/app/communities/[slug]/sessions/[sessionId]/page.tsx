@@ -32,19 +32,27 @@ export default async function SessionPage({ params }: { params: Promise<{ slug: 
   let confirmedCount = 0;
   let waitlistedCount = 0;
   let roster: SessionRosterEntry[] | undefined;
-  let ownSignup: OwnSessionSignupDetails | undefined;
+  let ownSignup: (OwnSessionSignupDetails & { characterId: string; gameSystemId: string }) | undefined;
+  let eligibleCharacters: { id: string; name: string; societyNumber: string }[] = [];
   if (session.status !== "draft") {
-    const rows = await getDb().select({ id: sessionSignups.id, personId: sessionSignups.personId, status: sessionSignups.status, waitlistPosition: sessionSignups.waitlistPosition, personName: people.displayName, discordHandle: people.discordHandle, societyPlayNumber: people.societyPlayNumber, characterName: characters.name, characterSocietyNumber: characters.societyNumber }).from(sessionSignups).innerJoin(people, eq(people.id, sessionSignups.personId)).leftJoin(characters, eq(characters.id, sessionSignups.characterId)).where(and(eq(sessionSignups.sessionId, session.id), inArray(sessionSignups.status, ["confirmed", "waitlisted"]))).orderBy(asc(sessionSignups.waitlistPosition), asc(sessionSignups.createdAt));
+    const rows = await getDb().select({ id: sessionSignups.id, personId: sessionSignups.personId, status: sessionSignups.status, waitlistPosition: sessionSignups.waitlistPosition, personName: people.displayName, discordHandle: people.discordHandle, societyPlayNumber: people.societyPlayNumber, characterId: characters.id, characterName: characters.name, characterSocietyNumber: characters.societyNumber, gameSystemId: characters.gameSystemId }).from(sessionSignups).innerJoin(people, eq(people.id, sessionSignups.personId)).leftJoin(characters, eq(characters.id, sessionSignups.characterId)).where(and(eq(sessionSignups.sessionId, session.id), inArray(sessionSignups.status, ["confirmed", "waitlisted"]))).orderBy(asc(sessionSignups.waitlistPosition), asc(sessionSignups.createdAt));
     confirmedCount = rows.filter(({ status }) => status === "confirmed").length;
     waitlistedCount = rows.filter(({ status }) => status === "waitlisted").length;
     const persistedOwnSignup = actor ? rows.find(({ personId }) => personId === actor.personId) : undefined;
-    if (persistedOwnSignup?.characterName) {
+    if (persistedOwnSignup?.characterName && persistedOwnSignup.characterId && persistedOwnSignup.gameSystemId) {
       ownSignup = {
         status: persistedOwnSignup.status === "confirmed" ? "confirmed" : "waitlisted",
         characterName: persistedOwnSignup.characterName,
         characterSocietyNumber: persistedOwnSignup.characterSocietyNumber,
         waitlistPosition: persistedOwnSignup.waitlistPosition,
+        characterId: persistedOwnSignup.characterId,
+        gameSystemId: persistedOwnSignup.gameSystemId,
+        slug,
+        sessionId: session.id,
+        canManage: session.status === "published" && session.startsAt > new Date(),
       };
+      eligibleCharacters = await getDb().select({ id: characters.id, name: characters.name, societyNumber: characters.societyNumber }).from(characters).where(and(eq(characters.personId, actor!.personId), eq(characters.gameSystemId, persistedOwnSignup.gameSystemId))).orderBy(asc(characters.name));
+      ownSignup.characters = eligibleCharacters;
     }
     roster = isManager ? rows.map((row) => ({ id: row.id, personName: row.personName, discordHandle: row.discordHandle, societyPlayNumber: row.societyPlayNumber, characterName: row.characterName, characterSocietyNumber: row.characterSocietyNumber, status: row.status === "confirmed" ? "confirmed" : "waitlisted", ...(row.waitlistPosition ? { waitlistPosition: row.waitlistPosition } : {}) })) : undefined;
   }
