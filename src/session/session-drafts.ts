@@ -15,6 +15,7 @@ import {
   contentItems,
   sessions,
 } from "@/db/schema";
+import { SUPPORTED_GAME_SYSTEM } from "@/game-system/config";
 
 const explicitInstantSchema = z.string().datetime({ offset: true });
 const ianaTimeZoneSchema = z.string().trim().min(1).max(100).refine((value) => {
@@ -141,6 +142,7 @@ async function insertDraft(
     id,
     communityId,
     contentItemId: input.contentItemId,
+    gameSystemId: SUPPORTED_GAME_SYSTEM.id,
     gmPersonId,
     startsAt: new Date(input.startsAt),
     endsAt: new Date(input.endsAt),

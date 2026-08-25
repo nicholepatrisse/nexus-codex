@@ -5,6 +5,7 @@ import { createTestIdentity } from "@/auth/test-fixture";
 import { createCommunity } from "@/community/create-community";
 import { revokeCommunityGmGrant } from "@/community/revoke-community-gm-grant";
 import { getDb } from "@/db/client";
+import { SUPPORTED_GAME_SYSTEM } from "@/game-system/config";
 import {
   authUsers,
   communities,
@@ -120,7 +121,7 @@ describeWithDatabase("session drafts", () => {
       ...draftInput(), gmPersonId: gmTwo.personId, displayTimeZone: "UTC",
     })).resolves.toMatchObject({ status: "updated" });
     const [updated] = await getDb().select().from(sessions).where(eq(sessions.id, created.sessionId));
-    expect(updated).toMatchObject({ gmPersonId: gmTwo.personId, displayTimeZone: "UTC" });
+    expect(updated).toMatchObject({ gmPersonId: gmTwo.personId, displayTimeZone: "UTC", gameSystemId: SUPPORTED_GAME_SYSTEM.id });
     expect(updated?.startsAt.toISOString()).toBe(stored?.startsAt.toISOString());
 
     await expect(updateSessionDraft(gmOne, community.slug, created.sessionId, draftInput()))

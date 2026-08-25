@@ -14,21 +14,15 @@ const settings = {
 };
 
 describe("community settings UI", () => {
-  it("renders current settings and supported programs", () => {
+  it("renders current settings without a redundant program selector", () => {
     const markup = renderToStaticMarkup(
-      <CommunitySettingsForm
-        settings={settings}
-        programs={[
-          { id: "sfs2", name: "Starfinder Society Second Edition" },
-          { id: "other", name: "Other Program" },
-        ]}
-        selectedProgramIds={["sfs2"]}
-      />,
+      <CommunitySettingsForm settings={settings} />,
     );
 
     expect(markup).toContain('value="Absalom Lodge"');
     expect(markup).not.toContain("Default time zone");
-    expect(markup).toMatch(/name="supportedProgramIds"[^>]*checked=""[^>]*value="sfs2"/);
+    expect(markup).not.toContain("Supported programs");
+    expect(markup).not.toContain('name="supportedProgramIds"');
     expect(markup).toContain("Save settings");
   });
 
