@@ -4,6 +4,7 @@ import { getOpaqueErrorId } from "@/app/error-identity";
 import { ErrorState } from "@/app/error-state";
 import RouteError from "@/app/error";
 import GlobalError from "@/app/global-error";
+import { REPORT_ISSUE_URL } from "@/app/external-links";
 
 describe("application error boundaries", () => {
   it("renders safe route recovery actions and an opaque reference", () => {
@@ -17,6 +18,10 @@ describe("application error boundaries", () => {
     expect(markup).toContain("Something went wrong");
     expect(markup).toContain("Try again");
     expect(markup).toContain('href="/"');
+    expect(markup).toContain(`href="${REPORT_ISSUE_URL}"`);
+    expect(markup).toContain('target="_blank"');
+    expect(markup).toContain('rel="noopener noreferrer"');
+    expect(markup).toContain("Report an issue");
     expect(markup).toContain("NC-123456");
     expect(markup).not.toContain("stack");
     expect(markup).not.toContain("database");
