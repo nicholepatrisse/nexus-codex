@@ -2,13 +2,13 @@ interface SignOutResult {
   error?: unknown;
 }
 
-export async function signOutAndRefresh<T extends SignOutResult>(
+export async function signOutAndRedirect<T extends SignOutResult>(
   signOut: () => Promise<T>,
-  refresh: () => void,
+  redirect: (href: "/") => void,
 ): Promise<T> {
   const result = await signOut();
 
-  if (!result.error) refresh();
+  if (!result.error) redirect("/");
 
   return result;
 }

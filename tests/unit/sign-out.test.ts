@@ -1,21 +1,22 @@
 import { describe, expect, it, vi } from "vitest";
-import { signOutAndRefresh } from "@/auth/sign-out";
+import { signOutAndRedirect } from "@/auth/sign-out";
 
 describe("sign out", () => {
-  it("refreshes server-rendered user content after sign-out succeeds", async () => {
-    const refresh = vi.fn();
+  it("redirects home after sign-out succeeds", async () => {
+    const redirect = vi.fn();
 
-    await expect(signOutAndRefresh(async () => ({ error: null }), refresh)).resolves.toEqual({
+    await expect(signOutAndRedirect(async () => ({ error: null }), redirect)).resolves.toEqual({
       error: null,
     });
-    expect(refresh).toHaveBeenCalledOnce();
+    expect(redirect).toHaveBeenCalledOnce();
+    expect(redirect).toHaveBeenCalledWith("/");
   });
 
   it("preserves the current UI when sign-out fails", async () => {
-    const refresh = vi.fn();
+    const redirect = vi.fn();
     const result = { error: { message: "Sign-out failed" } };
 
-    await expect(signOutAndRefresh(async () => result, refresh)).resolves.toBe(result);
-    expect(refresh).not.toHaveBeenCalled();
+    await expect(signOutAndRedirect(async () => result, redirect)).resolves.toBe(result);
+    expect(redirect).not.toHaveBeenCalled();
   });
 });
