@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { authClient } from "@/auth/client";
-import { signOutAndRefresh } from "@/auth/sign-out";
+import { signOutAndRedirect } from "@/auth/sign-out";
 import { clearNotificationsAction, markNotificationsReadAction } from "@/app/notification-actions";
 import { notificationBadgeCount, type AppNotification } from "@/notifications/model";
 
@@ -42,7 +42,7 @@ export function ApplicationHeader({ notifications, notificationsError = false, d
   }
   async function signOut() {
     setSignOutPending(true); setSignOutError(false);
-    const result = await signOutAndRefresh(() => authClient.signOut(), () => router.refresh());
+    const result = await signOutAndRedirect(() => authClient.signOut(), (href) => router.replace(href));
     if (result.error) { setSignOutError(true); setSignOutPending(false); }
   }
   const accountLinkClass = (active: boolean) =>

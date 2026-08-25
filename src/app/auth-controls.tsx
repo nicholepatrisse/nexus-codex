@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { SignInButton } from "@/app/sign-in/sign-in-button";
 import { authClient } from "@/auth/client";
-import { signOutAndRefresh } from "@/auth/sign-out";
+import { signOutAndRedirect } from "@/auth/sign-out";
 
 export function AuthControls() {
   const router = useRouter();
@@ -21,9 +21,9 @@ export function AuthControls() {
   async function signOut() {
     setSignOutPending(true);
     setError(null);
-    const result = await signOutAndRefresh(
+    const result = await signOutAndRedirect(
       () => authClient.signOut(),
-      () => router.refresh(),
+      (href) => router.replace(href),
     );
     if (result.error) {
       setError("Sign-out failed. Please try again.");
