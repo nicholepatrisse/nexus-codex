@@ -18,13 +18,13 @@ describeWithDatabase("characters persistence", () => {
     userIds.push(owner.authUser.id, other.authUser.id);
     const gameSystemId = `character-system-${crypto.randomUUID()}`;
     systemIds.push(gameSystemId);
-    await getDb().insert(gameSystems).values({ id: gameSystemId, code: gameSystemId, name: "Character Test" });
+    await getDb().insert(gameSystems).values({ id: gameSystemId, code: "starfinder-2e", name: "Character Test" });
     const ownerActor = { personId: owner.person.id, authUserId: owner.authUser.id, sessionId: "owner" };
     const otherActor = { personId: other.person.id, authUserId: other.authUser.id, sessionId: "other" };
     await getDb().update(people).set({ societyPlayNumber: "123456" }).where(eq(people.id, owner.person.id));
     await createCharacter(ownerActor, { name: "Navasi", gameSystemId, characterNumber: "01" });
     expect(await listCharacters(ownerActor)).toEqual([expect.objectContaining({ name: "Navasi", societyNumber: "123456-2701", gameSystemName: "Character Test" })]);
     expect(await listCharacters(otherActor)).toEqual([]);
-    expect((await getDb().select().from(characters))[0]?.personId).toBe(owner.person.id);
+    expect(await getDb().select().from(characters).where(eq(characters.personId, owner.person.id))).toHaveLength(1);
   });
 });
