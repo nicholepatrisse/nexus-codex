@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 interface ErrorStateProps {
   errorId: string;
   onRetry: () => void;
@@ -32,15 +34,14 @@ export function ErrorState({ errorId, onRetry, global = false }: ErrorStateProps
           >
             Try again
           </button>
-          <a
+          <Link
             href="/"
             className="rounded-md border border-white/20 px-5 py-3 font-semibold text-[var(--foreground)] hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
           >
             Return home
-          </a>
+          </Link>
         </div>
       </section>
     </main>
   );
 }
-
