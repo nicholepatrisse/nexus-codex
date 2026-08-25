@@ -69,23 +69,42 @@ describe("community profile", () => {
     expect(markup).not.toMatch(/request membership|cancel membership request/i);
   });
 
-  it("renders published sessions supplied by the visibility-aware page query", () => {
+  it("separates and orders upcoming and past sessions", () => {
     const markup = renderToStaticMarkup(
       <CommunityProfile
         community={publicCommunity}
         isOwner={false}
+        now="2030-09-02T00:00:00.000Z"
         sessions={[{
-          id: "session-1",
+          id: "future-later",
           code: "1-01",
           title: "The Commencement",
           startsAt: "2030-09-02T01:00:00.000Z",
           gmName: "Radaszam",
+        }, {
+          id: "past-older", code: "1-02", title: "Older", startsAt: "2029-01-01T00:00:00.000Z", gmName: "Zigvigix",
+        }, {
+          id: "future-next", code: "1-03", title: "Next", startsAt: "2030-09-02T00:30:00.000Z", gmName: "Tara Nova",
+        }, {
+          id: "past-recent", code: "1-04", title: "Recent", startsAt: "2030-09-01T23:00:00.000Z", gmName: "Chiskisk",
         }]}
       />,
     );
 
-    expect(markup).toContain("Published sessions");
+    expect(markup).toContain("Upcoming Sessions");
+    expect(markup).toContain("Past Sessions");
     expect(markup).toContain("1-01 — The Commencement");
     expect(markup).toContain("GM: Radaszam");
+    expect(markup.indexOf("1-03 — Next")).toBeLessThan(markup.indexOf("1-01 — The Commencement"));
+    expect(markup.indexOf("1-04 — Recent")).toBeLessThan(markup.indexOf("1-02 — Older"));
+  });
+
+  it("renders an empty state for each visible schedule section", () => {
+    const markup = renderToStaticMarkup(
+      <CommunityProfile community={publicCommunity} isOwner={false} canViewSchedule sessions={[]} />,
+    );
+
+    expect(markup).toContain("No upcoming sessions are scheduled.");
+    expect(markup).toContain("No past sessions yet.");
   });
 });
