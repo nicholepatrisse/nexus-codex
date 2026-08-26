@@ -6,10 +6,26 @@ import { CommunityProfile } from "./community-profile";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { characters, contentItems, communityGmRequests, communityMembershipRequests, communityRoleGrants, organizedPlayPrograms, people, rulesets, sessionSignups, sessions } from "@/db/schema";
+import type { Metadata } from "next";
+import { resolveCommunityAccessBySlug } from "@/authorization/community-access";
+import { defaultSocialMetadata, socialMetadata } from "@/app/social-metadata";
 
 interface CommunityPageProps {
   params: Promise<{ slug: string }>;
   searchParams?: Promise<{ published?: string }>;
+}
+
+export async function generateMetadata({ params }: CommunityPageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const access = await resolveCommunityAccessBySlug(slug, null).catch(() => ({ status: "unavailable" as const }));
+  if (access.status !== "available") return defaultSocialMetadata;
+  const description = access.community.description?.trim()
+    || `Explore public games and sessions hosted by ${access.community.name}.`;
+  return socialMetadata({
+    title: `${access.community.name} | Nexus Codex`,
+    description,
+    pathname: `/communities/${encodeURIComponent(access.community.slug)}`,
+  });
 }
 
 export default async function CommunityPage({ params, searchParams }: CommunityPageProps) {

@@ -11,6 +11,29 @@ import { PublishSessionButton } from "./publish-session-button";
 import { OwnSessionSignup, type OwnSessionSignupDetails } from "./own-session-signup";
 import { SessionRoster, type SessionRosterEntry } from "./session-roster";
 import { SessionSignupControl } from "../../session-signup-control";
+import type { Metadata } from "next";
+import { defaultSocialMetadata, socialMetadata } from "@/app/social-metadata";
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string; sessionId: string }> }): Promise<Metadata> {
+  const { slug, sessionId } = await params;
+  const access = await resolveCommunityAccessBySlug(slug, null).catch(() => ({ status: "unavailable" as const }));
+  if (access.status !== "available" || access.community.scheduleVisibility !== "public") return defaultSocialMetadata;
+  const [session] = await getDb()
+    .select({ code: contentItems.code, title: contentItems.title, startsAt: sessions.startsAt })
+    .from(sessions)
+    .innerJoin(contentItems, eq(contentItems.id, sessions.contentItemId))
+    .where(and(eq(sessions.id, sessionId), eq(sessions.communityId, access.community.id), inArray(sessions.status, ["published", "cancelled"])))
+    .limit(1)
+    .catch(() => []);
+  if (!session) return defaultSocialMetadata;
+  const sessionName = `${session.code} — ${session.title}`;
+  const date = new Intl.DateTimeFormat("en-US", { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" }).format(session.startsAt);
+  return socialMetadata({
+    title: `${sessionName} | Nexus Codex`,
+    description: `${access.community.name} · ${date}`,
+    pathname: `/communities/${encodeURIComponent(access.community.slug)}/sessions/${encodeURIComponent(sessionId)}`,
+  });
+}
 
 function formatInstant(instant: Date, timeZone: string) {
   return new Intl.DateTimeFormat("en-US", { timeZone, weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(instant);
