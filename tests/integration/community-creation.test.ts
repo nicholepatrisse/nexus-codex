@@ -9,7 +9,9 @@ import {
   communities,
   communityMemberships,
   communityRoleGrants,
+  communitySupportedPrograms,
 } from "@/db/schema";
+import { SUPPORTED_GAME_SYSTEM } from "@/game-system/config";
 
 const describeWithDatabase = process.env.CI ? describe : describe.skip;
 const suffix = crypto.randomUUID();
@@ -41,7 +43,7 @@ describeWithDatabase("community creation service", () => {
     await getDb().delete(authUsers).where(eq(authUsers.id, authUserId));
   });
 
-  it("atomically creates a private community, active membership, and owner grant", async () => {
+  it("atomically creates a private community with its default program, membership, and owner grant", async () => {
     const created = await createCommunity(
       { personId },
       { name: `Absalom Station ${suffix}`, requestedSlug: `Absalom Station ${suffix}` },
@@ -60,6 +62,10 @@ describeWithDatabase("community creation service", () => {
       .select()
       .from(communityRoleGrants)
       .where(eq(communityRoleGrants.communityId, created.id));
+    const [supportedProgram] = await getDb()
+      .select()
+      .from(communitySupportedPrograms)
+      .where(eq(communitySupportedPrograms.communityId, created.id));
 
     expect(community).toMatchObject({
       visibility: "private",
@@ -70,6 +76,9 @@ describeWithDatabase("community creation service", () => {
     });
     expect(membership).toMatchObject({ personId, status: "active" });
     expect(grant).toMatchObject({ personId, role: "owner", grantedByPersonId: personId });
+    expect(supportedProgram).toMatchObject({
+      programId: SUPPORTED_GAME_SYSTEM.organizedPlayProgramId,
+    });
     expect(await resolveCommunityAccessBySlug(created.slug, personId)).toMatchObject({
       status: "available",
       community: { id: created.id, name: created.name },

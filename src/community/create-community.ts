@@ -3,7 +3,13 @@ import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { AuthenticatedActor } from "@/auth/actor";
 import { getDb } from "@/db/client";
-import { communities, communityMemberships, communityRoleGrants } from "@/db/schema";
+import {
+  communities,
+  communityMemberships,
+  communityRoleGrants,
+  communitySupportedPrograms,
+} from "@/db/schema";
+import { SUPPORTED_GAME_SYSTEM } from "@/game-system/config";
 
 const MAX_SLUG_LENGTH = 80;
 
@@ -104,6 +110,11 @@ export async function createCommunity(
         personId: actor.personId,
         role: "owner",
         grantedByPersonId: actor.personId,
+      });
+      await transaction.insert(communitySupportedPrograms).values({
+        id: randomUUID(),
+        communityId,
+        programId: SUPPORTED_GAME_SYSTEM.organizedPlayProgramId,
       });
 
       return community;
