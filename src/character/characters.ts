@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import type { AuthenticatedActor } from "@/auth/actor";
 import { resolveCommunityAccessBySlug } from "@/authorization/community-access";
@@ -8,6 +8,7 @@ import { getDb } from "@/db/client";
 import { characters, chronicles, communities, contentItems, gameSystems, people, sessionSignups, sessions } from "@/db/schema";
 import { SUPPORTED_GAME_SYSTEM } from "@/game-system/config";
 import { CHARACTER_CLASSES } from "@/character/class-options";
+import { deriveSfs2Progression } from "@/character/sfs2-progression";
 
 const optionalCharacterClassSchema = z.string().trim()
   .pipe(z.union([z.literal(""), z.enum(CHARACTER_CLASSES, { error: "Choose a supported class." })]))
@@ -35,9 +36,23 @@ export function formatSocietyNumber(societyPlayNumber: string, characterNumber: 
   return `${societyPlayNumber}-${prefix}${sequence.padStart(2, "0")}`;
 }
 export async function listCharacters(actor: AuthenticatedActor, database: Database = getDb()) {
-  return database.select({ id: characters.id, name: characters.name, societyNumber: characters.societyNumber, className: characters.className, gameSystemId: characters.gameSystemId, gameSystemName: gameSystems.name })
+  const rows = await database.select({ id: characters.id, name: characters.name, societyNumber: characters.societyNumber, className: characters.className, gameSystemId: characters.gameSystemId, gameSystemName: gameSystems.name, startingLevel: characters.startingLevel })
     .from(characters).innerJoin(gameSystems, eq(gameSystems.id, characters.gameSystemId))
     .where(eq(characters.personId, actor.personId)).orderBy(asc(characters.name));
+  const progressionByCharacter = await getCharacterProgressions(rows, database);
+  return rows.map((character) => ({ ...character, ...progressionByCharacter.get(character.id)! }));
+}
+
+export async function getCharacterProgressions(
+  characterRows: ReadonlyArray<{ id: string; startingLevel: number }>,
+  database: Database = getDb(),
+) {
+  if (!characterRows.length) return new Map<string, ReturnType<typeof deriveSfs2Progression>>();
+  const rewards = await database.select({ characterId: chronicles.characterId, xp: chronicles.xp })
+    .from(chronicles).where(and(inArray(chronicles.characterId, characterRows.map(({ id }) => id)), eq(chronicles.status, "applied")));
+  const rewardsByCharacter = new Map<string, number[]>();
+  for (const reward of rewards) rewardsByCharacter.set(reward.characterId, [...(rewardsByCharacter.get(reward.characterId) ?? []), reward.xp]);
+  return new Map(characterRows.map((character) => [character.id, deriveSfs2Progression(character.startingLevel, rewardsByCharacter.get(character.id) ?? [])]));
 }
 export interface CharacterSession { id: string; communityName: string; communitySlug: string; scenarioCode: string; scenarioTitle: string; startsAt: Date; displayTimeZone: string; signupStatus: "confirmed" | "waitlisted" | "cancelled"; }
 export interface CharacterDetail { id: string; name: string; societyNumber: string; gameSystemName: string; startingLevel: number; currentLevel: number; xp: number; creditsMinor: number; reputation: number; downtime: number; className: string | null; ancestry: string | null; background: string | null; backstory: string | null; notes: string | null; isOwner: boolean; upcomingSessions: CharacterSession[]; pastSessions: CharacterSession[]; }
@@ -68,8 +83,10 @@ export async function getCharacterDetail(actor: AuthenticatedActor, characterId:
   const upcomingSessions = visible.filter((session) => session.startsAt >= now && session.signupStatus !== "cancelled").sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
   const pastSessions = visible.filter((session) => session.startsAt < now).sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime());
   if (!isOwner && visible.length === 0) return null;
-  const [totals] = await database.select({ xp: sql<number>`coalesce(sum(${chronicles.xp}), 0)::int`, creditsMinor: sql<number>`coalesce(sum(${chronicles.creditsMinor}), 0)::int`, reputation: sql<number>`coalesce(sum(${chronicles.reputation}), 0)::int`, downtime: sql<number>`coalesce(sum(${chronicles.downtime}), 0)::int` }).from(chronicles).where(and(eq(chronicles.characterId, character.id), eq(chronicles.status, "applied")));
-  return { id: character.id, name: character.name, societyNumber: character.societyNumber, gameSystemName: character.gameSystemName, startingLevel: character.startingLevel, currentLevel: character.startingLevel, xp: totals?.xp ?? 0, creditsMinor: totals?.creditsMinor ?? 0, reputation: totals?.reputation ?? 0, downtime: totals?.downtime ?? 0, className: character.className, ancestry: character.ancestry, background: character.background, backstory: character.backstory, notes: character.notes, isOwner, upcomingSessions, pastSessions };
+  const rewards = await database.select({ xp: chronicles.xp, creditsMinor: chronicles.creditsMinor, reputation: chronicles.reputation, downtime: chronicles.downtime }).from(chronicles).where(and(eq(chronicles.characterId, character.id), eq(chronicles.status, "applied")));
+  const progression = deriveSfs2Progression(character.startingLevel, rewards.map(({ xp }) => xp));
+  const totals = rewards.reduce((sum, reward) => ({ creditsMinor: sum.creditsMinor + reward.creditsMinor, reputation: sum.reputation + reward.reputation, downtime: sum.downtime + reward.downtime }), { creditsMinor: 0, reputation: 0, downtime: 0 });
+  return { id: character.id, name: character.name, societyNumber: character.societyNumber, gameSystemName: character.gameSystemName, startingLevel: character.startingLevel, currentLevel: progression.currentLevel, xp: progression.totalXp, ...totals, className: character.className, ancestry: character.ancestry, background: character.background, backstory: character.backstory, notes: character.notes, isOwner, upcomingSessions, pastSessions };
 }
 export async function createCharacter(actor: AuthenticatedActor, rawInput: CreateCharacterInput, database: Database = getDb()) {
   const input = createCharacterInputSchema.parse(rawInput);

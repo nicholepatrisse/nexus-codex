@@ -24,8 +24,9 @@ describe("character creation return destinations", () => {
   });
 
   it("offers character creation when eligible characters already exist", () => {
-    const markup = renderToStaticMarkup(<SessionSignupControl slug="star-finders" sessionId="session_123" characters={[{ id: "character-1", name: "Navasi", societyNumber: "123456-2701" }]} />);
+    const markup = renderToStaticMarkup(<SessionSignupControl slug="star-finders" sessionId="session_123" characters={[{ id: "character-1", name: "Navasi", societyNumber: "123456-2701", currentLevel: 1 }]} />);
     expect(markup).toContain("Add another character");
+    expect(markup).toContain("Level 1");
     expect(markup).toContain("/characters/new?returnTo=%2Fcommunities%2Fstar-finders%2Fsessions%2Fsession_123");
   });
 });

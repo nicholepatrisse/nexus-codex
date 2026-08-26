@@ -65,13 +65,14 @@ describeWithDatabase("characters persistence", () => {
     expect(await createManualChronicle(otherActor, character.id, { scenarioNumber: "x", scenarioName: "Unauthorized", datePlayed: "2026-08-20", characterLevel: 1, advancementSpeed: "standard", xp: 0, creditsMinor: 0, reputation: 0, downtime: 0 })).toBeNull();
     expect((await listChronicles(character.id)).map((entry) => entry.id)).toEqual([second.id, first.id]);
     expect(await updateManualChronicle(otherActor, character.id, first.id, { scenarioNumber: "x", scenarioName: "Stolen", datePlayed: "2026-08-20", characterLevel: 1, advancementSpeed: "standard", xp: 0, creditsMinor: 0, reputation: 0, downtime: 0 })).toBeNull();
-    const updated = await updateManualChronicle(ownerActor, character.id, first.id, { scenarioNumber: "1-02", scenarioName: "Updated snapshot", datePlayed: "2026-08-22", characterLevel: 2, advancementSpeed: "standard", xp: 6, creditsMinor: 225, reputation: 3, downtime: 9 });
+    const updated = await updateManualChronicle(ownerActor, character.id, first.id, { scenarioNumber: "1-02", scenarioName: "Updated snapshot", datePlayed: "2026-08-22", characterLevel: 2, advancementSpeed: "standard", xp: 12, creditsMinor: 225, reputation: 3, downtime: 9 });
     expect(updated).toEqual(expect.objectContaining({ id: first.id, scenarioNameSnapshot: "Updated snapshot", creditsMinor: 225 }));
     expect(await applyManualChronicle(otherActor, character.id, first.id)).toBeNull();
     const appliedAt = new Date("2026-08-23T10:00:00Z");
     expect(await applyManualChronicle(ownerActor, character.id, first.id, getDb(), appliedAt)).toEqual(expect.objectContaining({ status: "applied", appliedAt }));
     expect(await applyManualChronicle(ownerActor, character.id, first.id, getDb(), new Date("2026-08-24T10:00:00Z"))).toEqual(expect.objectContaining({ status: "applied", appliedAt }));
-    expect(await getCharacterDetail(ownerActor, character.id)).toEqual(expect.objectContaining({ xp: 6, creditsMinor: 225, reputation: 3, downtime: 9 }));
+    expect(await getCharacterDetail(ownerActor, character.id)).toEqual(expect.objectContaining({ xp: 12, currentLevel: 2, creditsMinor: 225, reputation: 3, downtime: 9 }));
+    expect(await listCharacters(ownerActor)).toEqual([expect.objectContaining({ id: character.id, totalXp: 12, currentLevel: 2 })]);
     expect(await updateManualChronicle(ownerActor, character.id, first.id, { scenarioNumber: "x", scenarioName: "Applied edit", datePlayed: "2026-08-22", characterLevel: 2, advancementSpeed: "standard", xp: 99, creditsMinor: 99, reputation: 99, downtime: 99 })).toBeNull();
     expect(await deleteManualChronicle(ownerActor, character.id, first.id)).toBe(false);
     expect(await unapplyManualChronicle(ownerActor, character.id, first.id)).toEqual(expect.objectContaining({ status: "pending", appliedAt: null }));

@@ -116,7 +116,7 @@ describe("community profile", () => {
       isOwner={false}
       isSignedIn
       now="2030-09-02T00:00:00.000Z"
-      sessions={[{ id: "session-1", code: "1-01", title: "The Commencement", startsAt: "2030-09-02T01:00:00.000Z", gmName: "Radaszam", signupStatus: "confirmed", signupCharacterName: "Navasi", eligibleCharacters: [{ id: "character-1", name: "Navasi", societyNumber: "123456-2701" }] }]}
+      sessions={[{ id: "session-1", code: "1-01", title: "The Commencement", startsAt: "2030-09-02T01:00:00.000Z", gmName: "Radaszam", signupStatus: "confirmed", signupCharacterName: "Navasi", eligibleCharacters: [{ id: "character-1", name: "Navasi", societyNumber: "123456-2701", currentLevel: 1 }] }]}
     />);
 
     expect(markup).toContain('href="/communities/absalom-station/sessions/session-1"');
