@@ -17,9 +17,5 @@ export default async function NewSessionDraftPage({ params }: { params: Promise<
   if (!canCreate) notFound();
   const options = await loadSessionFormOptions(access.community.id);
 
-<<<<<<< Updated upstream
-  return <main className="mx-auto min-h-screen max-w-3xl px-6 py-16"><Link href={`/communities/${slug}`} className="text-sm text-[var(--accent)] hover:underline">← {access.community.name}</Link><h1 className="mt-8 text-4xl font-semibold">Create session draft</h1><p className="mt-3 text-[var(--muted)]">Drafts remain private until the publication workflow is added.</p>{options.scenarios.length === 0 ? <p className="mt-8 rounded-xl bg-amber-300/10 p-4 text-amber-100">This community has no supported scenarios. An owner must select a supported program in community settings first.</p> : <SessionDraftForm action={createSessionDraftAction.bind(null, slug)} slug={slug} scenarios={options.scenarios} gms={options.gms} canAssignGm={isOwner} actorPersonId={actor.personId} />}</main>;
-=======
   return <main className="mx-auto min-h-screen max-w-3xl px-6 py-16"><Link href={`/communities/${slug}`} className="text-sm text-brand hover:underline">← {access.community.name}</Link><h1 className="mt-8 text-4xl font-semibold">Create session draft</h1><p className="mt-3 text-text-muted">Drafts remain private until the publication workflow is added.</p>{options.scenarios.length === 0 ? <p className="mt-8 rounded-xl bg-warning/10 p-4 text-warning">The scenario catalog is temporarily unavailable. Please try again after an administrator restores the catalog.</p> : <SessionDraftForm action={createSessionDraftAction.bind(null, slug)} slug={slug} scenarios={options.scenarios} gms={options.gms} canAssignGm={isOwner} actorPersonId={actor.personId} />}</main>;
->>>>>>> Stashed changes
 }
