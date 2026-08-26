@@ -122,7 +122,7 @@ describe("community profile", () => {
     expect(markup).toContain('href="/communities/absalom-station/sessions/session-1"');
     expect(markup).toContain("Confirmed");
     expect(markup).toContain("Navasi");
-    expect(markup).toContain("border-emerald-200/30");
+    expect(markup).toContain("border-success/30");
     expect(markup).not.toContain("Published");
     expect(markup).not.toContain("Choose a character");
     expect(markup).not.toContain("Sign up");
@@ -131,7 +131,7 @@ describe("community profile", () => {
   it("labels draft listings with a draft pill", () => {
     const markup = renderToStaticMarkup(<CommunityProfile community={publicCommunity} isOwner drafts={[{ id: "draft-1", code: "1-02", title: "Fugitive on the Red Planet", startsAt: "2030-09-02T01:00:00.000Z", gmPersonId: "gm-1" }]} sessions={[{ id: "session-1", code: "1-01", title: "The Commencement", startsAt: "2030-09-03T01:00:00.000Z", gmName: "Radaszam" }]} now="2030-09-01T00:00:00.000Z" />);
     expect(markup).toContain("Draft");
-    expect(markup).toContain("border-amber-200/30");
+    expect(markup).toContain("border-warning/30");
     expect(markup.indexOf("Session drafts")).toBeLessThan(markup.indexOf("Upcoming Sessions"));
   });
 });

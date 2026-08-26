@@ -35,7 +35,7 @@ describe("signed-up games", () => {
     expect(markup).toContain("Waitlisted · #2");
     expect(markup).not.toContain(">Player<");
     expect(markup).toContain(">Navasi<");
-    expect(markup).toContain("border-sky-200/30");
+    expect(markup).toContain("border-info/30");
     expect(markup).toContain('dateTime="2030-09-02T01:00:00.000Z"');
     expect(markup).toContain('href="/communities/absalom%20lodge/sessions/session%2Fone"');
   });

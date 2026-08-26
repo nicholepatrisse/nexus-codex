@@ -11,7 +11,7 @@ function SubmitButton({ children }: { children: React.ReactNode }) {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-full bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-[#07110f] disabled:cursor-wait disabled:opacity-60"
+      className="rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-background disabled:cursor-wait disabled:opacity-60"
     >
       {pending ? "Working…" : children}
     </button>
@@ -19,8 +19,8 @@ function SubmitButton({ children }: { children: React.ReactNode }) {
 }
 
 function Result({ state }: { state: AdmissionActionState }) {
-  if (state.error) return <p role="alert" className="text-sm text-red-300">{state.error}</p>;
-  if (state.message) return <p role="status" className="text-sm text-emerald-200">{state.message}</p>;
+  if (state.error) return <p role="alert" className="text-sm text-danger">{state.error}</p>;
+  if (state.message) return <p role="status" className="text-sm text-success">{state.message}</p>;
   return null;
 }
 
@@ -38,7 +38,7 @@ export function AdmissionForm({ slug, pendingRequestId }: { slug: string; pendin
   return (
     <form action={formAction} className="mt-8 flex flex-wrap items-center gap-4">
       <SubmitButton>{pendingRequestId ? "Cancel membership request" : "Request membership"}</SubmitButton>
-      {pendingRequestId && !state.message ? <p className="text-sm text-[var(--muted)]">Your request is awaiting review.</p> : null}
+      {pendingRequestId && !state.message ? <p className="text-sm text-text-muted">Your request is awaiting review.</p> : null}
       <Result state={state} />
     </form>
   );
