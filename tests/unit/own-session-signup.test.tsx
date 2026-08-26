@@ -8,12 +8,14 @@ describe("own session signup", () => {
       status: "confirmed",
       characterName: "Navasi",
       characterSocietyNumber: "123456-2701",
+      characterLevel: 4,
     }} />);
 
     expect(markup).toContain("You’re registered");
     expect(markup).toContain("Your character");
     expect(markup).toContain("Navasi");
     expect(markup).toContain("123456-2701");
+    expect(markup).toContain("Level 4");
   });
 
   it("shows the persisted waitlist position with the selected character", () => {

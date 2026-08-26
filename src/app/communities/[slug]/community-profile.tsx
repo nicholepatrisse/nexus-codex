@@ -17,7 +17,7 @@ export type CommunityProfileProps = Readonly<{
   gmState?: "eligible" | "pending" | "active" | "rejected" | "revoked";
   pendingGmRequestId?: string;
   drafts?: { id: string; code: string; title: string; startsAt: string; gmPersonId: string }[];
-  sessions?: { id: string; code: string; title: string; startsAt: string; gmName: string; canSignUp?: boolean; signupStatus?: "confirmed" | "waitlisted"; signupCharacterId?: string; signupCharacterName?: string; eligibleCharacters?: { id: string; name: string; societyNumber: string }[] }[];
+  sessions?: { id: string; code: string; title: string; startsAt: string; gmName: string; canSignUp?: boolean; signupStatus?: "confirmed" | "waitlisted"; signupCharacterId?: string; signupCharacterName?: string; eligibleCharacters?: { id: string; name: string; societyNumber: string; currentLevel: number }[] }[];
   canViewSchedule?: boolean;
   now?: string;
   published?: boolean;

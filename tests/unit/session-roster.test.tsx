@@ -10,7 +10,7 @@ describe("session roster", () => {
   });
 
   it("shows staff the confirmed players and ordered waitlist", () => {
-    const markup = renderToStaticMarkup(<SessionRoster capacity={6} confirmedCount={1} waitlistedCount={2} entries={[{ id: "w2", personName: "Second Waiting", status: "waitlisted", waitlistPosition: 2 }, { id: "p1", personName: "Confirmed Player", discordHandle: "confirmed.player", societyPlayNumber: "12345", characterId: "character-1", characterName: "Navasi", characterSocietyNumber: "12345-2701", status: "confirmed" }, { id: "w1", personName: "First Waiting", status: "waitlisted", waitlistPosition: 1 }]} />);
+    const markup = renderToStaticMarkup(<SessionRoster capacity={6} confirmedCount={1} waitlistedCount={2} entries={[{ id: "w2", personName: "Second Waiting", status: "waitlisted", waitlistPosition: 2 }, { id: "p1", personName: "Confirmed Player", discordHandle: "confirmed.player", societyPlayNumber: "12345", characterId: "character-1", characterName: "Navasi", characterSocietyNumber: "12345-2701", characterLevel: 4, status: "confirmed" }, { id: "w1", personName: "First Waiting", status: "waitlisted", waitlistPosition: 1 }]} />);
     expect(markup).toContain("Confirmed Player");
     expect(markup.indexOf("First Waiting")).toBeLessThan(markup.indexOf("Second Waiting"));
     expect(markup).toContain("#1");
@@ -19,6 +19,7 @@ describe("session roster", () => {
     expect(markup).toContain("Character: ");
     expect(markup).toContain("Navasi");
     expect(markup).toContain(" — 12345-2701");
+    expect(markup).toContain(" — Level 4");
     expect(markup).toContain('href="/characters/character-1"');
   });
 });
