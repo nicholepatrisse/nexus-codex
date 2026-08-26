@@ -17,24 +17,33 @@ function formatGameTime(game: SignedUpGame) {
 export function SignedUpGamesList({
   games,
   showViewAll = true,
+  heading = "Upcoming games",
+  headingId = "signed-up-games-heading",
+  emptyHeading = "No upcoming games",
+  emptyMessage = "Games you join or GM will appear here.",
 }: {
   games: SignedUpGame[];
   showViewAll?: boolean;
+  heading?: string;
+  headingId?: string;
+  emptyHeading?: string;
+  emptyMessage?: string;
 }) {
-  return <section aria-labelledby="signed-up-games-heading">
+  return <section aria-labelledby={headingId}>
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div>
         <p className="text-sm font-semibold tracking-[0.2em] text-brand uppercase">Your schedule</p>
-        <h1 id="signed-up-games-heading" className="mt-2 text-3xl font-semibold tracking-tight">Upcoming games</h1>
+        <h1 id={headingId} className="mt-2 text-3xl font-semibold tracking-tight">{heading}</h1>
       </div>
       {showViewAll ? <Link href="/games" className="text-sm font-semibold text-brand hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand">View all games</Link> : null}
     </div>
     {games.length === 0 ? <div className="mt-6 rounded-2xl border border-dashed border-border-strong bg-surface p-6">
-      <p className="font-semibold">No upcoming games</p>
-      <p className="mt-2 text-sm text-text-muted">Games you join or GM will appear here.</p>
+      <p className="font-semibold">{emptyHeading}</p>
+      <p className="mt-2 text-sm text-text-muted">{emptyMessage}</p>
     </div> : <ul className="mt-6 grid gap-4 sm:grid-cols-2">
       {games.map((game) => {
         const cancelled = game.sessionStatus === "cancelled";
+        const completed = game.sessionStatus === "completed";
         const signupLabel = game.signupStatus === "waitlisted"
           ? `Waitlisted${game.waitlistPosition ? ` · #${game.waitlistPosition}` : ""}`
           : "Confirmed";
@@ -47,6 +56,8 @@ export function SignedUpGamesList({
                 {game.participationRole === "player" ? <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${game.signupStatus === "waitlisted" ? "border-warning/30 bg-warning/10 text-warning" : "border-success/30 bg-success/10 text-success"}`}>{signupLabel}</span> : null}
                 {game.participationRole === "player" && game.characterName ? <span className="rounded-full border border-info/30 bg-info/10 px-2.5 py-1 text-xs font-semibold text-info">{game.characterName}</span> : null}
                 {cancelled ? <span className="rounded-full border border-danger/30 bg-danger/10 px-2.5 py-1 text-xs font-semibold text-danger">Cancelled</span> : null}
+                {completed ? <span className="rounded-full border border-success/30 bg-success/10 px-2.5 py-1 text-xs font-semibold text-success">Completed</span> : null}
+                {game.participationRole === "gm" && game.sessionStatus === "published" && game.startsAt < new Date() ? <span className="rounded-full border border-warning/30 bg-warning/10 px-2.5 py-1 text-xs font-semibold text-warning">Needs reporting</span> : null}
               </span>
             </span>
             <span className="mt-3 block text-sm text-text-muted">{game.communityName}</span>
@@ -57,6 +68,12 @@ export function SignedUpGamesList({
       })}
     </ul>}
   </section>;
+}
+
+export function AllGamesList({ games, now = new Date() }: { games: SignedUpGame[]; now?: Date }) {
+  const upcoming = games.filter((game) => game.sessionStatus === "published" && game.startsAt >= now).sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
+  const past = games.filter((game) => game.sessionStatus !== "published" || game.startsAt < now).sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime());
+  return <div className="space-y-12"><SignedUpGamesList games={upcoming} showViewAll={false} /><SignedUpGamesList games={past} showViewAll={false} heading="Past games" headingId="past-games-heading" emptyHeading="No past games" emptyMessage="Completed, cancelled, and previously played games will appear here." /></div>;
 }
 
 export function SignedUpGamesLoading() {

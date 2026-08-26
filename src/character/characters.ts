@@ -71,7 +71,7 @@ export async function getCharacterProgressions(
   for (const reward of rewards) rewardsByCharacter.set(reward.characterId, [...(rewardsByCharacter.get(reward.characterId) ?? []), reward.xp]);
   return new Map(characterRows.map((character) => [character.id, deriveSfs2Progression(character.startingLevel, rewardsByCharacter.get(character.id) ?? [])]));
 }
-export interface CharacterSession { id: string; communityName: string; communitySlug: string; scenarioCode: string; scenarioTitle: string; startsAt: Date; displayTimeZone: string; signupStatus: "confirmed" | "waitlisted" | "cancelled" | null; participationType: "player" | "gm_credit"; sessionStatus: "published" | "cancelled"; }
+export interface CharacterSession { id: string; communityName: string; communitySlug: string; scenarioCode: string; scenarioTitle: string; startsAt: Date; displayTimeZone: string; signupStatus: "confirmed" | "waitlisted" | "cancelled" | null; participationType: "player" | "gm_credit"; sessionStatus: "published" | "completed" | "cancelled"; }
 export interface CharacterDetail { id: string; name: string; societyNumber: string; gameSystemName: string; startingLevel: number; currentLevel: number; xp: number; creditsMinor: number | null; reputation: number; downtime: number; className: string | null; ancestry: string | null; background: string | null; backstory: string | null; notes: string | null; isOwner: boolean; upcomingSessions: CharacterSession[]; pastSessions: CharacterSession[]; }
 function communityRole(access: { isActiveMember: boolean; roles: ("owner" | "gm")[] }): CommunityRole | "member" | "visitor" {
   if (access.roles.includes("owner")) return "owner";
@@ -89,7 +89,7 @@ export async function getCharacterDetail(actor: AuthenticatedActor, characterId:
   }
   const rows = await database.select({ id: sessions.id, gmPersonId: sessions.gmPersonId, status: sessions.status, communityName: communities.name, communitySlug: communities.slug, scenarioCode: contentItems.code, scenarioTitle: contentItems.title, startsAt: sessions.startsAt, displayTimeZone: sessions.displayTimeZone, signupStatus: sessionSignups.status }).from(sessionSignups).innerJoin(sessions, eq(sessions.id, sessionSignups.sessionId)).innerJoin(communities, eq(communities.id, sessions.communityId)).innerJoin(contentItems, eq(contentItems.id, sessions.contentItemId)).where(eq(sessionSignups.characterId, character.id));
   const visible = (await Promise.all(rows.map(async (row) => {
-    if (row.status !== "published" && row.status !== "cancelled") return null;
+    if (row.status !== "published" && row.status !== "completed" && row.status !== "cancelled") return null;
     if (!isOwner && row.gmPersonId !== actor.personId) return null;
     const access = await resolveCommunityAccessBySlug(row.communitySlug, actor.personId, database);
     if (access.status !== "available") return null;
@@ -98,10 +98,10 @@ export async function getCharacterDetail(actor: AuthenticatedActor, characterId:
     return { id: row.id, communityName: row.communityName, communitySlug: row.communitySlug, scenarioCode: row.scenarioCode, scenarioTitle: row.scenarioTitle, startsAt: row.startsAt, displayTimeZone: row.displayTimeZone, signupStatus: row.signupStatus, participationType: "player", sessionStatus: row.status } satisfies CharacterSession;
   }))).filter((session): session is NonNullable<typeof session> => session !== null);
   const gmCreditRows = isOwner ? await database.select({ id: sessions.id, status: sessions.status, communityName: communities.name, communitySlug: communities.slug, scenarioCode: contentItems.code, scenarioTitle: contentItems.title, startsAt: sessions.startsAt, displayTimeZone: sessions.displayTimeZone }).from(sessionGmCredits).innerJoin(sessions, eq(sessions.id, sessionGmCredits.sessionId)).innerJoin(communities, eq(communities.id, sessions.communityId)).innerJoin(contentItems, eq(contentItems.id, sessions.contentItemId)).where(eq(sessionGmCredits.characterId, character.id)) : [];
-  const gmCredits: CharacterSession[] = gmCreditRows.filter((row) => row.status === "published" || row.status === "cancelled").map((row) => ({ ...row, status: undefined, sessionStatus: row.status as "published" | "cancelled", signupStatus: null, participationType: "gm_credit" }));
+  const gmCredits: CharacterSession[] = gmCreditRows.filter((row) => row.status === "published" || row.status === "completed" || row.status === "cancelled").map((row) => ({ ...row, status: undefined, sessionStatus: row.status as "published" | "completed" | "cancelled", signupStatus: null, participationType: "gm_credit" }));
   const history = [...visible, ...gmCredits];
-  const upcomingSessions = history.filter((session) => session.startsAt >= now && session.sessionStatus !== "cancelled" && session.signupStatus !== "cancelled").sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
-  const pastSessions = history.filter((session) => session.startsAt < now || session.sessionStatus === "cancelled" || session.signupStatus === "cancelled").sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime());
+  const upcomingSessions = history.filter((session) => session.startsAt >= now && session.sessionStatus === "published" && session.signupStatus !== "cancelled").sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
+  const pastSessions = history.filter((session) => session.startsAt < now || session.sessionStatus === "completed" || session.sessionStatus === "cancelled" || session.signupStatus === "cancelled").sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime());
   if (!isOwner && visible.length === 0) return null;
   const rewards = await database.select({ xp: chronicles.xp, creditsMinor: chronicles.creditsMinor, reputation: chronicles.reputation, downtime: chronicles.downtime }).from(chronicles).where(and(eq(chronicles.characterId, character.id), eq(chronicles.status, "applied")));
   const progression = deriveSfs2Progression(character.startingLevel, rewards.map(({ xp }) => xp));

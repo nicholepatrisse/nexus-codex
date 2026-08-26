@@ -24,7 +24,10 @@ import { createSessionDraft } from "@/session/session-drafts";
 import { publishSession } from "@/session/publish-session";
 import { cancelPublishedSession, updatePublishedSession } from "@/session/published-session";
 import {
+  assignSignupCharacterAsGm,
   cancelOwnSessionSignup,
+  listAllSignedUpGames,
+  listUnreportedGmGames,
   listUpcomingSignedUpGames,
   signupForSession,
   updateOwnSessionSignup,
@@ -155,6 +158,17 @@ describeWithDatabase("session signups", () => {
     expect(rows).toHaveLength(1);
   });
 
+  it("lets the assigned GM select a missing character only from that player's eligible characters", async () => {
+    const [signup] = await getDb().select().from(sessionSignups).where(and(eq(sessionSignups.sessionId, publishedSessionId), eq(sessionSignups.status, "confirmed"))).limit(1);
+    const player = actors.find(({ personId }) => personId === signup?.personId)!;
+    await getDb().update(sessionSignups).set({ characterId: null }).where(eq(sessionSignups.id, signup!.id));
+
+    await expect(assignSignupCharacterAsGm(player, community.slug, publishedSessionId, signup!.id, characterIdFor(player))).resolves.toEqual({ status: "unavailable" });
+    await expect(assignSignupCharacterAsGm(gm, community.slug, publishedSessionId, signup!.id, characterIdFor(actors.find(({ personId }) => personId !== player.personId)!))).resolves.toEqual({ status: "unavailable" });
+    await expect(assignSignupCharacterAsGm(gm, community.slug, publishedSessionId, signup!.id, characterIdFor(player))).resolves.toEqual({ status: "updated", signupId: signup!.id });
+    await expect(getDb().select({ characterId: sessionSignups.characterId }).from(sessionSignups).where(eq(sessionSignups.id, signup!.id))).resolves.toEqual([{ characterId: characterIdFor(player) }]);
+  });
+
   it("updates a live signup and records the audit event", async () => {
     const [signup] = await getDb().select().from(sessionSignups).where(and(
       eq(sessionSignups.sessionId, publishedSessionId),
@@ -174,7 +188,7 @@ describeWithDatabase("session signups", () => {
     await expect(getDb().select().from(communityAuditEvents).where(and(
       eq(communityAuditEvents.communityId, community.id),
       eq(communityAuditEvents.eventType, "session.signup.updated"),
-    ))).resolves.toEqual([expect.objectContaining({ actorPersonId: actor.personId })]);
+    ))).resolves.toEqual(expect.arrayContaining([expect.objectContaining({ actorPersonId: actor.personId })]));
   });
 
   it("lists only the person's authorized upcoming games in chronological order", async () => {
@@ -299,6 +313,13 @@ describeWithDatabase("session signups", () => {
     expect(gmNotifications).not.toEqual(expect.arrayContaining([
       expect.objectContaining({ kind: "session.changed" }),
     ]));
+  });
+
+  it("lists past published games only for their assigned GM until they are completed or cancelled", async () => {
+    await expect(listUnreportedGmGames(gm.personId, new Date("2031-01-01T00:00:00Z"))).resolves.toEqual(expect.arrayContaining([expect.objectContaining({ sessionId: publishedSessionId, scenarioTitle: "Signup scenario" })]));
+    await expect(listUnreportedGmGames(actors[2]!.personId, new Date("2031-01-01T00:00:00Z"))).resolves.toEqual([]);
+    await expect(listUnreportedGmGames(gm.personId, new Date("2030-01-01T00:00:00Z"))).resolves.toEqual([]);
+    await expect(listAllSignedUpGames(gm.personId)).resolves.toEqual(expect.arrayContaining([expect.objectContaining({ sessionId: publishedSessionId, participationRole: "gm" })]));
   });
 
   it("notifies confirmed and waitlisted users when their game is cancelled", async () => {

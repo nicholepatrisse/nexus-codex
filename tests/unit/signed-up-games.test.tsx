@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { SignedUpGamesList, SignedUpGamesLoading } from "@/app/signed-up-games";
+import { AllGamesList, SignedUpGamesList, SignedUpGamesLoading } from "@/app/signed-up-games";
 import type { SignedUpGame } from "@/session/session-signups";
 
 const game: SignedUpGame = {
@@ -64,5 +64,13 @@ describe("signed-up games", () => {
     const markup = renderToStaticMarkup(<SignedUpGamesLoading />);
     expect(markup).toContain('aria-busy="true"');
     expect(markup).toContain('role="status"');
+  });
+
+  it("separates all games into upcoming and past sections with completion context", () => {
+    const markup = renderToStaticMarkup(<AllGamesList now={new Date("2030-08-01T00:00:00Z")} games={[game, { ...game, sessionId: "completed", startsAt: new Date("2030-07-01T00:00:00Z"), sessionStatus: "completed", participationRole: "gm" }]} />);
+    expect(markup).toContain("Upcoming games");
+    expect(markup).toContain("Past games");
+    expect(markup).toContain("Completed");
+    expect(markup).toContain('id="past-games-heading"');
   });
 });

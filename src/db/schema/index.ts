@@ -417,7 +417,7 @@ export const communityAuditEvents = pgTable(
     index("community_audit_events_actor_person_id_idx").on(table.actorPersonId),
     check(
       "community_audit_events_type_check",
-      sql`${table.eventType} in ('community.settings.updated', 'community.archived', 'community.restored', 'community.invitation.created', 'community.invitation.accepted', 'community.invitation.revoked', 'community.invitation.expired', 'community.membership.requested', 'community.membership.approved', 'community.membership.rejected', 'community.membership.cancelled', 'community.gm.requested', 'community.gm.approved', 'community.gm.rejected', 'community.gm.cancelled', 'community.gm.revoked', 'community.gm.self_service_promoted', 'session.draft.created', 'session.draft.updated', 'session.gm.reassigned', 'session.published', 'session.published.updated', 'session.cancelled', 'session.signup.confirmed', 'session.signup.waitlisted', 'session.signup.cancelled', 'session.signup.promoted', 'session.signup.updated')`,
+      sql`${table.eventType} in ('community.settings.updated', 'community.archived', 'community.restored', 'community.invitation.created', 'community.invitation.accepted', 'community.invitation.revoked', 'community.invitation.expired', 'community.membership.requested', 'community.membership.approved', 'community.membership.rejected', 'community.membership.cancelled', 'community.gm.requested', 'community.gm.approved', 'community.gm.rejected', 'community.gm.cancelled', 'community.gm.revoked', 'community.gm.self_service_promoted', 'session.draft.created', 'session.draft.updated', 'session.gm.reassigned', 'session.published', 'session.published.updated', 'session.cancelled', 'session.completed', 'session.notes.updated', 'session.signup.confirmed', 'session.signup.waitlisted', 'session.signup.cancelled', 'session.signup.promoted', 'session.signup.updated')`,
     ),
     check("community_audit_events_details_object_check", sql`jsonb_typeof(${table.details}) = 'object'`),
   ],
@@ -474,7 +474,7 @@ export const sessions = pgTable(
     ),
     index("sessions_gm_status_starts_at_idx").on(table.gmPersonId, table.status, table.startsAt),
     index("sessions_game_system_id_idx").on(table.gameSystemId),
-    check("sessions_status_check", sql`${table.status} in ('draft', 'published', 'cancelled')`),
+    check("sessions_status_check", sql`${table.status} in ('draft', 'published', 'completed', 'cancelled')`),
     check("sessions_time_order_check", sql`${table.endsAt} > ${table.startsAt}`),
     check(
       "sessions_display_time_zone_check",
@@ -565,12 +565,14 @@ export const chronicles = pgTable(
     reputation: integer("reputation").notNull(),
     downtime: integer("downtime").notNull(),
     playerNotes: text("player_notes"),
+    gmNotes: text("gm_notes"),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   },
   (table) => [
     index("chronicles_character_date_id_idx").on(table.characterId, table.playedOn, table.id),
     index("chronicles_session_id_idx").on(table.sessionId),
+    uniqueIndex("chronicles_session_character_unique").on(table.sessionId, table.characterId).where(sql`${table.sessionId} is not null`),
     index("chronicles_content_item_id_idx").on(table.contentItemId),
     check("chronicles_scenario_number_length_check", sql`length(btrim(${table.scenarioNumberSnapshot})) between 1 and 100`),
     check("chronicles_scenario_name_length_check", sql`length(btrim(${table.scenarioNameSnapshot})) between 1 and 200`),
@@ -585,6 +587,7 @@ export const chronicles = pgTable(
     check("chronicles_reputation_check", sql`${table.reputation} >= 0`),
     check("chronicles_downtime_check", sql`${table.downtime} >= 0`),
     check("chronicles_player_notes_length_check", sql`${table.playerNotes} is null or length(${table.playerNotes}) <= 5000`),
+    check("chronicles_gm_notes_length_check", sql`${table.gmNotes} is null or length(${table.gmNotes}) <= 5000`),
   ],
 );
 

@@ -1,0 +1,5 @@
+import { PAIZO_ORGANIZED_PLAY_URL } from "@/app/external-links";
+
+export function PaizoReportingReminder({ justCompleted = false }: { justCompleted?: boolean }) {
+  return <aside className="mt-8 rounded-2xl border border-info/30 bg-info/10 p-5" aria-labelledby="paizo-reporting-heading"><p className="text-sm font-semibold tracking-[0.16em] text-info uppercase">One more reporting step</p><h2 id="paizo-reporting-heading" className="mt-2 text-lg font-semibold">Report this game to Paizo</h2><p className="mt-2 text-sm text-text-muted">{justCompleted ? "Your Nexus Chronicles are ready." : "Completing Nexus Chronicles does not report the game to Paizo."} If you are the event organizer or delegated reporter, submit the session from the GM/Event Coordinator tab in My Organized Play.</p><a href={PAIZO_ORGANIZED_PLAY_URL} target="_blank" rel="noreferrer" className="mt-4 inline-flex rounded-full bg-info px-4 py-2 text-sm font-semibold text-on-brand hover:opacity-90">Open Paizo My Organized Play <span aria-hidden="true" className="ml-1">↗</span><span className="sr-only"> (opens in a new tab)</span></a></aside>;
+}
