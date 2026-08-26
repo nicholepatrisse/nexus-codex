@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SparkAccent } from "@/app/accent-primitives";
 import { getAuthenticatedActor } from "@/auth/actor";
 import {
   listHomepageAdmissionStatusesForPerson,
@@ -134,8 +135,8 @@ export function CommunityList({
       </div>
 
       {activeCommunities.length === 0 && archivedCommunities.length === 0 ? (
-        <div className="mt-6 rounded-2xl border border-dashed border-border-strong bg-surface p-6">
-          <p className="font-semibold">No communities yet</p>
+        <div className="accent-brand-gradient mt-6 rounded-2xl border border-dashed border-border-strong p-6">
+          <p className="flex items-center gap-2 font-semibold"><SparkAccent size={14} />No communities yet</p>
           <p className="mt-2 text-sm leading-6 text-text-muted">
             Create a community to start organizing Society games.
           </p>

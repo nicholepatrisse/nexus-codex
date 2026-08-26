@@ -109,11 +109,6 @@ body {
   overflow: hidden;
 }
 
-.accent-surface > * {
-  position: relative;
-  z-index: 1;
-}
-
 .accent-brand-gradient {
   background-color: var(--theme-surface);
   background-image: linear-gradient(
