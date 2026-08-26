@@ -1,0 +1,1 @@
+ALTER TABLE "chronicles" ADD CONSTRAINT "chronicles_provenance_session_check" CHECK (coalesce(("chronicles"."provenance" = 'manual' and "chronicles"."session_id" is null) or ("chronicles"."provenance" = 'nexus' and "chronicles"."session_id" is not null), false));

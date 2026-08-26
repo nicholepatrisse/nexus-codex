@@ -20,9 +20,13 @@ describe("manual Chronicles", () => {
     const button = readFileSync(new URL("../../src/app/characters/[characterId]/chronicles/delete-chronicle-button.tsx", import.meta.url), "utf8");
     expect(migration).toContain('CREATE TABLE "chronicles"');
     expect(migration).toContain('"credits_minor" integer NOT NULL');
-    expect(service).toContain("desc(chronicles.datePlayed), desc(chronicles.id)");
+    expect(service).toContain("desc(chronicles.playedOn), desc(chronicles.id)");
     expect(service).toContain("isNull(chronicles.sessionId)");
     expect(service).toContain("eq(characters.personId, actor.personId)");
     expect(button).toContain("window.confirm");
+    const lifecycleMigration = readFileSync(new URL("../../drizzle/0026_violet_the_santerians.sql", import.meta.url), "utf8");
+    expect(lifecycleMigration).toContain('RENAME COLUMN "date_played" TO "played_on"');
+    expect(lifecycleMigration).toContain('CONSTRAINT "chronicles_lifecycle_check"');
+    expect(lifecycleMigration).toContain("'pending', 'applied'");
   });
 });
