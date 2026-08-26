@@ -1,7 +1,9 @@
 "use client";
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
+import { CharacterClassSelect } from "@/character/character-class-select";
+import { CharacterClassIcon } from "@/character/character-class-icon";
 import type { CharacterDetail } from "@/character/characters";
 import { updateCharacterAction, type EditCharacterFormState } from "./actions";
 
@@ -11,11 +13,13 @@ function SubmitButton() { const { pending } = useFormStatus(); return <button ty
 export function EditCharacterForm({ character }: { character: CharacterDetail }) {
   const action = updateCharacterAction.bind(null, character.id);
   const [state, formAction] = useActionState<EditCharacterFormState, FormData>(action, {});
+  const [className, setClassName] = useState(character.className ?? "");
   const field = (name: string) => state.fieldErrors?.[name]?.[0];
-  return <form action={formAction} className="mt-10 space-y-6" noValidate>
+  return <form action={formAction} className="relative mt-10 space-y-6" noValidate>
+    <div className="absolute -top-32 right-0"><CharacterClassIcon className={className} /></div>
     <div><label htmlFor="name" className="block text-sm font-semibold">Character name</label><input id="name" name="name" required maxLength={100} defaultValue={character.name} aria-invalid={Boolean(field("name"))} className={`mt-2 ${inputClass}`} />{field("name") ? <p role="alert" className="mt-2 text-sm text-danger">{field("name")}</p> : null}</div>
     <div className="grid gap-5 sm:grid-cols-2">
-      <div><label htmlFor="className" className="block text-sm font-semibold">Class <span className="font-normal text-text-muted">(optional)</span></label><input id="className" name="className" maxLength={100} defaultValue={character.className ?? ""} aria-invalid={Boolean(field("className"))} className={`mt-2 ${inputClass}`} />{field("className") ? <p role="alert" className="mt-2 text-sm text-danger">{field("className")}</p> : null}</div>
+      <div><label htmlFor="className" className="block text-sm font-semibold">Class <span className="font-normal text-text-muted">(optional)</span></label><CharacterClassSelect defaultValue={character.className} invalid={Boolean(field("className"))} onValueChange={setClassName} />{field("className") ? <p role="alert" className="mt-2 text-sm text-danger">{field("className")}</p> : null}</div>
       <div><label htmlFor="ancestry" className="block text-sm font-semibold">Ancestry <span className="font-normal text-text-muted">(optional)</span></label><input id="ancestry" name="ancestry" maxLength={100} defaultValue={character.ancestry ?? ""} aria-invalid={Boolean(field("ancestry"))} className={`mt-2 ${inputClass}`} />{field("ancestry") ? <p role="alert" className="mt-2 text-sm text-danger">{field("ancestry")}</p> : null}</div>
       <div><label htmlFor="background" className="block text-sm font-semibold">Background <span className="font-normal text-text-muted">(optional)</span></label><input id="background" name="background" maxLength={100} defaultValue={character.background ?? ""} aria-invalid={Boolean(field("background"))} className={`mt-2 ${inputClass}`} />{field("background") ? <p role="alert" className="mt-2 text-sm text-danger">{field("background")}</p> : null}</div>
       <div className="sm:col-span-2"><label htmlFor="backstory" className="block text-sm font-semibold">Backstory <span className="font-normal text-text-muted">(optional)</span></label><textarea id="backstory" name="backstory" rows={6} maxLength={5000} defaultValue={character.backstory ?? ""} aria-invalid={Boolean(field("backstory"))} className={`mt-2 resize-y ${inputClass}`} />{field("backstory") ? <p role="alert" className="mt-2 text-sm text-danger">{field("backstory")}</p> : null}</div>

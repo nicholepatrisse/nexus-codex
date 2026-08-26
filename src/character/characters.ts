@@ -7,13 +7,18 @@ import { canPerformCommunityOperation, type CommunityRole } from "@/authorizatio
 import { getDb } from "@/db/client";
 import { characters, chronicles, communities, contentItems, gameSystems, people, sessionSignups, sessions } from "@/db/schema";
 import { SUPPORTED_GAME_SYSTEM } from "@/game-system/config";
+import { CHARACTER_CLASSES } from "@/character/class-options";
 import { deriveSfs2Progression } from "@/character/sfs2-progression";
+
+const optionalCharacterClassSchema = z.string().trim()
+  .pipe(z.union([z.literal(""), z.enum(CHARACTER_CLASSES, { error: "Choose a supported class." })]))
+  .nullable().optional().transform((value) => value || null);
 
 export const createCharacterInputSchema = z.object({
   name: z.string().trim().min(1, "Enter a character name.").max(100, "Character name must be 100 characters or fewer."),
   characterNumber: z.string().trim().regex(/^(0?[1-9]|[1-9]\d)$/, "Enter a character number from 1 to 99."),
   startingLevel: z.coerce.number().refine((level): level is 1 | 3 | 5 | 7 => [1, 3, 5, 7].includes(level), "Starting level must be 1, 3, 5, or 7.").default(1),
-  className: z.string().trim().max(100, "Class must be 100 characters or fewer.").nullable().optional().transform((value) => value || null),
+  className: optionalCharacterClassSchema,
   ancestry: z.string().trim().max(100, "Ancestry must be 100 characters or fewer.").nullable().optional().transform((value) => value || null),
   background: z.string().trim().max(100, "Background must be 100 characters or fewer.").nullable().optional().transform((value) => value || null),
   backstory: z.string().trim().max(5000, "Backstory must be 5,000 characters or fewer.").nullable().optional().transform((value) => value || null),
@@ -31,7 +36,7 @@ export function formatSocietyNumber(societyPlayNumber: string, characterNumber: 
   return `${societyPlayNumber}-${prefix}${sequence.padStart(2, "0")}`;
 }
 export async function listCharacters(actor: AuthenticatedActor, database: Database = getDb()) {
-  const rows = await database.select({ id: characters.id, name: characters.name, societyNumber: characters.societyNumber, gameSystemId: characters.gameSystemId, gameSystemName: gameSystems.name, startingLevel: characters.startingLevel })
+  const rows = await database.select({ id: characters.id, name: characters.name, societyNumber: characters.societyNumber, className: characters.className, gameSystemId: characters.gameSystemId, gameSystemName: gameSystems.name, startingLevel: characters.startingLevel })
     .from(characters).innerJoin(gameSystems, eq(gameSystems.id, characters.gameSystemId))
     .where(eq(characters.personId, actor.personId)).orderBy(asc(characters.name));
   const progressionByCharacter = await getCharacterProgressions(rows, database);

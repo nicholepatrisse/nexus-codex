@@ -21,6 +21,11 @@ describe("character creation", () => {
     });
   });
 
+  it("rejects unsupported character classes", () => {
+    expect(createCharacterInputSchema.safeParse({ name: "Navasi", characterNumber: "01", className: "Vanguard" }).success).toBe(false);
+    expect(updateCharacterInputSchema.safeParse({ name: "Navasi", className: "Technomancer" }).success).toBe(false);
+  });
+
   it.each([0, 2, 4, 6, 8, 20, 1.5, "not a level"])("rejects invalid starting level %s", (startingLevel) => {
     expect(createCharacterInputSchema.safeParse({ name: "Navasi", characterNumber: "01", startingLevel }).success).toBe(false);
   });
