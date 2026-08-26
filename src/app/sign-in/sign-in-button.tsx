@@ -26,7 +26,7 @@ export function SignInButton({
   return (
     <div className="flex flex-col items-start gap-3">
       <button
-        className="rounded-full bg-[var(--accent)] px-6 py-3 font-semibold text-[#07110f] transition hover:brightness-110 disabled:cursor-wait disabled:opacity-60"
+        className="rounded-full bg-brand px-6 py-3 font-semibold text-background transition hover:bg-brand-hover disabled:cursor-wait disabled:opacity-60"
         type="button"
         onClick={signIn}
         disabled={pending}
@@ -34,7 +34,7 @@ export function SignInButton({
         {pending ? "Opening Google…" : label}
       </button>
       {error ? (
-        <p className="text-sm text-red-300" role="alert">
+        <p className="text-sm text-danger" role="alert">
           {error}
         </p>
       ) : null}

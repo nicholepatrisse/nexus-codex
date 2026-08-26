@@ -14,11 +14,11 @@ export function PublishSessionButton({ slug, sessionId }: { slug: string; sessio
       <button
         type="submit"
         disabled={pending}
-        className="rounded-full bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-[#07110f] disabled:cursor-wait disabled:opacity-60"
+        className="rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-background disabled:cursor-wait disabled:opacity-60"
       >
         {pending ? "Publishing…" : "Publish session"}
       </button>
-      {state.error ? <p className="mt-2 max-w-xs text-sm text-red-200" role="alert">{state.error}</p> : null}
+      {state.error ? <p className="mt-2 max-w-xs text-sm text-danger" role="alert">{state.error}</p> : null}
     </form>
   );
 }
