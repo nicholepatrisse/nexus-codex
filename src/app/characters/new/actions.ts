@@ -7,7 +7,7 @@ import { resolveCharacterCreationReturnTo } from "@/character/character-creation
 import { societyPlayNumberSchema, updateSocietyPlayNumber } from "@/profile/profile";
 export interface CreateCharacterFormState { fieldErrors?: Record<string, string[] | undefined>; formError?: string }
 export async function createCharacterAction(_state: CreateCharacterFormState, formData: FormData): Promise<CreateCharacterFormState> {
-  const parsed = createCharacterInputSchema.safeParse({ name: formData.get("name"), characterNumber: formData.get("characterNumber"), startingLevel: formData.get("startingLevel"), className: formData.get("className"), ancestry: formData.get("ancestry"), background: formData.get("background"), backstory: formData.get("backstory"), notes: formData.get("notes") });
+  const parsed = createCharacterInputSchema.safeParse({ name: formData.get("name"), characterNumber: formData.get("characterNumber"), startingLevel: formData.get("startingLevel"), startingCredits: formData.get("startingCredits"), className: formData.get("className"), ancestry: formData.get("ancestry"), background: formData.get("background"), backstory: formData.get("backstory"), notes: formData.get("notes") });
   if (!parsed.success) return { fieldErrors: z.flattenError(parsed.error).fieldErrors };
   let destination: string | null = null;
   try {
