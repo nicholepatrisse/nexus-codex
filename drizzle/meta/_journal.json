@@ -176,6 +176,13 @@
       "when": 1787764744778,
       "tag": "0024_small_franklin_storm",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1787766770217,
+      "tag": "0025_woozy_lenny_balinger",
+      "breakpoints": true
     }
   ]
 }
