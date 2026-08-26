@@ -7,7 +7,7 @@ import type { ChronicleFormState } from "./actions";
 
 type CatalogItem = { id: string; code: string; title: string };
 const inputClass = "mt-2 w-full rounded-xl border border-border-strong bg-surface-raised px-4 py-3 outline-none focus:border-brand";
-const rewardFields = [["xp", "XP"], ["creditsMinor", "Credits (minor units)"], ["reputation", "Reputation"], ["downtime", "Downtime"]] as const;
+const rewardFields = [["xp", "XP"], ["creditsMinor", "Credits"], ["reputation", "Reputation"], ["downtime", "Downtime"]] as const;
 const standardScenarioCredits: Record<number, number> = { 1: 140, 2: 220, 3: 380, 4: 640, 5: 1000, 6: 1500, 7: 2200, 8: 3000, 9: 4400, 10: 6000 };
 function SubmitButton({ editing }: { editing: boolean }) { const { pending } = useFormStatus(); return <button type="submit" disabled={pending} className="rounded-full bg-brand px-6 py-3 font-semibold text-on-brand disabled:opacity-60">{pending ? "Saving…" : editing ? "Save Chronicle" : "Add Chronicle"}</button>; }
 

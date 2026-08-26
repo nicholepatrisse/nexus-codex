@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { manualChronicleInputSchema, parseManualChronicleInput } from "@/character/chronicles";
+import { creditAdjustmentInputSchema, formatCredits } from "@/character/credit-ledger";
 
 const valid = { scenarioNumber: " 1-01 ", scenarioName: "  The Commencement ", datePlayed: "2026-08-25", characterLevel: "3", advancementSpeed: "standard" as const, xp: "4", creditsMinor: "1250", reputation: "2", downtime: "8", playerNotes: "  Great table.  " };
 
@@ -12,6 +13,12 @@ describe("manual Chronicles", () => {
   it("rejects future dates, fractions, negative rewards, invalid levels, and oversized notes", () => {
     expect(() => parseManualChronicleInput({ ...valid, datePlayed: "2026-08-27" }, new Date("2026-08-26T12:00:00Z"))).toThrow("Play date cannot be in the future");
     for (const input of [{ ...valid, xp: "1.5" }, { ...valid, creditsMinor: "-1" }, { ...valid, characterLevel: "21" }, { ...valid, playerNotes: "x".repeat(5001) }]) expect(manualChronicleInputSchema.safeParse(input).success).toBe(false);
+  });
+
+  it("keeps ledger amounts exact and permits signed owner adjustments", () => {
+    expect(creditAdjustmentInputSchema.parse({ amountMinor: "-125", effectiveOn: "2026-08-25", notes: " correction " })).toEqual({ amountMinor: -125, effectiveOn: "2026-08-25", notes: "correction" });
+    expect(creditAdjustmentInputSchema.safeParse({ amountMinor: "0.1", effectiveOn: "2026-08-25", notes: "fraction" }).success).toBe(false);
+    expect(formatCredits(-125)).toBe("-125");
   });
 
   it("ships database constraints, provenance guards, deterministic ordering, and confirmation", () => {
