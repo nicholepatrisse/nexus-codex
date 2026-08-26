@@ -5,9 +5,9 @@
 
   /* Nexus Codex semantic palette. Override these values to create a theme. */
   --theme-background: #0e1724;
-  --theme-brand: #2f6fed;
-  --theme-brand-hover: #4ca0f3;
-  --theme-brand-muted: #16324f;
+  --theme-brand: #4c8ff5;
+  --theme-brand-hover: #69a8ff;
+  --theme-brand-muted: #172f52;
   --theme-accent: #55d9f6;
   --theme-accent-secondary: #805ad5;
   --theme-surface: #131b28;
@@ -58,7 +58,10 @@
 body {
   min-height: 100vh;
   margin: 0;
-  background: radial-gradient(circle at 15% 10%, rgb(28 64 74 / 45%), transparent 32rem), var(--theme-background);
+  background:
+    radial-gradient(circle at 12% 4%, rgb(47 111 237 / 14%), transparent 30rem),
+    radial-gradient(circle at 88% 12%, rgb(128 90 213 / 8%), transparent 24rem),
+    var(--theme-background);
   color: var(--theme-text-primary);
   font-family: Arial, Helvetica, sans-serif;
 }
@@ -87,6 +90,11 @@ body {
 
 :where(button, a, [role="button"], [role="menuitem"]):focus-visible {
   outline-color: var(--theme-brand);
+}
+
+:where(button, input, select, textarea):disabled {
+  color: var(--theme-text-subtle);
+  cursor: not-allowed;
 }
 
 ::placeholder {

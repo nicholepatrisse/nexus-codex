@@ -173,10 +173,10 @@ export function CommunityList({
               <li key={community.id}>
                 <Link
                   href={`/communities/${community.slug}/settings`}
-                  className="block rounded-2xl border border-warning/30 bg-warning/10 p-5 transition hover:border-warning"
+                  className="block rounded-2xl border border-border bg-surface/70 p-5 text-text-muted transition hover:border-border-strong hover:bg-surface-hover"
                 >
                   <span className="block text-lg font-semibold text-text-primary">{community.name}</span>
-                  <span className="mt-2 block text-sm text-warning">Open settings to restore</span>
+                  <span className="mt-2 block text-sm text-text-subtle">Archived · Open settings to restore</span>
                 </Link>
               </li>
             ))}
