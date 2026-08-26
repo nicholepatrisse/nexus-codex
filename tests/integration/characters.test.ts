@@ -21,11 +21,11 @@ describeWithDatabase("characters persistence", () => {
     const ownerActor = { personId: owner.person.id, authUserId: owner.authUser.id, sessionId: "owner" };
     const otherActor = { personId: other.person.id, authUserId: other.authUser.id, sessionId: "other" };
     await getDb().update(people).set({ societyPlayNumber: "123456" }).where(eq(people.id, owner.person.id));
-    await createCharacter(ownerActor, { name: "Navasi", characterNumber: "01" });
+    await createCharacter(ownerActor, { name: "Navasi", characterNumber: "01", startingLevel: 3 });
     expect(await listCharacters(ownerActor)).toEqual([expect.objectContaining({ name: "Navasi", societyNumber: "123456-2701", gameSystemName: "Starfinder 2E" })]);
     expect(await listCharacters(otherActor)).toEqual([]);
     expect(await getDb().select().from(characters).where(eq(characters.personId, owner.person.id))).toEqual([
-      expect.objectContaining({ gameSystemId: SUPPORTED_GAME_SYSTEM.id }),
+      expect.objectContaining({ gameSystemId: SUPPORTED_GAME_SYSTEM.id, startingLevel: 3 }),
     ]);
   });
 
@@ -40,8 +40,9 @@ describeWithDatabase("characters persistence", () => {
     const created = await createCharacter(ownerActor, { name: "Navasi", characterNumber: "01" });
     if (!created) throw new Error("Expected character creation to return a record.");
 
-    expect(await updateCharacter(otherActor, created.id, { name: "Stolen", level: 20 })).toBeNull();
-    expect(await updateCharacter(ownerActor, created.id, { name: " Navasi ", level: 3, className: " Envoy ", ancestry: "Human", background: "  ", backstory: "  Raised aboard a station.  ", notes: "  " })).toEqual(expect.objectContaining({ id: created.id }));
-    expect(await getCharacterDetail(ownerActor, created.id)).toEqual(expect.objectContaining({ name: "Navasi", level: 3, className: "Envoy", ancestry: "Human", background: null, backstory: "Raised aboard a station.", notes: null, isOwner: true }));
+    expect(await updateCharacter(otherActor, created.id, { name: "Stolen" })).toBeNull();
+    const attemptedStartingLevelChange = { name: " Navasi ", startingLevel: 7, className: " Envoy ", ancestry: "Human", background: "  ", backstory: "  Raised aboard a station.  ", notes: "  " } as Parameters<typeof updateCharacter>[2];
+    expect(await updateCharacter(ownerActor, created.id, attemptedStartingLevelChange)).toEqual(expect.objectContaining({ id: created.id }));
+    expect(await getCharacterDetail(ownerActor, created.id)).toEqual(expect.objectContaining({ name: "Navasi", startingLevel: 1, currentLevel: 1, xp: 0, className: "Envoy", ancestry: "Human", background: null, backstory: "Raised aboard a station.", notes: null, isOwner: true }));
   });
 });

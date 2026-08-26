@@ -7,7 +7,7 @@ import { updateCharacter, updateCharacterInputSchema } from "@/character/charact
 export interface EditCharacterFormState { fieldErrors?: Record<string, string[] | undefined>; formError?: string }
 
 export async function updateCharacterAction(characterId: string, _state: EditCharacterFormState, formData: FormData): Promise<EditCharacterFormState> {
-  const parsed = updateCharacterInputSchema.safeParse({ name: formData.get("name"), level: formData.get("level"), className: formData.get("className"), ancestry: formData.get("ancestry"), background: formData.get("background"), backstory: formData.get("backstory"), notes: formData.get("notes") });
+  const parsed = updateCharacterInputSchema.safeParse({ name: formData.get("name"), className: formData.get("className"), ancestry: formData.get("ancestry"), background: formData.get("background"), backstory: formData.get("backstory"), notes: formData.get("notes") });
   if (!parsed.success) return { fieldErrors: z.flattenError(parsed.error).fieldErrors };
   try {
     const updated = await updateCharacter(await requireAuthenticatedActor(), characterId, parsed.data);

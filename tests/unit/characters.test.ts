@@ -1,9 +1,12 @@
+import { readFileSync } from "node:fs";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { createCharacterInputSchema, formatSocietyNumber, updateCharacterInputSchema } from "@/character/characters";
-import { normalizeCharacterNumber } from "@/app/characters/new/character-form";
+import { nextAvailableCharacterNumber, normalizeCharacterNumber } from "@/app/characters/new/character-form";
+import { CharacterProgress } from "@/app/characters/[characterId]/character-progress";
 describe("character creation", () => {
   it("accepts and normalizes required fields", () => {
-    expect(createCharacterInputSchema.parse({ name: "  Navasi  ", characterNumber: " 01 " })).toEqual({ name: "Navasi", characterNumber: "01", level: 1, className: null, ancestry: null, background: null, backstory: null, notes: null });
+    expect(createCharacterInputSchema.parse({ name: "  Navasi  ", characterNumber: " 01 " })).toEqual({ name: "Navasi", characterNumber: "01", startingLevel: 1, className: null, ancestry: null, background: null, backstory: null, notes: null });
   });
   it.each([
     { name: "", characterNumber: "01" },
@@ -13,18 +16,26 @@ describe("character creation", () => {
   ])("rejects invalid information", (input) => expect(createCharacterInputSchema.safeParse(input).success).toBe(false));
 
   it("normalizes optional character details", () => {
-    expect(createCharacterInputSchema.parse({ name: "Navasi", characterNumber: "01", level: "12", className: "  Envoy ", ancestry: "  Human  ", background: "   " })).toEqual({
-      name: "Navasi", characterNumber: "01", level: 12, className: "Envoy", ancestry: "Human", background: null, backstory: null, notes: null,
+    expect(createCharacterInputSchema.parse({ name: "Navasi", characterNumber: "01", startingLevel: "7", className: "  Envoy ", ancestry: "  Human  ", background: "   " })).toEqual({
+      name: "Navasi", characterNumber: "01", startingLevel: 7, className: "Envoy", ancestry: "Human", background: null, backstory: null, notes: null,
     });
   });
 
-  it.each([0, 21, 1.5, "not a level"])("rejects invalid character level %s", (level) => {
-    expect(updateCharacterInputSchema.safeParse({ name: "Navasi", level }).success).toBe(false);
+  it.each([0, 2, 4, 6, 8, 20, 1.5, "not a level"])("rejects invalid starting level %s", (startingLevel) => {
+    expect(createCharacterInputSchema.safeParse({ name: "Navasi", characterNumber: "01", startingLevel }).success).toBe(false);
+  });
+
+  it.each([1, 3, 5, 7])("accepts Society starting level %s", (startingLevel) => {
+    expect(createCharacterInputSchema.safeParse({ name: "Navasi", characterNumber: "01", startingLevel }).success).toBe(true);
+  });
+
+  it("does not expose starting level through character updates", () => {
+    expect(updateCharacterInputSchema.parse({ name: "Navasi", startingLevel: 7 })).toEqual({ name: "Navasi", className: null, ancestry: null, background: null, backstory: null, notes: null });
   });
 
   it("applies reasonable detail length limits", () => {
-    expect(updateCharacterInputSchema.safeParse({ name: "Navasi", level: 1, className: "x".repeat(101) }).success).toBe(false);
-    expect(updateCharacterInputSchema.safeParse({ name: "Navasi", level: 1, backstory: "x".repeat(5001) }).success).toBe(false);
+    expect(updateCharacterInputSchema.safeParse({ name: "Navasi", className: "x".repeat(101) }).success).toBe(false);
+    expect(updateCharacterInputSchema.safeParse({ name: "Navasi", backstory: "x".repeat(5001) }).success).toBe(false);
   });
 
   it("formats Starfinder 2E character numbers", () => {
@@ -36,5 +47,27 @@ describe("character creation", () => {
     expect(normalizeCharacterNumber(" 9 ")).toBe("09");
     expect(normalizeCharacterNumber("12")).toBe("12");
     expect(normalizeCharacterNumber("0")).toBe("0");
+  });
+
+  it("suggests the first unused Society character number", () => {
+    expect(nextAvailableCharacterNumber(["01", "03"])).toBe("02");
+    expect(nextAvailableCharacterNumber(["1", "02"])).toBe("03");
+    expect(nextAvailableCharacterNumber(Array.from({ length: 99 }, (_, index) => String(index + 1)))).toBe("");
+  });
+
+  it("shows immutable starting level and placeholder progression state", () => {
+    const html = renderToStaticMarkup(CharacterProgress({ startingLevel: 5, currentLevel: 5, xp: 0 }));
+    expect(html).toContain("Starting level");
+    expect(html).toContain("Current level");
+    expect(html).toContain("XP");
+    expect(html).toContain(">5<");
+    expect(html).toContain(">0<");
+  });
+
+  it("preserves supported legacy levels and fails loudly for unsupported rows before constraining the column", () => {
+    const migration = readFileSync(new URL("../../drizzle/0024_small_franklin_storm.sql", import.meta.url), "utf8");
+    expect(migration.indexOf("level NOT IN (1, 3, 5, 7)")).toBeLessThan(migration.indexOf('RENAME COLUMN "level" TO "starting_level"'));
+    expect(migration).toContain("RAISE EXCEPTION 'Cannot migrate characters with unsupported Society starting levels:");
+    expect(migration).toContain('CHECK ("characters"."starting_level" in (1, 3, 5, 7))');
   });
 });
