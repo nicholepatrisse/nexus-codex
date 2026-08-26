@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const SITE_NAME = "Nexus Codex";
-export const DEFAULT_DESCRIPTION = "A Starfinder 2E community and game management tool.";
+export const DEFAULT_DESCRIPTION = "A Starfinder 2E community and game management tool for organizing games, sessions, and characters.";
 export const SOCIAL_IMAGE_PATH = "/nexus-codex-social-preview-v2.png";
 
 export function getSiteUrl(): URL {
@@ -46,7 +46,7 @@ export function socialMetadata({
 }
 
 export const defaultSocialMetadata = socialMetadata({
-  title: SITE_NAME,
+  title: "Nexus Codex | Starfinder 2E Game Management",
   description: DEFAULT_DESCRIPTION,
   pathname: "/",
 });
