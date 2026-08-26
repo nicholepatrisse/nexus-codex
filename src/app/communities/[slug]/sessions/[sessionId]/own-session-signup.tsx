@@ -5,12 +5,13 @@ export interface OwnSessionSignupDetails {
   status: "confirmed" | "waitlisted";
   characterName: string;
   characterSocietyNumber?: string | null;
+  characterLevel?: number | null;
   waitlistPosition?: number | null;
   characterId?: string;
   slug?: string;
   sessionId?: string;
   canManage?: boolean;
-  characters?: { id: string; name: string; societyNumber: string }[];
+  characters?: { id: string; name: string; societyNumber: string; currentLevel: number }[];
 }
 
 export function OwnSessionSignup({ signup, children }: { signup: OwnSessionSignupDetails; children?: ReactNode }) {
@@ -24,6 +25,7 @@ export function OwnSessionSignup({ signup, children }: { signup: OwnSessionSignu
     <p className="mt-1 font-semibold text-text-primary">
       {signup.characterName}
       {signup.characterSocietyNumber ? <span className="font-normal text-text-muted"> — {signup.characterSocietyNumber}</span> : null}
+      {signup.characterLevel ? <span className="font-normal text-text-muted"> — Level {signup.characterLevel}</span> : null}
     </p>
     {signup.slug && signup.sessionId && signup.characterId ? signup.canManage
       ? <SessionSignupControl slug={signup.slug} sessionId={signup.sessionId} initialStatus={signup.status} initialCharacterId={signup.characterId} initialCharacterName={signup.characterName} characters={signup.characters ?? []} />

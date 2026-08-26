@@ -9,6 +9,7 @@ import { characters, contentItems, communityGmRequests, communityMembershipReque
 import type { Metadata } from "next";
 import { resolveCommunityAccessBySlug } from "@/authorization/community-access";
 import { defaultSocialMetadata, socialMetadata } from "@/app/social-metadata";
+import { listCharacters } from "@/character/characters";
 
 interface CommunityPageProps {
   params: Promise<{ slug: string }>;
@@ -84,8 +85,8 @@ export default async function CommunityPage({ params, searchParams }: CommunityP
     : [];
   const signupBySession = new Map(ownSignups.map((signup) => [signup.sessionId, signup]));
   const ownCharacters = actor
-    ? await getDb().select({ id: characters.id, name: characters.name, societyNumber: characters.societyNumber, gameSystemId: characters.gameSystemId }).from(characters).where(eq(characters.personId, actor.personId)).orderBy(asc(characters.name))
+    ? await listCharacters(actor)
     : [];
 
-  return <CommunityProfile community={community} isOwner={isOwner} isSignedIn={Boolean(actor)} isMember={authorization.access.isActiveMember} pendingRequestId={pendingRequest?.id} gmAdmission={community.gmAdmission === "self_service" ? "self_service" : "approved_only"} gmState={gmState} pendingGmRequestId={gmRequest?.status === "pending" ? gmRequest.id : undefined} drafts={drafts.map((draft) => ({ ...draft, startsAt: draft.startsAt.toISOString() }))} sessions={publishedSessions.map((session) => { const signup = signupBySession.get(session.id); return { ...session, startsAt: session.startsAt.toISOString(), canSignUp: actor?.personId !== session.gmPersonId, signupStatus: signup?.status === "confirmed" ? "confirmed" as const : signup?.status === "waitlisted" ? "waitlisted" as const : undefined, signupCharacterId: signup?.characterId ?? undefined, signupCharacterName: signup?.characterName ?? undefined, eligibleCharacters: ownCharacters.filter(({ gameSystemId }) => gameSystemId === session.gameSystemId).map(({ id, name, societyNumber }) => ({ id, name, societyNumber })) }; })} canViewSchedule={canViewSchedule} published={(await searchParams)?.published === "1"} />;
+  return <CommunityProfile community={community} isOwner={isOwner} isSignedIn={Boolean(actor)} isMember={authorization.access.isActiveMember} pendingRequestId={pendingRequest?.id} gmAdmission={community.gmAdmission === "self_service" ? "self_service" : "approved_only"} gmState={gmState} pendingGmRequestId={gmRequest?.status === "pending" ? gmRequest.id : undefined} drafts={drafts.map((draft) => ({ ...draft, startsAt: draft.startsAt.toISOString() }))} sessions={publishedSessions.map((session) => { const signup = signupBySession.get(session.id); return { ...session, startsAt: session.startsAt.toISOString(), canSignUp: actor?.personId !== session.gmPersonId, signupStatus: signup?.status === "confirmed" ? "confirmed" as const : signup?.status === "waitlisted" ? "waitlisted" as const : undefined, signupCharacterId: signup?.characterId ?? undefined, signupCharacterName: signup?.characterName ?? undefined, eligibleCharacters: ownCharacters.filter(({ gameSystemId }) => gameSystemId === session.gameSystemId).map(({ id, name, societyNumber, currentLevel }) => ({ id, name, societyNumber, currentLevel })) }; })} canViewSchedule={canViewSchedule} published={(await searchParams)?.published === "1"} />;
 }
