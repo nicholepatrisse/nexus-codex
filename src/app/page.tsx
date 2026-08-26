@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { AccentSurface, OrbitMotif, SparkAccent, accentPosition } from "@/app/accent-primitives";
 import { MyCommunities } from "@/app/my-communities";
+import { NexusCodexMark } from "@/app/nexus-codex-mark";
 import { SignInButton } from "@/app/sign-in/sign-in-button";
 import { SignedUpGames, SignedUpGamesLoading } from "@/app/signed-up-games";
 import { getAuthenticatedActor } from "@/auth/actor";
@@ -17,6 +18,7 @@ export default async function Home() {
       >
         <OrbitMotif className="pointer-events-none absolute -top-8 -right-16 w-80 opacity-35 sm:w-[28rem]" />
         <section className="relative max-w-3xl">
+          <NexusCodexMark className="mb-8 size-24 sm:size-32" />
           <p className="mb-5 flex items-center gap-2 text-sm font-semibold tracking-[0.24em] text-brand uppercase">
             <SparkAccent className="shrink-0" size={14} />
             Society operations, connected
