@@ -525,6 +525,23 @@ export const sessionSignups = pgTable(
   ],
 );
 
+/** A GM's character credit for a real Nexus session; never represents player participation. */
+export const sessionGmCredits = pgTable(
+  "session_gm_credits",
+  {
+    id: text("id").primaryKey(),
+    sessionId: text("session_id").notNull().references(() => sessions.id, { onDelete: "restrict" }),
+    gmPersonId: text("gm_person_id").notNull().references(() => people.id, { onDelete: "restrict" }),
+    characterId: text("character_id").notNull().references(() => characters.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("session_gm_credits_session_gm_unique").on(table.sessionId, table.gmPersonId),
+    index("session_gm_credits_character_id_idx").on(table.characterId),
+  ],
+);
+
 /** Immutable play/reward history owned by a character. Manual rows have no session. */
 export const chronicles = pgTable(
   "chronicles",
