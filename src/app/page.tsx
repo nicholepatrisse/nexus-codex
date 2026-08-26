@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { Suspense } from "react";
 import { AccentSurface, OrbitMotif, SparkAccent, accentPosition } from "@/app/accent-primitives";
 import { MyCommunities } from "@/app/my-communities";
@@ -21,8 +22,15 @@ export default async function Home() {
             <SparkAccent className="shrink-0" size={14} />
             Society operations, connected
           </p>
-          <h1 className="text-5xl leading-tight font-semibold tracking-tight sm:text-7xl">
-            Nexus Codex
+          <h1 className="relative -ml-[8%] aspect-[12/5] w-[108%] max-w-[45rem] overflow-hidden">
+            <Image
+              src="/nexus-codex-wordmark.png"
+              alt="Nexus Codex"
+              fill
+              priority
+              sizes="(min-width: 640px) 720px, calc(100vw - 64px)"
+              className="object-cover"
+            />
           </h1>
           <p className="mt-7 max-w-2xl text-lg leading-8 text-text-muted sm:text-xl">
             Schedule games, coordinate characters and tables, and keep every Chronicle and credit
