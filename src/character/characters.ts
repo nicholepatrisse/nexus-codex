@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { AuthenticatedActor } from "@/auth/actor";
 import { resolveCommunityAccessBySlug } from "@/authorization/community-access";
 import { canPerformCommunityOperation, type CommunityRole } from "@/authorization/policy";
 import { getDb } from "@/db/client";
-import { characters, communities, contentItems, gameSystems, people, sessionSignups, sessions } from "@/db/schema";
+import { characters, chronicles, communities, contentItems, gameSystems, people, sessionSignups, sessions } from "@/db/schema";
 import { SUPPORTED_GAME_SYSTEM } from "@/game-system/config";
 
 export const createCharacterInputSchema = z.object({
@@ -35,7 +35,7 @@ export async function listCharacters(actor: AuthenticatedActor, database: Databa
     .where(eq(characters.personId, actor.personId)).orderBy(asc(characters.name));
 }
 export interface CharacterSession { id: string; communityName: string; communitySlug: string; scenarioCode: string; scenarioTitle: string; startsAt: Date; displayTimeZone: string; signupStatus: "confirmed" | "waitlisted" | "cancelled"; }
-export interface CharacterDetail { id: string; name: string; societyNumber: string; gameSystemName: string; startingLevel: number; currentLevel: number; xp: number; className: string | null; ancestry: string | null; background: string | null; backstory: string | null; notes: string | null; isOwner: boolean; upcomingSessions: CharacterSession[]; pastSessions: CharacterSession[]; }
+export interface CharacterDetail { id: string; name: string; societyNumber: string; gameSystemName: string; startingLevel: number; currentLevel: number; xp: number; creditsMinor: number; reputation: number; downtime: number; className: string | null; ancestry: string | null; background: string | null; backstory: string | null; notes: string | null; isOwner: boolean; upcomingSessions: CharacterSession[]; pastSessions: CharacterSession[]; }
 function communityRole(access: { isActiveMember: boolean; roles: ("owner" | "gm")[] }): CommunityRole | "member" | "visitor" {
   if (access.roles.includes("owner")) return "owner";
   if (access.roles.includes("gm")) return "gm";
@@ -63,7 +63,8 @@ export async function getCharacterDetail(actor: AuthenticatedActor, characterId:
   const upcomingSessions = visible.filter((session) => session.startsAt >= now && session.signupStatus !== "cancelled").sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
   const pastSessions = visible.filter((session) => session.startsAt < now).sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime());
   if (!isOwner && visible.length === 0) return null;
-  return { id: character.id, name: character.name, societyNumber: character.societyNumber, gameSystemName: character.gameSystemName, startingLevel: character.startingLevel, currentLevel: character.startingLevel, xp: 0, className: character.className, ancestry: character.ancestry, background: character.background, backstory: character.backstory, notes: character.notes, isOwner, upcomingSessions, pastSessions };
+  const [totals] = await database.select({ xp: sql<number>`coalesce(sum(${chronicles.xp}), 0)::int`, creditsMinor: sql<number>`coalesce(sum(${chronicles.creditsMinor}), 0)::int`, reputation: sql<number>`coalesce(sum(${chronicles.reputation}), 0)::int`, downtime: sql<number>`coalesce(sum(${chronicles.downtime}), 0)::int` }).from(chronicles).where(and(eq(chronicles.characterId, character.id), eq(chronicles.status, "applied")));
+  return { id: character.id, name: character.name, societyNumber: character.societyNumber, gameSystemName: character.gameSystemName, startingLevel: character.startingLevel, currentLevel: character.startingLevel, xp: totals?.xp ?? 0, creditsMinor: totals?.creditsMinor ?? 0, reputation: totals?.reputation ?? 0, downtime: totals?.downtime ?? 0, className: character.className, ancestry: character.ancestry, background: character.background, backstory: character.backstory, notes: character.notes, isOwner, upcomingSessions, pastSessions };
 }
 export async function createCharacter(actor: AuthenticatedActor, rawInput: CreateCharacterInput, database: Database = getDb()) {
   const input = createCharacterInputSchema.parse(rawInput);

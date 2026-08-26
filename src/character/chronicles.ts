@@ -32,11 +32,14 @@ export function parseManualChronicleInput(input: ManualChronicleInput, now = new
   return parsed;
 }
 
-export type Chronicle = typeof chronicles.$inferSelect & { provenance: "manual" | "nexus" };
+export const chronicleLifecycleSchema = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("pending"), appliedAt: z.null() }),
+  z.object({ status: z.literal("applied"), appliedAt: z.date() }),
+]);
+export type Chronicle = typeof chronicles.$inferSelect;
 
 export async function listChronicles(characterId: string, database: Database = getDb()): Promise<Chronicle[]> {
-  const rows = await database.select().from(chronicles).where(eq(chronicles.characterId, characterId)).orderBy(desc(chronicles.datePlayed), desc(chronicles.id));
-  return rows.map((row) => ({ ...row, provenance: row.sessionId ? "nexus" : "manual" }));
+  return database.select().from(chronicles).where(eq(chronicles.characterId, characterId)).orderBy(desc(chronicles.playedOn), desc(chronicles.id));
 }
 
 export async function listChronicleContentItems(database: Database = getDb()) {
@@ -55,7 +58,7 @@ export async function createManualChronicle(actor: AuthenticatedActor, character
   const [owned] = await database.select({ id: characters.id }).from(characters).where(and(eq(characters.id, characterId), eq(characters.personId, actor.personId))).limit(1);
   if (!owned) return null;
   const snapshot = await catalogSnapshot(input.contentItemId, input.scenarioNumber, input.scenarioName, database);
-  const [created] = await database.insert(chronicles).values({ id: randomUUID(), characterId, sessionId: null, ...snapshot, datePlayed: input.datePlayed, characterLevel: input.characterLevel, advancementSpeed: input.advancementSpeed, xp: input.xp, creditsMinor: input.creditsMinor, reputation: input.reputation, downtime: input.downtime, playerNotes: input.playerNotes }).returning();
+  const [created] = await database.insert(chronicles).values({ id: randomUUID(), characterId, sessionId: null, provenance: "manual", status: "pending", appliedAt: null, ...snapshot, playedOn: input.datePlayed, characterLevel: input.characterLevel, advancementSpeed: input.advancementSpeed, xp: input.xp, creditsMinor: input.creditsMinor, reputation: input.reputation, downtime: input.downtime, playerNotes: input.playerNotes }).returning();
   return created;
 }
 
@@ -69,13 +72,27 @@ export async function updateManualChronicle(actor: AuthenticatedActor, character
   const editable = await getEditableManualChronicle(actor, characterId, chronicleId, database);
   if (!editable) return null;
   const snapshot = await catalogSnapshot(input.contentItemId, input.scenarioNumber, input.scenarioName, database);
-  const [updated] = await database.update(chronicles).set({ ...snapshot, datePlayed: input.datePlayed, characterLevel: input.characterLevel, advancementSpeed: input.advancementSpeed, xp: input.xp, creditsMinor: input.creditsMinor, reputation: input.reputation, downtime: input.downtime, playerNotes: input.playerNotes, updatedAt: new Date() }).where(and(eq(chronicles.id, chronicleId), eq(chronicles.characterId, characterId), isNull(chronicles.sessionId))).returning();
+  const [updated] = await database.update(chronicles).set({ ...snapshot, playedOn: input.datePlayed, characterLevel: input.characterLevel, advancementSpeed: input.advancementSpeed, xp: input.xp, creditsMinor: input.creditsMinor, reputation: input.reputation, downtime: input.downtime, playerNotes: input.playerNotes, updatedAt: new Date() }).where(and(eq(chronicles.id, chronicleId), eq(chronicles.characterId, characterId), isNull(chronicles.sessionId), eq(chronicles.status, "pending"))).returning();
   return updated ?? null;
 }
 
 export async function deleteManualChronicle(actor: AuthenticatedActor, characterId: string, chronicleId: string, database: Database = getDb()) {
   const editable = await getEditableManualChronicle(actor, characterId, chronicleId, database);
   if (!editable) return false;
-  const deleted = await database.delete(chronicles).where(and(eq(chronicles.id, chronicleId), eq(chronicles.characterId, characterId), isNull(chronicles.sessionId))).returning({ id: chronicles.id });
+  const deleted = await database.delete(chronicles).where(and(eq(chronicles.id, chronicleId), eq(chronicles.characterId, characterId), isNull(chronicles.sessionId), eq(chronicles.status, "pending"))).returning({ id: chronicles.id });
   return deleted.length === 1;
+}
+
+export async function applyManualChronicle(actor: AuthenticatedActor, characterId: string, chronicleId: string, database: Database = getDb(), now = new Date()) {
+  const [applied] = await database.update(chronicles).set({ status: "applied", appliedAt: now, updatedAt: now }).from(characters).where(and(eq(chronicles.id, chronicleId), eq(chronicles.characterId, characterId), eq(chronicles.characterId, characters.id), eq(characters.personId, actor.personId), eq(chronicles.provenance, "manual"), eq(chronicles.status, "pending"), isNull(chronicles.appliedAt))).returning();
+  if (applied) return applied;
+  const [existing] = await database.select().from(chronicles).innerJoin(characters, eq(characters.id, chronicles.characterId)).where(and(eq(chronicles.id, chronicleId), eq(chronicles.characterId, characterId), eq(characters.personId, actor.personId), eq(chronicles.provenance, "manual"), eq(chronicles.status, "applied"))).limit(1);
+  return existing?.chronicles ?? null;
+}
+
+export async function unapplyManualChronicle(actor: AuthenticatedActor, characterId: string, chronicleId: string, database: Database = getDb(), now = new Date()) {
+  const [pending] = await database.update(chronicles).set({ status: "pending", appliedAt: null, updatedAt: now }).from(characters).where(and(eq(chronicles.id, chronicleId), eq(chronicles.characterId, characterId), eq(chronicles.characterId, characters.id), eq(characters.personId, actor.personId), eq(chronicles.provenance, "manual"), eq(chronicles.status, "applied"))).returning();
+  if (pending) return pending;
+  const [existing] = await database.select().from(chronicles).innerJoin(characters, eq(characters.id, chronicles.characterId)).where(and(eq(chronicles.id, chronicleId), eq(chronicles.characterId, characterId), eq(characters.personId, actor.personId), eq(chronicles.provenance, "manual"), eq(chronicles.status, "pending"))).limit(1);
+  return existing?.chronicles ?? null;
 }

@@ -1,8 +1,9 @@
 "use server";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { AuthenticationRequiredError, requireAuthenticatedActor } from "@/auth/actor";
-import { createManualChronicle, deleteManualChronicle, manualChronicleInputSchema, updateManualChronicle } from "@/character/chronicles";
+import { applyManualChronicle, createManualChronicle, deleteManualChronicle, manualChronicleInputSchema, unapplyManualChronicle, updateManualChronicle } from "@/character/chronicles";
 
 export interface ChronicleFormState { fieldErrors?: Record<string, string[] | undefined>; formError?: string }
 function input(formData: FormData) { return { contentItemId: formData.get("contentItemId"), scenarioNumber: formData.get("scenarioNumber"), scenarioName: formData.get("scenarioName"), datePlayed: formData.get("datePlayed"), characterLevel: formData.get("characterLevel"), advancementSpeed: formData.get("advancementSpeed"), xp: formData.get("xp"), creditsMinor: formData.get("creditsMinor"), reputation: formData.get("reputation"), downtime: formData.get("downtime"), playerNotes: formData.get("playerNotes") }; }
@@ -38,4 +39,14 @@ export async function updateChronicleAction(characterId: string, chronicleId: st
 export async function deleteChronicleAction(characterId: string, chronicleId: string) {
   try { await deleteManualChronicle(await requireAuthenticatedActor(), characterId, chronicleId); } catch { /* Preserve the privacy-safe not-found behavior on failure. */ }
   redirect(`/characters/${characterId}`);
+}
+
+export async function applyChronicleAction(characterId: string, chronicleId: string) {
+  await applyManualChronicle(await requireAuthenticatedActor(), characterId, chronicleId);
+  revalidatePath(`/characters/${characterId}`);
+}
+
+export async function unapplyChronicleAction(characterId: string, chronicleId: string) {
+  await unapplyManualChronicle(await requireAuthenticatedActor(), characterId, chronicleId);
+  revalidatePath(`/characters/${characterId}`);
 }
