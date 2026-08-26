@@ -17,7 +17,7 @@ interface Settings {
 
 function SaveButton() {
   const { pending } = useFormStatus();
-  return <button type="submit" disabled={pending} className="rounded-full bg-brand px-6 py-3 font-semibold text-background disabled:opacity-60">{pending ? "Saving…" : "Save settings"}</button>;
+  return <button type="submit" disabled={pending} className="rounded-full bg-brand px-6 py-3 font-semibold text-on-brand disabled:opacity-60">{pending ? "Saving…" : "Save settings"}</button>;
 }
 
 export function CommunitySettingsForm({ settings }: { settings: Settings }) {

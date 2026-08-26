@@ -1,14 +1,15 @@
-# Refreshed theme accessibility review
+# Light and dark theme accessibility review
 
 Reviewed against WCAG 2.2 AA. The semantic palette is enforced by
-`tests/unit/theme-accessibility.test.ts` so later theme changes cannot silently
+`tests/unit/theme-accessibility.test.ts` for both system color schemes so later theme changes cannot silently
 reduce normal-text contrast below 4.5:1 or strong control borders below 3:1.
 
 ## Review result
 
 - Primary, muted, subtle, link, and status text meet 4.5:1 on the background,
   surface, and raised-surface tokens.
-- Brand-filled buttons retain 5.62:1 contrast between their text and fill.
+- Brand-filled buttons use a dedicated semantic foreground token and retain at
+  least 4.5:1 contrast in both themes.
 - Strong borders meet 3:1 against raised control surfaces; ordinary structural
   borders were also increased for visibility.
 - All links, buttons, form controls, menu items, and tabs receive a three-pixel

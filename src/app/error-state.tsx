@@ -31,7 +31,7 @@ export function ErrorState({ errorId, onRetry, global = false }: ErrorStateProps
           <button
             type="button"
             onClick={onRetry}
-            className="cursor-pointer rounded-md bg-brand px-5 py-3 font-semibold text-background hover:bg-brand-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+            className="cursor-pointer rounded-md bg-brand px-5 py-3 font-semibold text-on-brand hover:bg-brand-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
           >
             Try again
           </button>

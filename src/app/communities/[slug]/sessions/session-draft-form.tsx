@@ -29,7 +29,7 @@ function defaultEndFromStart(localStart: string) {
 
 function SubmitButton({ editing }: { editing: boolean }) {
   const { pending } = useFormStatus();
-  return <button type="submit" disabled={pending} className="rounded-full bg-brand px-6 py-3 font-semibold text-background disabled:opacity-60">{pending ? "Saving…" : editing ? "Save draft" : "Create draft"}</button>;
+  return <button type="submit" disabled={pending} className="rounded-full bg-brand px-6 py-3 font-semibold text-on-brand disabled:opacity-60">{pending ? "Saving…" : editing ? "Save draft" : "Create draft"}</button>;
 }
 
 export function SessionDraftForm({
