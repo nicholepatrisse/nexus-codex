@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 export const SITE_NAME = "Nexus Codex";
 export const DEFAULT_DESCRIPTION = "A Starfinder 2E community and game management tool.";
-export const SOCIAL_IMAGE_PATH = "/nexus-codex-social-preview-v1.png";
+export const SOCIAL_IMAGE_PATH = "/nexus-codex-social-preview-v2.png";
 
 export function getSiteUrl(): URL {
   const configuredUrl = process.env.NEXT_PUBLIC_SITE_URL ?? process.env.BETTER_AUTH_URL;
