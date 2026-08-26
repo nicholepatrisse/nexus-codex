@@ -16,9 +16,9 @@ export default async function CommunitiesPage({ searchParams }: CommunitiesPageP
   if (!result) {
     return (
       <main className="mx-auto min-h-screen max-w-5xl px-6 py-16 sm:py-24">
-        <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-7">
+        <section className="rounded-2xl border border-border bg-surface p-7">
           <h1 className="text-3xl font-semibold">Community directory unavailable</h1>
-          <p className="mt-3 text-[var(--muted)]">Please try again in a moment.</p>
+          <p className="mt-3 text-text-muted">Please try again in a moment.</p>
         </section>
       </main>
     );
@@ -29,13 +29,13 @@ export default async function CommunitiesPage({ searchParams }: CommunitiesPageP
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-6 py-16 sm:py-24">
       <section>
-        <p className="text-sm font-semibold tracking-[0.2em] text-[var(--accent)] uppercase">
+        <p className="text-sm font-semibold tracking-[0.2em] text-brand uppercase">
           Community directory
         </p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">
           Public communities
         </h1>
-        <p className="mt-4 max-w-2xl leading-7 text-[var(--muted)]">
+        <p className="mt-4 max-w-2xl leading-7 text-text-muted">
           Browse communities that have chosen to make their profile public.
         </p>
 
@@ -44,15 +44,15 @@ export default async function CommunitiesPage({ searchParams }: CommunitiesPageP
         {pageCount > 1 ? (
           <nav aria-label="Community results pages" className="mt-8 flex items-center gap-4">
             {page > 1 ? (
-              <Link href={directoryHref(page - 1)} className="text-[var(--accent)] hover:underline">
+              <Link href={directoryHref(page - 1)} className="text-brand hover:underline">
                 ← Previous
               </Link>
             ) : null}
-            <span className="text-sm text-[var(--muted)]">
+            <span className="text-sm text-text-muted">
               Page {Math.min(page, pageCount)} of {pageCount}
             </span>
             {page < pageCount ? (
-              <Link href={directoryHref(page + 1)} className="text-[var(--accent)] hover:underline">
+              <Link href={directoryHref(page + 1)} className="text-brand hover:underline">
                 Next →
               </Link>
             ) : null}

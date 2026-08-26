@@ -62,3 +62,33 @@ body {
   color: var(--theme-text-primary);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Native controls inherit the semantic system even when a component only
+   supplies layout utilities. This keeps control chrome themeable, too. */
+:where(input, select, textarea) {
+  color: var(--theme-text-primary);
+  background-color: var(--theme-surface-raised);
+  border-color: var(--theme-border);
+}
+
+:where(input, select, textarea):hover:not(:disabled) {
+  border-color: var(--theme-border-strong);
+}
+
+:where(input, select, textarea):focus-visible {
+  border-color: var(--theme-brand);
+  outline: 2px solid var(--theme-brand);
+  outline-offset: 2px;
+}
+
+:where(input[type="checkbox"], input[type="radio"]) {
+  accent-color: var(--theme-brand);
+}
+
+:where(button, a, [role="button"], [role="menuitem"]):focus-visible {
+  outline-color: var(--theme-brand);
+}
+
+::placeholder {
+  color: var(--theme-text-subtle);
+}
