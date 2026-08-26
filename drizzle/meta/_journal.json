@@ -148,6 +148,27 @@
       "when": 1787702761819,
       "tag": "0020_seed_sfs2_catalog",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1787760652521,
+      "tag": "0021_quiet_mikhail_rasputin",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1787761470790,
+      "tag": "0022_closed_misty_knight",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1787761564309,
+      "tag": "0023_handy_fixer",
+      "breakpoints": true
     }
   ]
 }

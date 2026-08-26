@@ -27,6 +27,7 @@ import {
   cancelOwnSessionSignup,
   listUpcomingSignedUpGames,
   signupForSession,
+  updateOwnSessionSignup,
 } from "@/session/session-signups";
 
 const describeWithDatabase = process.env.CI ? describe : describe.skip;
@@ -152,6 +153,28 @@ describeWithDatabase("session signups", () => {
     expect(result).toMatchObject({ status: "confirmed", replayed: true });
     const rows = await getDb().select().from(sessionSignups).where(eq(sessionSignups.personId, confirmedActor.personId));
     expect(rows).toHaveLength(1);
+  });
+
+  it("updates a live signup and records the audit event", async () => {
+    const [signup] = await getDb().select().from(sessionSignups).where(and(
+      eq(sessionSignups.sessionId, publishedSessionId),
+      eq(sessionSignups.status, "confirmed"),
+    )).limit(1);
+    const actor = actors.find(({ personId }) => personId === signup?.personId)!;
+    const alternateCharacterId = `alternate-${characterIdFor(actor)}`;
+    await getDb().insert(characters).values({
+      id: alternateCharacterId, personId: actor.personId, gameSystemId: systemId,
+      name: "Alternate signup character", societyNumber: "99-1",
+    });
+
+    await expect(updateOwnSessionSignup(actor, community.slug, publishedSessionId, alternateCharacterId))
+      .resolves.toEqual({ status: "updated", signupId: signup!.id });
+    await expect(getDb().select().from(sessionSignups).where(eq(sessionSignups.id, signup!.id)))
+      .resolves.toEqual([expect.objectContaining({ characterId: alternateCharacterId })]);
+    await expect(getDb().select().from(communityAuditEvents).where(and(
+      eq(communityAuditEvents.communityId, community.id),
+      eq(communityAuditEvents.eventType, "session.signup.updated"),
+    ))).resolves.toEqual([expect.objectContaining({ actorPersonId: actor.personId })]);
   });
 
   it("lists only the person's authorized upcoming games in chronological order", async () => {
