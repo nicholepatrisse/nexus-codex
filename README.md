@@ -55,6 +55,11 @@ For production, use `pnpm db:deploy:production` and paste the production Postgre
 hidden prompt. The URL is passed only to the migration process; it is not written to disk or shell
 history.
 
+After CI succeeds for a push to `main`, GitHub Actions automatically applies committed migrations
+through the protected `production` environment. Configure its `PRODUCTION_DATABASE_URL` secret
+with the production PostgreSQL connection string. Environment approval rules can be used to require
+a manual review before the migration job starts.
+
 ## Environment
 
 | Variable | Purpose |

@@ -49,3 +49,32 @@ jobs:
       - run: pnpm build
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e
+
+  migrate-production:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: production-database-migrations
+      cancel-in-progress: false
+    env:
+      DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Validate production database secret
+        run: |
+          case "$DATABASE_URL" in
+            postgresql://*) ;;
+            *) echo "PRODUCTION_DATABASE_URL must be configured with a postgresql:// URL." >&2; exit 1 ;;
+          esac
+      - name: Apply production database migrations
+        run: pnpm db:deploy
