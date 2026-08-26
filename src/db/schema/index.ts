@@ -1,6 +1,7 @@
 import {
   boolean,
   check,
+  date,
   foreignKey,
   index,
   integer,
@@ -521,6 +522,45 @@ export const sessionSignups = pgTable(
         or (${table.status} = 'waitlisted' and ${table.waitlistPosition} is not null and ${table.waitlistPosition} > 0 and ${table.cancelledAt} is null)
         or (${table.status} = 'cancelled' and ${table.cancelledAt} is not null), false)`,
     ),
+  ],
+);
+
+/** Immutable play/reward history owned by a character. Manual rows have no session. */
+export const chronicles = pgTable(
+  "chronicles",
+  {
+    id: text("id").primaryKey(),
+    characterId: text("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "cascade" }),
+    sessionId: text("session_id").references(() => sessions.id, { onDelete: "restrict" }),
+    contentItemId: text("content_item_id").references(() => contentItems.id, { onDelete: "set null" }),
+    scenarioNumberSnapshot: text("scenario_number_snapshot").notNull(),
+    scenarioNameSnapshot: text("scenario_name_snapshot").notNull(),
+    datePlayed: date("date_played", { mode: "string" }).notNull(),
+    characterLevel: integer("character_level").notNull(),
+    advancementSpeed: text("advancement_speed").notNull(),
+    xp: integer("xp").notNull(),
+    creditsMinor: integer("credits_minor").notNull(),
+    reputation: integer("reputation").notNull(),
+    downtime: integer("downtime").notNull(),
+    playerNotes: text("player_notes"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("chronicles_character_date_id_idx").on(table.characterId, table.datePlayed, table.id),
+    index("chronicles_session_id_idx").on(table.sessionId),
+    index("chronicles_content_item_id_idx").on(table.contentItemId),
+    check("chronicles_scenario_number_length_check", sql`length(btrim(${table.scenarioNumberSnapshot})) between 1 and 100`),
+    check("chronicles_scenario_name_length_check", sql`length(btrim(${table.scenarioNameSnapshot})) between 1 and 200`),
+    check("chronicles_character_level_check", sql`${table.characterLevel} between 1 and 20`),
+    check("chronicles_advancement_speed_check", sql`${table.advancementSpeed} in ('standard', 'slow')`),
+    check("chronicles_xp_check", sql`${table.xp} >= 0`),
+    check("chronicles_credits_minor_check", sql`${table.creditsMinor} >= 0`),
+    check("chronicles_reputation_check", sql`${table.reputation} >= 0`),
+    check("chronicles_downtime_check", sql`${table.downtime} >= 0`),
+    check("chronicles_player_notes_length_check", sql`${table.playerNotes} is null or length(${table.playerNotes}) <= 5000`),
   ],
 );
 
