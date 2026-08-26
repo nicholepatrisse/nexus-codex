@@ -11,7 +11,7 @@ import { SUPPORTED_GAME_SYSTEM } from "@/game-system/config";
 export const createCharacterInputSchema = z.object({
   name: z.string().trim().min(1, "Enter a character name.").max(100, "Character name must be 100 characters or fewer."),
   characterNumber: z.string().trim().regex(/^(0?[1-9]|[1-9]\d)$/, "Enter a character number from 1 to 99."),
-  level: z.coerce.number().int("Enter a whole-number level.").min(SUPPORTED_GAME_SYSTEM.minimumCharacterLevel, `Level must be at least ${SUPPORTED_GAME_SYSTEM.minimumCharacterLevel}.`).max(SUPPORTED_GAME_SYSTEM.maximumCharacterLevel, `Level must be ${SUPPORTED_GAME_SYSTEM.maximumCharacterLevel} or lower.`).default(1),
+  startingLevel: z.coerce.number().refine((level): level is 1 | 3 | 5 | 7 => [1, 3, 5, 7].includes(level), "Starting level must be 1, 3, 5, or 7.").default(1),
   className: z.string().trim().max(100, "Class must be 100 characters or fewer.").nullable().optional().transform((value) => value || null),
   ancestry: z.string().trim().max(100, "Ancestry must be 100 characters or fewer.").nullable().optional().transform((value) => value || null),
   background: z.string().trim().max(100, "Background must be 100 characters or fewer.").nullable().optional().transform((value) => value || null),
@@ -19,7 +19,7 @@ export const createCharacterInputSchema = z.object({
   notes: z.string().trim().max(5000, "Notes must be 5,000 characters or fewer.").nullable().optional().transform((value) => value || null),
 });
 export type CreateCharacterInput = z.input<typeof createCharacterInputSchema>;
-export const updateCharacterInputSchema = createCharacterInputSchema.omit({ characterNumber: true });
+export const updateCharacterInputSchema = createCharacterInputSchema.omit({ characterNumber: true, startingLevel: true });
 export type UpdateCharacterInput = z.input<typeof updateCharacterInputSchema>;
 type Database = ReturnType<typeof getDb>;
 export class CharacterCreationError extends Error {}
@@ -35,7 +35,7 @@ export async function listCharacters(actor: AuthenticatedActor, database: Databa
     .where(eq(characters.personId, actor.personId)).orderBy(asc(characters.name));
 }
 export interface CharacterSession { id: string; communityName: string; communitySlug: string; scenarioCode: string; scenarioTitle: string; startsAt: Date; displayTimeZone: string; signupStatus: "confirmed" | "waitlisted" | "cancelled"; }
-export interface CharacterDetail { id: string; name: string; societyNumber: string; gameSystemName: string; level: number; className: string | null; ancestry: string | null; background: string | null; backstory: string | null; notes: string | null; isOwner: boolean; upcomingSessions: CharacterSession[]; pastSessions: CharacterSession[]; }
+export interface CharacterDetail { id: string; name: string; societyNumber: string; gameSystemName: string; startingLevel: number; currentLevel: number; xp: number; className: string | null; ancestry: string | null; background: string | null; backstory: string | null; notes: string | null; isOwner: boolean; upcomingSessions: CharacterSession[]; pastSessions: CharacterSession[]; }
 function communityRole(access: { isActiveMember: boolean; roles: ("owner" | "gm")[] }): CommunityRole | "member" | "visitor" {
   if (access.roles.includes("owner")) return "owner";
   if (access.roles.includes("gm")) return "gm";
@@ -43,7 +43,7 @@ function communityRole(access: { isActiveMember: boolean; roles: ("owner" | "gm"
 }
 /** Returns only character and game data the actor is authorized to see. */
 export async function getCharacterDetail(actor: AuthenticatedActor, characterId: string, now: Date = new Date(), database: Database = getDb()): Promise<CharacterDetail | null> {
-  const [character] = await database.select({ id: characters.id, personId: characters.personId, name: characters.name, societyNumber: characters.societyNumber, gameSystemName: gameSystems.name, level: characters.level, className: characters.className, ancestry: characters.ancestry, background: characters.background, backstory: characters.backstory, notes: characters.notes }).from(characters).innerJoin(gameSystems, eq(gameSystems.id, characters.gameSystemId)).where(eq(characters.id, characterId)).limit(1);
+  const [character] = await database.select({ id: characters.id, personId: characters.personId, name: characters.name, societyNumber: characters.societyNumber, gameSystemName: gameSystems.name, startingLevel: characters.startingLevel, className: characters.className, ancestry: characters.ancestry, background: characters.background, backstory: characters.backstory, notes: characters.notes }).from(characters).innerJoin(gameSystems, eq(gameSystems.id, characters.gameSystemId)).where(eq(characters.id, characterId)).limit(1);
   if (!character) return null;
   const isOwner = character.personId === actor.personId;
   if (!isOwner) {
@@ -63,7 +63,7 @@ export async function getCharacterDetail(actor: AuthenticatedActor, characterId:
   const upcomingSessions = visible.filter((session) => session.startsAt >= now && session.signupStatus !== "cancelled").sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
   const pastSessions = visible.filter((session) => session.startsAt < now).sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime());
   if (!isOwner && visible.length === 0) return null;
-  return { id: character.id, name: character.name, societyNumber: character.societyNumber, gameSystemName: character.gameSystemName, level: character.level, className: character.className, ancestry: character.ancestry, background: character.background, backstory: character.backstory, notes: character.notes, isOwner, upcomingSessions, pastSessions };
+  return { id: character.id, name: character.name, societyNumber: character.societyNumber, gameSystemName: character.gameSystemName, startingLevel: character.startingLevel, currentLevel: character.startingLevel, xp: 0, className: character.className, ancestry: character.ancestry, background: character.background, backstory: character.backstory, notes: character.notes, isOwner, upcomingSessions, pastSessions };
 }
 export async function createCharacter(actor: AuthenticatedActor, rawInput: CreateCharacterInput, database: Database = getDb()) {
   const input = createCharacterInputSchema.parse(rawInput);
@@ -79,7 +79,7 @@ export async function createCharacter(actor: AuthenticatedActor, rawInput: Creat
   try {
     const [created] = await database.insert(characters).values({
       id: randomUUID(), personId: actor.personId, gameSystemId: SUPPORTED_GAME_SYSTEM.id,
-      name: input.name, societyNumber, level: input.level, className: input.className, ancestry: input.ancestry, background: input.background, backstory: input.backstory, notes: input.notes,
+      name: input.name, societyNumber, startingLevel: input.startingLevel, className: input.className, ancestry: input.ancestry, background: input.background, backstory: input.backstory, notes: input.notes,
     }).returning({ id: characters.id, name: characters.name });
     return created;
   } catch (error) {
