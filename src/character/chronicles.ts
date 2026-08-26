@@ -3,7 +3,7 @@ import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import type { AuthenticatedActor } from "@/auth/actor";
 import { getDb } from "@/db/client";
-import { characters, chronicles, contentItems } from "@/db/schema";
+import { characterCreditLedgerEntries, characters, chronicles, contentItems } from "@/db/schema";
 
 type Database = ReturnType<typeof getDb>;
 const optionalId = z.string().trim().max(100).nullable().optional().transform((value) => value || null);
@@ -72,27 +72,50 @@ export async function updateManualChronicle(actor: AuthenticatedActor, character
   const editable = await getEditableManualChronicle(actor, characterId, chronicleId, database);
   if (!editable) return null;
   const snapshot = await catalogSnapshot(input.contentItemId, input.scenarioNumber, input.scenarioName, database);
-  const [updated] = await database.update(chronicles).set({ ...snapshot, playedOn: input.datePlayed, characterLevel: input.characterLevel, advancementSpeed: input.advancementSpeed, xp: input.xp, creditsMinor: input.creditsMinor, reputation: input.reputation, downtime: input.downtime, playerNotes: input.playerNotes, updatedAt: new Date() }).where(and(eq(chronicles.id, chronicleId), eq(chronicles.characterId, characterId), isNull(chronicles.sessionId), eq(chronicles.status, "pending"))).returning();
-  return updated ?? null;
+  return database.transaction(async (transaction) => {
+    const [updated] = await transaction.update(chronicles).set({ ...snapshot, playedOn: input.datePlayed, characterLevel: input.characterLevel, advancementSpeed: input.advancementSpeed, xp: input.xp, creditsMinor: input.creditsMinor, reputation: input.reputation, downtime: input.downtime, playerNotes: input.playerNotes, updatedAt: new Date() }).where(and(eq(chronicles.id, chronicleId), eq(chronicles.characterId, characterId), isNull(chronicles.sessionId))).returning();
+    if (!updated) return null;
+    const creditDelta = updated.status === "applied" ? updated.creditsMinor - editable.creditsMinor : 0;
+    if (creditDelta !== 0) await transaction.insert(characterCreditLedgerEntries).values({ id: randomUUID(), characterId, amountMinor: creditDelta, displayScale: 1, type: "adjustment", effectiveOn: updated.playedOn, source: "chronicle_correction", sourceChronicleId: chronicleId, notes: `Corrected ${updated.scenarioNumberSnapshot} — ${updated.scenarioNameSnapshot}` });
+    return updated;
+  });
 }
 
 export async function deleteManualChronicle(actor: AuthenticatedActor, characterId: string, chronicleId: string, database: Database = getDb()) {
   const editable = await getEditableManualChronicle(actor, characterId, chronicleId, database);
   if (!editable) return false;
+  const [posted] = await database.select({ id: characterCreditLedgerEntries.id }).from(characterCreditLedgerEntries).where(eq(characterCreditLedgerEntries.sourceChronicleId, chronicleId)).limit(1);
+  if (posted) return false;
   const deleted = await database.delete(chronicles).where(and(eq(chronicles.id, chronicleId), eq(chronicles.characterId, characterId), isNull(chronicles.sessionId), eq(chronicles.status, "pending"))).returning({ id: chronicles.id });
   return deleted.length === 1;
 }
 
 export async function applyManualChronicle(actor: AuthenticatedActor, characterId: string, chronicleId: string, database: Database = getDb(), now = new Date()) {
-  const [applied] = await database.update(chronicles).set({ status: "applied", appliedAt: now, updatedAt: now }).from(characters).where(and(eq(chronicles.id, chronicleId), eq(chronicles.characterId, characterId), eq(chronicles.characterId, characters.id), eq(characters.personId, actor.personId), eq(chronicles.provenance, "manual"), eq(chronicles.status, "pending"), isNull(chronicles.appliedAt))).returning();
-  if (applied) return applied;
-  const [existing] = await database.select().from(chronicles).innerJoin(characters, eq(characters.id, chronicles.characterId)).where(and(eq(chronicles.id, chronicleId), eq(chronicles.characterId, characterId), eq(characters.personId, actor.personId), eq(chronicles.provenance, "manual"), eq(chronicles.status, "applied"))).limit(1);
-  return existing?.chronicles ?? null;
+  return database.transaction(async (transaction) => {
+    const [applied] = await transaction.update(chronicles).set({ status: "applied", appliedAt: now, updatedAt: now }).from(characters).where(and(eq(chronicles.id, chronicleId), eq(chronicles.characterId, characterId), eq(chronicles.characterId, characters.id), eq(characters.personId, actor.personId), eq(chronicles.provenance, "manual"), eq(chronicles.status, "pending"), isNull(chronicles.appliedAt))).returning();
+    if (applied) {
+      const existing = await transaction.select({ id: characterCreditLedgerEntries.id, amountMinor: characterCreditLedgerEntries.amountMinor }).from(characterCreditLedgerEntries).where(eq(characterCreditLedgerEntries.sourceChronicleId, chronicleId));
+      const net = existing.reduce((sum, entry) => sum + entry.amountMinor, 0);
+      if (!existing.some((entry) => entry.amountMinor === applied.creditsMinor && net === applied.creditsMinor)) {
+        await transaction.insert(characterCreditLedgerEntries).values({ id: randomUUID(), characterId, amountMinor: applied.creditsMinor - net, displayScale: 1, type: existing.length ? "adjustment" : "chronicle_reward", effectiveOn: applied.playedOn, source: existing.length ? "chronicle_correction" : "chronicle", sourceChronicleId: chronicleId, notes: existing.length ? "Chronicle reapplied" : `${applied.scenarioNumberSnapshot} — ${applied.scenarioNameSnapshot}` }).onConflictDoNothing();
+      }
+      return applied;
+    }
+    const [existing] = await transaction.select().from(chronicles).innerJoin(characters, eq(characters.id, chronicles.characterId)).where(and(eq(chronicles.id, chronicleId), eq(chronicles.characterId, characterId), eq(characters.personId, actor.personId), eq(chronicles.provenance, "manual"), eq(chronicles.status, "applied"))).limit(1);
+    return existing?.chronicles ?? null;
+  });
 }
 
 export async function unapplyManualChronicle(actor: AuthenticatedActor, characterId: string, chronicleId: string, database: Database = getDb(), now = new Date()) {
-  const [pending] = await database.update(chronicles).set({ status: "pending", appliedAt: null, updatedAt: now }).from(characters).where(and(eq(chronicles.id, chronicleId), eq(chronicles.characterId, characterId), eq(chronicles.characterId, characters.id), eq(characters.personId, actor.personId), eq(chronicles.provenance, "manual"), eq(chronicles.status, "applied"))).returning();
-  if (pending) return pending;
-  const [existing] = await database.select().from(chronicles).innerJoin(characters, eq(characters.id, chronicles.characterId)).where(and(eq(chronicles.id, chronicleId), eq(chronicles.characterId, characterId), eq(characters.personId, actor.personId), eq(chronicles.provenance, "manual"), eq(chronicles.status, "pending"))).limit(1);
-  return existing?.chronicles ?? null;
+  return database.transaction(async (transaction) => {
+    const [pending] = await transaction.update(chronicles).set({ status: "pending", appliedAt: null, updatedAt: now }).from(characters).where(and(eq(chronicles.id, chronicleId), eq(chronicles.characterId, characterId), eq(chronicles.characterId, characters.id), eq(characters.personId, actor.personId), eq(chronicles.provenance, "manual"), eq(chronicles.status, "applied"))).returning();
+    if (pending) {
+      const existing = await transaction.select({ id: characterCreditLedgerEntries.id, amountMinor: characterCreditLedgerEntries.amountMinor }).from(characterCreditLedgerEntries).where(eq(characterCreditLedgerEntries.sourceChronicleId, chronicleId));
+      const net = existing.reduce((sum, entry) => sum + entry.amountMinor, 0);
+      if (net !== 0) await transaction.insert(characterCreditLedgerEntries).values({ id: randomUUID(), characterId, amountMinor: -net, displayScale: 1, type: "adjustment", effectiveOn: pending.playedOn, source: "chronicle_reversal", sourceChronicleId: chronicleId, reversesEntryId: existing[existing.length - 1]?.id, notes: `Unapplied ${pending.scenarioNumberSnapshot} — ${pending.scenarioNameSnapshot}` });
+      return pending;
+    }
+    const [existing] = await transaction.select().from(chronicles).innerJoin(characters, eq(characters.id, chronicles.characterId)).where(and(eq(chronicles.id, chronicleId), eq(chronicles.characterId, characterId), eq(characters.personId, actor.personId), eq(chronicles.provenance, "manual"), eq(chronicles.status, "pending"))).limit(1);
+    return existing?.chronicles ?? null;
+  });
 }

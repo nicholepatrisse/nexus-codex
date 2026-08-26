@@ -571,6 +571,37 @@ export const chronicles = pgTable(
   ],
 );
 
+/** Append-only, exact-value financial history. Posted rows are never updated or deleted. */
+export const characterCreditLedgerEntries = pgTable(
+  "character_credit_ledger_entries",
+  {
+    id: text("id").primaryKey(),
+    characterId: text("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "cascade" }),
+    amountMinor: integer("amount_minor").notNull(),
+    displayScale: integer("display_scale").notNull().default(1),
+    type: text("type").notNull(),
+    effectiveOn: date("effective_on", { mode: "string" }).notNull(),
+    source: text("source").notNull(),
+    sourceChronicleId: text("source_chronicle_id").references(() => chronicles.id, { onDelete: "set null" }),
+    reversesEntryId: text("reverses_entry_id"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("credit_ledger_character_effective_created_id_idx").on(table.characterId, table.effectiveOn, table.createdAt, table.id),
+    uniqueIndex("credit_ledger_chronicle_reward_unique").on(table.sourceChronicleId).where(sql`${table.type} = 'chronicle_reward'`),
+    foreignKey({ columns: [table.reversesEntryId], foreignColumns: [table.id], name: "credit_ledger_reverses_entry_fk" }).onDelete("restrict"),
+    check("credit_ledger_amount_nonzero_check", sql`${table.amountMinor} <> 0 or ${table.type} in ('starting_credits', 'chronicle_reward')`),
+    check("credit_ledger_display_scale_check", sql`${table.displayScale} = 1`),
+    check("credit_ledger_type_check", sql`${table.type} in ('starting_credits', 'chronicle_reward', 'adjustment')`),
+    check("credit_ledger_source_check", sql`${table.source} in ('character_creation', 'chronicle', 'owner_adjustment', 'chronicle_reversal', 'chronicle_correction')`),
+    check("credit_ledger_source_relationship_check", sql`coalesce((${table.type} = 'chronicle_reward' and ${table.sourceChronicleId} is not null and ${table.reversesEntryId} is null) or (${table.type} = 'starting_credits' and ${table.sourceChronicleId} is null and ${table.reversesEntryId} is null) or (${table.type} = 'adjustment'), false)`),
+    check("credit_ledger_notes_length_check", sql`${table.notes} is null or length(${table.notes}) <= 1000`),
+  ],
+);
+
 /** A reusable community share link. Only a one-way digest of its bearer token is persisted. */
 export const communityInvitations = pgTable(
   "community_invitations",

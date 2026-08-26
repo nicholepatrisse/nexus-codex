@@ -5,7 +5,7 @@ import type { AuthenticatedActor } from "@/auth/actor";
 import { resolveCommunityAccessBySlug } from "@/authorization/community-access";
 import { canPerformCommunityOperation, type CommunityRole } from "@/authorization/policy";
 import { getDb } from "@/db/client";
-import { characters, chronicles, communities, contentItems, gameSystems, people, sessionSignups, sessions } from "@/db/schema";
+import { characterCreditLedgerEntries, characters, chronicles, communities, contentItems, gameSystems, people, sessionSignups, sessions } from "@/db/schema";
 import { SUPPORTED_GAME_SYSTEM } from "@/game-system/config";
 import { CHARACTER_CLASSES } from "@/character/class-options";
 import { deriveSfs2Progression } from "@/character/sfs2-progression";
@@ -55,7 +55,7 @@ export async function getCharacterProgressions(
   return new Map(characterRows.map((character) => [character.id, deriveSfs2Progression(character.startingLevel, rewardsByCharacter.get(character.id) ?? [])]));
 }
 export interface CharacterSession { id: string; communityName: string; communitySlug: string; scenarioCode: string; scenarioTitle: string; startsAt: Date; displayTimeZone: string; signupStatus: "confirmed" | "waitlisted" | "cancelled"; }
-export interface CharacterDetail { id: string; name: string; societyNumber: string; gameSystemName: string; startingLevel: number; currentLevel: number; xp: number; creditsMinor: number; reputation: number; downtime: number; className: string | null; ancestry: string | null; background: string | null; backstory: string | null; notes: string | null; isOwner: boolean; upcomingSessions: CharacterSession[]; pastSessions: CharacterSession[]; }
+export interface CharacterDetail { id: string; name: string; societyNumber: string; gameSystemName: string; startingLevel: number; currentLevel: number; xp: number; creditsMinor: number | null; reputation: number; downtime: number; className: string | null; ancestry: string | null; background: string | null; backstory: string | null; notes: string | null; isOwner: boolean; upcomingSessions: CharacterSession[]; pastSessions: CharacterSession[]; }
 function communityRole(access: { isActiveMember: boolean; roles: ("owner" | "gm")[] }): CommunityRole | "member" | "visitor" {
   if (access.roles.includes("owner")) return "owner";
   if (access.roles.includes("gm")) return "gm";
@@ -85,8 +85,10 @@ export async function getCharacterDetail(actor: AuthenticatedActor, characterId:
   if (!isOwner && visible.length === 0) return null;
   const rewards = await database.select({ xp: chronicles.xp, creditsMinor: chronicles.creditsMinor, reputation: chronicles.reputation, downtime: chronicles.downtime }).from(chronicles).where(and(eq(chronicles.characterId, character.id), eq(chronicles.status, "applied")));
   const progression = deriveSfs2Progression(character.startingLevel, rewards.map(({ xp }) => xp));
-  const totals = rewards.reduce((sum, reward) => ({ creditsMinor: sum.creditsMinor + reward.creditsMinor, reputation: sum.reputation + reward.reputation, downtime: sum.downtime + reward.downtime }), { creditsMinor: 0, reputation: 0, downtime: 0 });
-  return { id: character.id, name: character.name, societyNumber: character.societyNumber, gameSystemName: character.gameSystemName, startingLevel: character.startingLevel, currentLevel: progression.currentLevel, xp: progression.totalXp, ...totals, className: character.className, ancestry: character.ancestry, background: character.background, backstory: character.backstory, notes: character.notes, isOwner, upcomingSessions, pastSessions };
+  const nonFinancialTotals = rewards.reduce((sum, reward) => ({ reputation: sum.reputation + reward.reputation, downtime: sum.downtime + reward.downtime }), { reputation: 0, downtime: 0 });
+  const ledgerRows = isOwner ? await database.select({ amountMinor: characterCreditLedgerEntries.amountMinor }).from(characterCreditLedgerEntries).where(eq(characterCreditLedgerEntries.characterId, character.id)) : [];
+  const creditsMinor = isOwner ? ledgerRows.reduce((sum, entry) => sum + entry.amountMinor, 0) : null;
+  return { id: character.id, name: character.name, societyNumber: character.societyNumber, gameSystemName: character.gameSystemName, startingLevel: character.startingLevel, currentLevel: progression.currentLevel, xp: progression.totalXp, creditsMinor, ...nonFinancialTotals, className: character.className, ancestry: character.ancestry, background: character.background, backstory: character.backstory, notes: character.notes, isOwner, upcomingSessions, pastSessions };
 }
 export async function createCharacter(actor: AuthenticatedActor, rawInput: CreateCharacterInput, database: Database = getDb()) {
   const input = createCharacterInputSchema.parse(rawInput);
@@ -100,11 +102,15 @@ export async function createCharacter(actor: AuthenticatedActor, rawInput: Creat
   }
   const societyNumber = formatSocietyNumber(profile.societyPlayNumber, input.characterNumber);
   try {
-    const [created] = await database.insert(characters).values({
-      id: randomUUID(), personId: actor.personId, gameSystemId: SUPPORTED_GAME_SYSTEM.id,
-      name: input.name, societyNumber, startingLevel: input.startingLevel, className: input.className, ancestry: input.ancestry, background: input.background, backstory: input.backstory, notes: input.notes,
-    }).returning({ id: characters.id, name: characters.name });
-    return created;
+    return await database.transaction(async (transaction) => {
+      const [created] = await transaction.insert(characters).values({
+        id: randomUUID(), personId: actor.personId, gameSystemId: SUPPORTED_GAME_SYSTEM.id,
+        name: input.name, societyNumber, startingLevel: input.startingLevel, className: input.className, ancestry: input.ancestry, background: input.background, backstory: input.backstory, notes: input.notes,
+      }).returning({ id: characters.id, name: characters.name });
+      if (!created) throw new CharacterCreationError("The character could not be created.");
+      await transaction.insert(characterCreditLedgerEntries).values({ id: randomUUID(), characterId: created.id, amountMinor: 0, displayScale: 1, type: "starting_credits", effectiveOn: new Date().toISOString().slice(0, 10), source: "character_creation", notes: "Opening balance" });
+      return created;
+    });
   } catch (error) {
     if (typeof error === "object" && error && "code" in error && error.code === "23505") throw new CharacterCreationError("You already have a character with that society number.");
     throw error;
