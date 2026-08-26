@@ -17,7 +17,7 @@ type Request = { id: string; displayName: string; requestedAt: Date };
 
 function Button({ children, destructive = false }: { children: React.ReactNode; destructive?: boolean }) {
   const { pending } = useFormStatus();
-  return <button type="submit" disabled={pending} className={`rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-60 ${destructive ? "border border-danger/30 text-danger" : "bg-brand text-background"}`}>{pending ? "Working…" : children}</button>;
+  return <button type="submit" disabled={pending} className={`rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-60 ${destructive ? "border border-danger/30 text-danger" : "bg-brand text-on-brand"}`}>{pending ? "Working…" : children}</button>;
 }
 
 function Feedback({ state }: { state: OwnerAdmissionState }) {

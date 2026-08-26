@@ -4,7 +4,7 @@ import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { saveSocietyNumberAction, type SocietyNumberFormState } from "./actions";
 import { CharacterForm } from "./character-form";
-function SaveButton() { const { pending } = useFormStatus(); return <button type="submit" disabled={pending} className="rounded-full bg-brand px-5 py-2.5 font-semibold text-background disabled:opacity-60">{pending ? "Saving…" : "Save society number"}</button>; }
+function SaveButton() { const { pending } = useFormStatus(); return <button type="submit" disabled={pending} className="rounded-full bg-brand px-5 py-2.5 font-semibold text-on-brand disabled:opacity-60">{pending ? "Saving…" : "Save society number"}</button>; }
 export function SocietyNumberGate({ initialSocietyPlayNumber, returnTo }: { initialSocietyPlayNumber: string; returnTo?: string }) {
   const [state, action] = useActionState<SocietyNumberFormState, FormData>(saveSocietyNumberAction, {});
   const societyPlayNumber = state.savedNumber ?? initialSocietyPlayNumber;

@@ -6,7 +6,7 @@ import { redeemInvitationAction } from "../actions";
 
 function AcceptButton() {
   const { pending } = useFormStatus();
-  return <button type="submit" disabled={pending} className="rounded-full bg-brand px-6 py-3 font-semibold text-background disabled:cursor-wait disabled:opacity-60">{pending ? "Accepting…" : "Accept invitation"}</button>;
+  return <button type="submit" disabled={pending} className="rounded-full bg-brand px-6 py-3 font-semibold text-on-brand disabled:cursor-wait disabled:opacity-60">{pending ? "Accepting…" : "Accept invitation"}</button>;
 }
 
 export function RedeemInvitationForm({ token }: { token: string }) {

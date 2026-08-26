@@ -127,7 +127,7 @@ export function CommunityList({
           </Link>
           <Link
             href="/communities/new"
-            className="inline-flex rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-background transition hover:bg-brand-hover"
+            className="inline-flex rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-on-brand transition hover:bg-brand-hover"
           >
             Create a community
           </Link>

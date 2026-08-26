@@ -7,6 +7,7 @@
   --theme-background: #0e1724;
   --theme-brand: #4c8ff5;
   --theme-brand-hover: #69a8ff;
+  --theme-on-brand: #0e1724;
   --theme-brand-muted: #172f52;
   --theme-accent: #55d9f6;
   --theme-accent-secondary: #805ad5;
@@ -32,10 +33,38 @@
   --accent: var(--theme-accent);
 }
 
+/* CSS media queries apply before first paint and continue tracking operating
+   system changes, while :root remains the dark fallback for older browsers. */
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --theme-background: #f4f7fb;
+    --theme-brand: #075dcc;
+    --theme-brand-hover: #004ba8;
+    --theme-on-brand: #ffffff;
+    --theme-brand-muted: #d7e7fb;
+    --theme-accent: #087d96;
+    --theme-accent-secondary: #6941a5;
+    --theme-surface: #ffffff;
+    --theme-surface-raised: #e8eef6;
+    --theme-surface-hover: #dce6f2;
+    --theme-border: #9bacc0;
+    --theme-border-strong: #71869f;
+    --theme-text-primary: #101c2c;
+    --theme-text-muted: #52657c;
+    --theme-text-subtle: #52657c;
+    --theme-success: #167247;
+    --theme-warning: #8a5200;
+    --theme-danger: #b42332;
+    --theme-info: #075dcc;
+  }
+}
+
 @theme inline {
   --color-background: var(--theme-background);
   --color-brand: var(--theme-brand);
   --color-brand-hover: var(--theme-brand-hover);
+  --color-on-brand: var(--theme-on-brand);
   --color-brand-muted: var(--theme-brand-muted);
   --color-accent: var(--theme-accent);
   --color-accent-secondary: var(--theme-accent-secondary);

@@ -87,16 +87,16 @@ export function CommunityProfile({ community, isOwner, isSignedIn = false, isMem
             className="inline-flex rounded-full border border-border-strong px-5 py-2.5 text-sm font-semibold hover:border-brand hover:text-brand"
           >
             Community settings
-          </Link><Link href={`/communities/${encodeURIComponent(community.slug)}/sessions/new`} className="inline-flex rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-background">New Session</Link></div>
+          </Link><Link href={`/communities/${encodeURIComponent(community.slug)}/sessions/new`} className="inline-flex rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-on-brand">New Session</Link></div>
         ) : null}
-        {!isOwner && isMember && (gmState === "active" || (gmState === "eligible" && gmAdmission === "self_service")) ? <Link href={`/communities/${encodeURIComponent(community.slug)}/sessions/new`} className="mt-8 inline-flex rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-background">New Session</Link> : null}
+        {!isOwner && isMember && (gmState === "active" || (gmState === "eligible" && gmAdmission === "self_service")) ? <Link href={`/communities/${encodeURIComponent(community.slug)}/sessions/new`} className="mt-8 inline-flex rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-on-brand">New Session</Link> : null}
         {isPublic && !isMember && !isOwner ? (
           isSignedIn ? (
             <AdmissionForm slug={community.slug} pendingRequestId={pendingRequestId} />
           ) : (
             <Link
               href={`/sign-in?callbackURL=${encodeURIComponent(`/communities/${community.slug}`)}`}
-              className="mt-8 inline-flex rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-background"
+              className="mt-8 inline-flex rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-on-brand"
             >
               Sign in to request membership
             </Link>

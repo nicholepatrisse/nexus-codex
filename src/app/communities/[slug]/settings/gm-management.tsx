@@ -10,7 +10,7 @@ type GmGrant = { id: string; displayName: string; status: string; futureSessions
 
 function Button({ children, destructive = false }: { children: React.ReactNode; destructive?: boolean }) {
   const { pending } = useFormStatus();
-  return <button type="submit" disabled={pending} className={destructive ? "rounded-full border border-danger/30 px-4 py-2 text-sm font-semibold text-danger disabled:opacity-60" : "rounded-full bg-brand px-4 py-2 text-sm font-semibold text-background disabled:opacity-60"}>{pending ? "Working…" : children}</button>;
+  return <button type="submit" disabled={pending} className={destructive ? "rounded-full border border-danger/30 px-4 py-2 text-sm font-semibold text-danger disabled:opacity-60" : "rounded-full bg-brand px-4 py-2 text-sm font-semibold text-on-brand disabled:opacity-60"}>{pending ? "Working…" : children}</button>;
 }
 
 function Feedback({ state }: { state: OwnerGmActionState }) {

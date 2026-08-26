@@ -26,7 +26,7 @@ export function SignInButton({
   return (
     <div className="flex flex-col items-start gap-3">
       <button
-        className="rounded-full bg-brand px-6 py-3 font-semibold text-background transition hover:bg-brand-hover disabled:cursor-wait disabled:opacity-60"
+        className="rounded-full bg-brand px-6 py-3 font-semibold text-on-brand transition hover:bg-brand-hover disabled:cursor-wait disabled:opacity-60"
         type="button"
         onClick={signIn}
         disabled={pending}
