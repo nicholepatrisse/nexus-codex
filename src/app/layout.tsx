@@ -10,6 +10,25 @@ import { getProfile } from "@/profile/profile";
 export const metadata: Metadata = {
   title: "Nexus Codex",
   description: "A central tracker for organized Society play.",
+  applicationName: "Nexus Codex",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    apple: [{ url: "/apple-icon.png", sizes: "180x180", type: "image/png" }],
+  },
+  openGraph: {
+    title: "Nexus Codex",
+    description: "A central tracker for organized Society play.",
+    siteName: "Nexus Codex",
+    type: "website",
+    images: [{ url: "/opengraph-image.png", width: 1200, height: 630, alt: "Nexus Codex" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Nexus Codex",
+    description: "A central tracker for organized Society play.",
+    images: ["/opengraph-image.png"],
+  },
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
