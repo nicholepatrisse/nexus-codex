@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title description">
+  <title id="title">Nexus Codex</title>
+  <desc id="description">The letter N crossed by an orbit and topped by a star</desc>
+  <circle cx="256" cy="256" r="240" fill="#131b28" stroke="#49617e" stroke-width="24"/>
+  <path d="M152 360V152l208 208V152" fill="none" stroke="#f4f7fa" stroke-width="56" stroke-linejoin="miter"/>
+  <path d="M48 344c88 48 256 16 416-80" fill="none" stroke="#4c8ff5" stroke-width="32" stroke-linecap="round"/>
+  <path d="m256 24 16 56 56 16-56 16-16 56-16-56-56-16 56-16 16-56Z" fill="#55d9f6"/>
+</svg>
