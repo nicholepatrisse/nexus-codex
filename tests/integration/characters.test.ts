@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 import { createTestIdentity } from "@/auth/test-fixture";
-import { createCharacter, listCharacters } from "@/character/characters";
+import { createCharacter, getCharacterDetail, listCharacters, updateCharacter } from "@/character/characters";
 import { getDb } from "@/db/client";
 import { authUsers, characters, gameSystems, people } from "@/db/schema";
 import { SUPPORTED_GAME_SYSTEM } from "@/game-system/config";
@@ -27,5 +27,21 @@ describeWithDatabase("characters persistence", () => {
     expect(await getDb().select().from(characters).where(eq(characters.personId, owner.person.id))).toEqual([
       expect.objectContaining({ gameSystemId: SUPPORTED_GAME_SYSTEM.id }),
     ]);
+  });
+
+  it("updates details only when the actor owns the character", async () => {
+    const owner = await createTestIdentity({ name: "Owner", sessions: 0 });
+    const other = await createTestIdentity({ name: "Other", sessions: 0 });
+    userIds.push(owner.authUser.id, other.authUser.id);
+    await getDb().insert(gameSystems).values({ id: SUPPORTED_GAME_SYSTEM.id, code: SUPPORTED_GAME_SYSTEM.code, name: SUPPORTED_GAME_SYSTEM.name }).onConflictDoUpdate({ target: gameSystems.id, set: { code: SUPPORTED_GAME_SYSTEM.code, name: SUPPORTED_GAME_SYSTEM.name } });
+    const ownerActor = { personId: owner.person.id, authUserId: owner.authUser.id, sessionId: "owner" };
+    const otherActor = { personId: other.person.id, authUserId: other.authUser.id, sessionId: "other" };
+    await getDb().update(people).set({ societyPlayNumber: "654321" }).where(eq(people.id, owner.person.id));
+    const created = await createCharacter(ownerActor, { name: "Navasi", characterNumber: "01" });
+    if (!created) throw new Error("Expected character creation to return a record.");
+
+    expect(await updateCharacter(otherActor, created.id, { name: "Stolen", level: 20 })).toBeNull();
+    expect(await updateCharacter(ownerActor, created.id, { name: " Navasi ", level: 3, className: " Envoy ", ancestry: "Human", background: "  ", backstory: "  Raised aboard a station.  ", notes: "  " })).toEqual(expect.objectContaining({ id: created.id }));
+    expect(await getCharacterDetail(ownerActor, created.id)).toEqual(expect.objectContaining({ name: "Navasi", level: 3, className: "Envoy", ancestry: "Human", background: null, backstory: "Raised aboard a station.", notes: null, isOwner: true }));
   });
 });
