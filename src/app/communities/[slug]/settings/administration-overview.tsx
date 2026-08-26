@@ -51,7 +51,7 @@ export function MembersOverview({ members }: { members: AdministrationMember[] }
   return (
     <section className="mt-8 rounded-3xl border border-border bg-surface p-8">
       <h2 className="text-2xl font-semibold">Members and owner grants</h2>
-      {members.length ? <ul className="mt-5 divide-y divide-white/10">{members.map((member) => <li key={member.id} className="flex flex-wrap items-center justify-between gap-3 py-4"><div><p className="font-semibold">{member.displayName}</p><p className="text-sm capitalize text-text-muted">{member.status}</p></div><div className="flex flex-wrap gap-2">{member.roles.map((role) => <span key={role} className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold capitalize">{role}</span>)}</div></li>)}</ul> : <p className="mt-3 text-sm text-text-muted">No members.</p>}
+      {members.length ? <ul className="mt-5 divide-y divide-border">{members.map((member) => <li key={member.id} className="flex flex-wrap items-center justify-between gap-3 py-4"><div><p className="font-semibold">{member.displayName}</p><p className="text-sm capitalize text-text-muted">{member.status}</p></div><div className="flex flex-wrap gap-2">{member.roles.map((role) => <span key={role} className="rounded-full bg-surface-raised px-3 py-1 text-xs font-semibold capitalize text-text-muted">{role}</span>)}</div></li>)}</ul> : <p className="mt-3 text-sm text-text-muted">No members.</p>}
     </section>
   );
 }
