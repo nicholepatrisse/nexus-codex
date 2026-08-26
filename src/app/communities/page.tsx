@@ -2,6 +2,13 @@ import Link from "next/link";
 import { PublicCommunityList } from "@/app/communities/public-community-list";
 import { directoryHref, parseDirectoryQuery } from "@/app/communities/discovery-query";
 import { listPublicCommunities } from "@/community/public-discovery";
+import { socialMetadata } from "@/app/social-metadata";
+
+export const metadata = socialMetadata({
+  title: "Public Communities | Nexus Codex",
+  description: "Browse public Starfinder 2E communities, games, and sessions on Nexus Codex.",
+  pathname: "/communities",
+});
 
 export const dynamic = "force-dynamic";
 
