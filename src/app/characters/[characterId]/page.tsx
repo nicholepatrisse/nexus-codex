@@ -21,7 +21,7 @@ function SessionList({ sessions, empty }: { sessions: CharacterSession[]; empty:
   return <ul className="mt-4 space-y-3">{sessions.map((session) => <li key={session.id} className="rounded-xl border border-border bg-surface p-4">
     <Link className="font-semibold hover:text-brand hover:underline" href={`/communities/${encodeURIComponent(session.communitySlug)}/sessions/${session.id}`}>{session.scenarioCode} — {session.scenarioTitle}</Link>
     <p className="mt-1 text-sm text-text-muted">{session.communityName} · {formatSessionDate(session)}</p>
-    <p className="mt-1 text-xs capitalize text-text-muted">Signup: {session.signupStatus}</p>
+    <p className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${session.participationType === "gm_credit" ? "bg-brand/10 text-brand" : "bg-surface-raised text-text-muted"}`}>{session.participationType === "gm_credit" ? "GM Credit" : `Player participation · ${session.signupStatus}`}{session.sessionStatus === "cancelled" ? " · Cancelled session" : ""}</p>
   </li>)}</ul>;
 }
 
