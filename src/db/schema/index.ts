@@ -592,6 +592,7 @@ export const characterCreditLedgerEntries = pgTable(
   (table) => [
     index("credit_ledger_character_effective_created_id_idx").on(table.characterId, table.effectiveOn, table.createdAt, table.id),
     uniqueIndex("credit_ledger_chronicle_reward_unique").on(table.sourceChronicleId).where(sql`${table.type} = 'chronicle_reward'`),
+    uniqueIndex("credit_ledger_starting_credits_unique").on(table.characterId).where(sql`${table.type} = 'starting_credits'`),
     foreignKey({ columns: [table.reversesEntryId], foreignColumns: [table.id], name: "credit_ledger_reverses_entry_fk" }).onDelete("restrict"),
     check("credit_ledger_amount_nonzero_check", sql`${table.amountMinor} <> 0 or ${table.type} in ('starting_credits', 'chronicle_reward')`),
     check("credit_ledger_display_scale_check", sql`${table.displayScale} = 1`),

@@ -9,6 +9,7 @@ import { characterCreditLedgerEntries, characters, chronicles, communities, cont
 import { SUPPORTED_GAME_SYSTEM } from "@/game-system/config";
 import { CHARACTER_CLASSES } from "@/character/class-options";
 import { deriveSfs2Progression } from "@/character/sfs2-progression";
+import { isValidStartingCredits, SFS2_STARTING_WEALTH, startingWealthNote, type Sfs2StartingLevel } from "@/character/sfs2-starting-wealth";
 
 const optionalCharacterClassSchema = z.string().trim()
   .pipe(z.union([z.literal(""), z.enum(CHARACTER_CLASSES, { error: "Choose a supported class." })]))
@@ -18,14 +19,30 @@ export const createCharacterInputSchema = z.object({
   name: z.string().trim().min(1, "Enter a character name.").max(100, "Character name must be 100 characters or fewer."),
   characterNumber: z.string().trim().regex(/^(0?[1-9]|[1-9]\d)$/, "Enter a character number from 1 to 99."),
   startingLevel: z.coerce.number().refine((level): level is 1 | 3 | 5 | 7 => [1, 3, 5, 7].includes(level), "Starting level must be 1, 3, 5, or 7.").default(1),
+  startingCredits: z.coerce.number().int().nonnegative().optional(),
+  className: optionalCharacterClassSchema,
+  ancestry: z.string().trim().max(100, "Ancestry must be 100 characters or fewer.").nullable().optional().transform((value) => value || null),
+  background: z.string().trim().max(100, "Background must be 100 characters or fewer.").nullable().optional().transform((value) => value || null),
+  backstory: z.string().trim().max(5000, "Backstory must be 5,000 characters or fewer.").nullable().optional().transform((value) => value || null),
+  notes: z.string().trim().max(5000, "Notes must be 5,000 characters or fewer.").nullable().optional().transform((value) => value || null),
+}).transform((input, context) => {
+  const startingLevel = input.startingLevel as Sfs2StartingLevel;
+  const startingCredits = input.startingCredits ?? SFS2_STARTING_WEALTH[startingLevel][0].credits;
+  if (!isValidStartingCredits(startingLevel, startingCredits)) {
+    context.addIssue({ code: "custom", path: ["startingCredits"], message: "Choose a starting wealth option available at this level." });
+    return z.NEVER;
+  }
+  return { ...input, startingCredits };
+});
+export type CreateCharacterInput = z.input<typeof createCharacterInputSchema>;
+export const updateCharacterInputSchema = z.object({
+  name: z.string().trim().min(1, "Enter a character name.").max(100, "Character name must be 100 characters or fewer."),
   className: optionalCharacterClassSchema,
   ancestry: z.string().trim().max(100, "Ancestry must be 100 characters or fewer.").nullable().optional().transform((value) => value || null),
   background: z.string().trim().max(100, "Background must be 100 characters or fewer.").nullable().optional().transform((value) => value || null),
   backstory: z.string().trim().max(5000, "Backstory must be 5,000 characters or fewer.").nullable().optional().transform((value) => value || null),
   notes: z.string().trim().max(5000, "Notes must be 5,000 characters or fewer.").nullable().optional().transform((value) => value || null),
 });
-export type CreateCharacterInput = z.input<typeof createCharacterInputSchema>;
-export const updateCharacterInputSchema = createCharacterInputSchema.omit({ characterNumber: true, startingLevel: true });
 export type UpdateCharacterInput = z.input<typeof updateCharacterInputSchema>;
 type Database = ReturnType<typeof getDb>;
 export class CharacterCreationError extends Error {}
@@ -108,7 +125,7 @@ export async function createCharacter(actor: AuthenticatedActor, rawInput: Creat
         name: input.name, societyNumber, startingLevel: input.startingLevel, className: input.className, ancestry: input.ancestry, background: input.background, backstory: input.backstory, notes: input.notes,
       }).returning({ id: characters.id, name: characters.name });
       if (!created) throw new CharacterCreationError("The character could not be created.");
-      await transaction.insert(characterCreditLedgerEntries).values({ id: randomUUID(), characterId: created.id, amountMinor: 0, displayScale: 1, type: "starting_credits", effectiveOn: new Date().toISOString().slice(0, 10), source: "character_creation", notes: "Opening balance" });
+      await transaction.insert(characterCreditLedgerEntries).values({ id: randomUUID(), characterId: created.id, amountMinor: input.startingCredits, displayScale: 1, type: "starting_credits", effectiveOn: new Date().toISOString().slice(0, 10), source: "character_creation", notes: startingWealthNote(input.startingLevel, input.startingCredits) });
       return created;
     });
   } catch (error) {

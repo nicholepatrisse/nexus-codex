@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "credit_ledger_starting_credits_unique" ON "character_credit_ledger_entries" USING btree ("character_id") WHERE "character_credit_ledger_entries"."type" = 'starting_credits';
