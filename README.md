@@ -50,6 +50,10 @@ pnpm db:migrate
 ```
 
 Generated SQL migrations under `drizzle/` must be reviewed and committed.
+Use `pnpm db:deploy` when applying committed migrations to a deployed environment.
+For production, use `pnpm db:deploy:production` and paste the production PostgreSQL URL at the
+hidden prompt. The URL is passed only to the migration process; it is not written to disk or shell
+history.
 
 ## Environment
 

@@ -20,7 +20,9 @@
     "catalog:seed:sfs2": "tsx scripts/seed-sfs2-catalog.ts",
     "db:generate": "drizzle-kit generate",
     "db:check": "drizzle-kit check",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "db:deploy": "drizzle-kit migrate",
+    "db:deploy:production": "sh scripts/deploy-production-db.sh"
   },
   "dependencies": {
     "better-auth": "^1.6.29",
