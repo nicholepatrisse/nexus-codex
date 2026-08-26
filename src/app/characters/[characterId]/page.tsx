@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getAuthenticatedActor } from "@/auth/actor";
 import { getCharacterDetail, type CharacterSession } from "@/character/characters";
+import { CharacterClassIcon } from "@/character/character-class-icon";
 import { listChronicles } from "@/character/chronicles";
 import { CharacterProgress } from "./character-progress";
 import { applyChronicleAction, deleteChronicleAction, unapplyChronicleAction } from "./chronicles/actions";
@@ -31,10 +32,11 @@ export default async function CharacterPage({ params }: { params: Promise<{ char
   const hasSessions = character.upcomingSessions.length > 0 || character.pastSessions.length > 0;
   return <main className="mx-auto min-h-screen max-w-3xl px-6 py-16">
     <Link href={character.isOwner ? "/characters" : "/games"} className="text-sm text-brand hover:underline">← {character.isOwner ? "Your characters" : "Games"}</Link>
-    <section className="mt-8 rounded-3xl border border-border bg-surface p-8 sm:p-10">
-      <p className="text-sm font-semibold tracking-[0.2em] text-brand uppercase">{character.isOwner ? "Your character" : "Character · Read only"}</p>
+    <section className="relative mt-8 rounded-3xl border border-border bg-surface p-8 sm:p-10">
+      <div className="pr-20 sm:pr-24"><p className="text-sm font-semibold tracking-[0.2em] text-brand uppercase">{character.isOwner ? "Your character" : "Character · Read only"}</p>
       <h1 className="mt-3 text-4xl font-semibold">{character.name}</h1>
-      {character.isOwner ? <Link href={`/characters/${character.id}/edit`} className="mt-4 inline-block text-sm font-semibold text-brand hover:underline">Edit character</Link> : null}
+      {character.isOwner ? <Link href={`/characters/${character.id}/edit`} className="mt-4 inline-block text-sm font-semibold text-brand hover:underline">Edit character</Link> : null}</div>
+      <div className="absolute top-5 right-5 sm:top-7 sm:right-7"><CharacterClassIcon className={character.className} /></div>
       <dl className="mt-8 grid gap-5 sm:grid-cols-2"><div><dt className="text-sm text-text-muted">Society number</dt><dd className="mt-1 font-semibold">{character.societyNumber}</dd></div><CharacterProgress startingLevel={character.startingLevel} currentLevel={character.currentLevel} xp={character.xp} />
         <div><dt className="text-sm text-text-muted">Applied rewards</dt><dd className="mt-1 font-semibold">{character.creditsMinor} credits · {character.reputation} reputation · {character.downtime} downtime</dd></div>
         {character.className ? <div><dt className="text-sm text-text-muted">Class</dt><dd className="mt-1 font-semibold">{character.className}</dd></div> : null}
