@@ -4,7 +4,7 @@ import { inventoryEntryInputSchema } from "@/character/inventory";
 describe("inventory validation", () => {
   const valid = { itemName: "Laser pistol", quantity: 1, acquisitionType: "purchased", acquiredOn: "2026-08-26" };
   it("accepts supported acquisition metadata and exact zero cost", () => {
-    expect(inventoryEntryInputSchema.parse({ ...valid, amountPaidMinor: 0, itemLink: "https://example.com/items/laser-pistol" })).toEqual(expect.objectContaining({ itemName: "Laser pistol", quantity: 1, amountPaidMinor: 0, itemLink: "https://example.com/items/laser-pistol" }));
+    expect(inventoryEntryInputSchema.parse({ ...valid, amountPaidMinor: 0, itemLink: "https://example.com/items/laser-pistol", bulk: " L " })).toEqual(expect.objectContaining({ itemName: "Laser pistol", quantity: 1, amountPaidMinor: 0, itemLink: "https://example.com/items/laser-pistol", bulk: "L" }));
   });
   it("rejects non-positive quantities, unsupported types, and negative costs", () => {
     expect(inventoryEntryInputSchema.safeParse({ ...valid, quantity: 0 }).success).toBe(false);
