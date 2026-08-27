@@ -623,6 +623,42 @@ export const characterCreditLedgerEntries = pgTable(
   ],
 );
 
+/** Current owned equipment. Each row is an acquisition lot, never transaction history. */
+export const characterInventoryEntries = pgTable(
+  "character_inventory_entries",
+  {
+    id: text("id").primaryKey(),
+    characterId: text("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "cascade" }),
+    contentItemId: text("content_item_id").references(() => contentItems.id, { onDelete: "set null" }),
+    itemNameSnapshot: text("item_name_snapshot").notNull(),
+    itemLinkSnapshot: text("item_link_snapshot"),
+    quantity: integer("quantity").notNull(),
+    acquisitionType: text("acquisition_type").notNull(),
+    acquiredOn: date("acquired_on", { mode: "string" }).notNull(),
+    amountPaidMinor: integer("amount_paid_minor"),
+    sourceChronicleId: text("source_chronicle_id").references(() => chronicles.id, { onDelete: "set null" }),
+    notes: text("notes"),
+    /** Stable provenance identity keeps otherwise-similar cost/source lots distinct. */
+    lotKey: text("lot_key").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("character_inventory_character_acquired_idx").on(table.characterId, table.acquiredOn, table.createdAt),
+    index("character_inventory_content_item_idx").on(table.contentItemId),
+    index("character_inventory_source_chronicle_idx").on(table.sourceChronicleId),
+    uniqueIndex("character_inventory_character_lot_unique").on(table.characterId, table.lotKey),
+    check("character_inventory_name_check", sql`length(btrim(${table.itemNameSnapshot})) between 1 and 200`),
+    check("character_inventory_link_length_check", sql`${table.itemLinkSnapshot} is null or length(${table.itemLinkSnapshot}) <= 2000`),
+    check("character_inventory_quantity_check", sql`${table.quantity} > 0`),
+    check("character_inventory_acquisition_type_check", sql`${table.acquisitionType} in ('starting_equipment', 'purchased', 'crafted', 'boon_reward', 'other')`),
+    check("character_inventory_amount_paid_check", sql`${table.amountPaidMinor} is null or ${table.amountPaidMinor} >= 0`),
+    check("character_inventory_notes_length_check", sql`${table.notes} is null or length(${table.notes}) <= 5000`),
+  ],
+);
+
 /** A reusable community share link. Only a one-way digest of its bearer token is persisted. */
 export const communityInvitations = pgTable(
   "community_invitations",

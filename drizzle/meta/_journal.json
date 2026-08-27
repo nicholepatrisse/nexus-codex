@@ -239,6 +239,20 @@
       "when": 1787782307717,
       "tag": "0033_apply_completed_nexus_chronicles",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1787799195641,
+      "tag": "0034_nasty_sentinel",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1787802110897,
+      "tag": "0035_wise_ricochet",
+      "breakpoints": true
     }
   ]
 }
