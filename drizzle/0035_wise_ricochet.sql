@@ -1,0 +1,3 @@
+ALTER TABLE "character_inventory_entries" RENAME COLUMN "item_code_snapshot" TO "item_link_snapshot";--> statement-breakpoint
+ALTER TABLE "character_inventory_entries" DROP CONSTRAINT "character_inventory_code_length_check";--> statement-breakpoint
+ALTER TABLE "character_inventory_entries" ADD CONSTRAINT "character_inventory_link_length_check" CHECK ("character_inventory_entries"."item_link_snapshot" is null or length("character_inventory_entries"."item_link_snapshot") <= 2000);

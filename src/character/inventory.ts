@@ -1,0 +1,75 @@
+import { randomUUID } from "node:crypto";
+import { and, asc, eq } from "drizzle-orm";
+import { z } from "zod";
+import type { AuthenticatedActor } from "@/auth/actor";
+import { getDb } from "@/db/client";
+import { characterInventoryEntries, characters, chronicles, contentItems } from "@/db/schema";
+
+type Database = ReturnType<typeof getDb>;
+const optionalText = (maximum: number) => z.string().trim().max(maximum).nullable().optional().transform((value) => value || null);
+const optionalLink = z.string().trim().max(2000, "Item link must be 2,000 characters or fewer.").refine((value) => !value || /^https?:\/\//i.test(value), "Enter a complete http or https link.").nullable().optional().transform((value) => value || null);
+
+export const inventoryEntryInputSchema = z.object({
+  contentItemId: optionalText(100),
+  itemName: z.string().trim().min(1, "Enter an item name.").max(200, "Item name must be 200 characters or fewer."),
+  itemLink: optionalLink,
+  quantity: z.coerce.number().int("Quantity must be a whole number.").positive("Quantity must be at least 1.").max(2_000_000_000),
+  acquisitionType: z.enum(["starting_equipment", "purchased", "crafted", "boon_reward", "other"], { error: "Choose an acquisition type." }),
+  acquiredOn: z.string().date("Enter a valid acquisition date."),
+  amountPaidMinor: z.union([z.literal(""), z.null(), z.coerce.number().int("Amount paid must be a whole number.").nonnegative("Amount paid cannot be negative.").max(2_000_000_000)]).optional().transform((value) => value === "" || value == null ? null : value),
+  sourceChronicleId: optionalText(100),
+  notes: optionalText(5000),
+});
+export type InventoryEntryInput = z.input<typeof inventoryEntryInputSchema>;
+export type InventoryEntry = typeof characterInventoryEntries.$inferSelect;
+
+async function ownedCharacter(actor: AuthenticatedActor, characterId: string, database: Database) {
+  const [row] = await database.select({ id: characters.id }).from(characters).where(and(eq(characters.id, characterId), eq(characters.personId, actor.personId))).limit(1);
+  return row ?? null;
+}
+
+async function snapshots(input: z.output<typeof inventoryEntryInputSchema>, characterId: string, database: Database) {
+  let item = { contentItemId: null as string | null, itemNameSnapshot: input.itemName, itemLinkSnapshot: input.itemLink };
+  if (input.contentItemId) {
+    const [catalog] = await database.select({ id: contentItems.id, title: contentItems.title, code: contentItems.code }).from(contentItems).where(eq(contentItems.id, input.contentItemId)).limit(1);
+    if (!catalog) throw new Error("The selected catalog item no longer exists.");
+    item = { contentItemId: catalog.id, itemNameSnapshot: catalog.title, itemLinkSnapshot: input.itemLink };
+  }
+  if (input.sourceChronicleId) {
+    const [source] = await database.select({ id: chronicles.id }).from(chronicles).where(and(eq(chronicles.id, input.sourceChronicleId), eq(chronicles.characterId, characterId))).limit(1);
+    if (!source) throw new Error("The source Chronicle must belong to this character.");
+  }
+  return item;
+}
+
+export async function listOwnedInventory(actor: AuthenticatedActor, characterId: string, database: Database = getDb()) {
+  if (!await ownedCharacter(actor, characterId, database)) return null;
+  return database.select().from(characterInventoryEntries).where(eq(characterInventoryEntries.characterId, characterId)).orderBy(asc(characterInventoryEntries.itemNameSnapshot), asc(characterInventoryEntries.createdAt));
+}
+
+export async function getOwnedInventoryEntry(actor: AuthenticatedActor, characterId: string, entryId: string, database: Database = getDb()) {
+  const [entry] = await database.select({ entry: characterInventoryEntries }).from(characterInventoryEntries).innerJoin(characters, eq(characters.id, characterInventoryEntries.characterId)).where(and(eq(characterInventoryEntries.id, entryId), eq(characterInventoryEntries.characterId, characterId), eq(characters.personId, actor.personId))).limit(1);
+  return entry?.entry ?? null;
+}
+
+export async function createInventoryEntry(actor: AuthenticatedActor, characterId: string, raw: InventoryEntryInput, database: Database = getDb()) {
+  const input = inventoryEntryInputSchema.parse(raw);
+  if (!await ownedCharacter(actor, characterId, database)) return null;
+  const item = await snapshots(input, characterId, database);
+  const [created] = await database.insert(characterInventoryEntries).values({ id: randomUUID(), lotKey: randomUUID(), characterId, ...item, quantity: input.quantity, acquisitionType: input.acquisitionType, acquiredOn: input.acquiredOn, amountPaidMinor: input.amountPaidMinor, sourceChronicleId: input.sourceChronicleId, notes: input.notes }).returning();
+  return created ?? null;
+}
+
+export async function updateInventoryEntry(actor: AuthenticatedActor, characterId: string, entryId: string, raw: InventoryEntryInput, database: Database = getDb()) {
+  const input = inventoryEntryInputSchema.parse(raw);
+  if (!await getOwnedInventoryEntry(actor, characterId, entryId, database)) return null;
+  const item = await snapshots(input, characterId, database);
+  const [updated] = await database.update(characterInventoryEntries).set({ ...item, quantity: input.quantity, acquisitionType: input.acquisitionType, acquiredOn: input.acquiredOn, amountPaidMinor: input.amountPaidMinor, sourceChronicleId: input.sourceChronicleId, notes: input.notes, updatedAt: new Date() }).where(and(eq(characterInventoryEntries.id, entryId), eq(characterInventoryEntries.characterId, characterId))).returning();
+  return updated ?? null;
+}
+
+export async function deleteInventoryEntry(actor: AuthenticatedActor, characterId: string, entryId: string, database: Database = getDb()) {
+  if (!await getOwnedInventoryEntry(actor, characterId, entryId, database)) return false;
+  const deleted = await database.delete(characterInventoryEntries).where(and(eq(characterInventoryEntries.id, entryId), eq(characterInventoryEntries.characterId, characterId))).returning({ id: characterInventoryEntries.id });
+  return deleted.length === 1;
+}
