@@ -53,7 +53,7 @@ export function SignedUpGamesList({
               <span className="font-semibold text-text-primary">{game.scenarioCode} — {game.scenarioTitle}</span>
               <span className="flex shrink-0 flex-wrap justify-end gap-2">
                 {game.participationRole === "gm" ? <span className="rounded-full border border-info/30 bg-info/10 px-2.5 py-1 text-xs font-semibold text-info">GM</span> : null}
-                {game.participationRole === "player" ? <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${game.signupStatus === "waitlisted" ? "border-warning/30 bg-warning/10 text-warning" : "border-success/30 bg-success/10 text-success"}`}>{signupLabel}</span> : null}
+                {game.participationRole === "player" && !completed ? <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${game.signupStatus === "waitlisted" ? "border-warning/30 bg-warning/10 text-warning" : "border-success/30 bg-success/10 text-success"}`}>{signupLabel}</span> : null}
                 {game.participationRole === "player" && game.characterName ? <span className="rounded-full border border-info/30 bg-info/10 px-2.5 py-1 text-xs font-semibold text-info">{game.characterName}</span> : null}
                 {cancelled ? <span className="rounded-full border border-danger/30 bg-danger/10 px-2.5 py-1 text-xs font-semibold text-danger">Cancelled</span> : null}
                 {completed ? <span className="rounded-full border border-success/30 bg-success/10 px-2.5 py-1 text-xs font-semibold text-success">Completed</span> : null}
@@ -99,5 +99,5 @@ export async function SignedUpGames({ actor }: { actor: AuthenticatedActor }) {
       <p role="alert" className="mt-6 rounded-2xl bg-danger/10 p-6 text-danger">Your games could not be loaded. Please try again.</p>
     </section>;
   }
-  return <SignedUpGamesList games={result.games.slice(0, 4)} />;
+  return <SignedUpGamesList games={result.games.slice(0, 2)} />;
 }

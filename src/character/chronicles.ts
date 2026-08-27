@@ -76,6 +76,13 @@ export async function listChronicles(characterId: string, database: Database = g
   return database.select().from(chronicles).where(eq(chronicles.characterId, characterId)).orderBy(desc(chronicles.playedOn), desc(chronicles.id));
 }
 
+export async function listUnappliedChronicles(personId: string, database: Database = getDb()) {
+  return database.select({ id: chronicles.id, characterId: chronicles.characterId, characterName: characters.name, scenarioNumber: chronicles.scenarioNumberSnapshot, scenarioName: chronicles.scenarioNameSnapshot, playedOn: chronicles.playedOn, characterLevel: chronicles.characterLevel, xp: chronicles.xp, provenance: chronicles.provenance })
+    .from(chronicles).innerJoin(characters, eq(characters.id, chronicles.characterId))
+    .where(and(eq(characters.personId, personId), eq(chronicles.status, "pending")))
+    .orderBy(desc(chronicles.playedOn), desc(chronicles.createdAt), desc(chronicles.id));
+}
+
 export async function listChronicleContentItems(database: Database = getDb()) {
   return database.select({ id: contentItems.id, code: contentItems.code, title: contentItems.title }).from(contentItems).orderBy(asc(contentItems.normalizedCode));
 }
