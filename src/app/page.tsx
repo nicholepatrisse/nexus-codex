@@ -5,7 +5,9 @@ import { MyCommunities } from "@/app/my-communities";
 import { SignInButton } from "@/app/sign-in/sign-in-button";
 import { SignedUpGames, SignedUpGamesLoading } from "@/app/signed-up-games";
 import { getAuthenticatedActor } from "@/auth/actor";
-import { GmReportingQueue, GmReportingQueueLoading } from "@/app/gm-reporting-queue";
+import { GmReportingQueueLoading } from "@/app/gm-reporting-queue";
+import { UnappliedChroniclesLoading } from "@/app/unapplied-chronicles";
+import { HomepageFollowups } from "@/app/homepage-followups";
 
 export default async function Home() {
   const actor = await getAuthenticatedActor();
@@ -43,7 +45,7 @@ export default async function Home() {
         </section>
       </AccentSurface> : null}
       {actor ? <Suspense fallback={<SignedUpGamesLoading />}><SignedUpGames actor={actor} /></Suspense> : null}
-      {actor ? <Suspense fallback={<GmReportingQueueLoading />}><GmReportingQueue actor={actor} /></Suspense> : null}
+      {actor ? <Suspense fallback={<><GmReportingQueueLoading /><UnappliedChroniclesLoading /></>}><HomepageFollowups actor={actor} /></Suspense> : null}
       <MyCommunities />
     </main>
   );

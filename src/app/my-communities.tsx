@@ -55,7 +55,7 @@ export function AdmissionStatusList({ admissions }: { admissions: AdmissionSumma
         Membership requests
       </h3>
       <ul className="mt-4 grid gap-4 sm:grid-cols-2">
-        {admissions.map((admission) => {
+        {admissions.slice(0, 2).map((admission) => {
           const badge = admissionBadges[admission.status] ?? {
             label: "Updated",
             className: "border-border-strong bg-surface-raised text-text-muted",
@@ -145,7 +145,7 @@ export function CommunityList({
 
       {activeCommunities.length > 0 ? (
         <ul className="mt-6 grid gap-4 sm:grid-cols-2">
-          {activeCommunities.map((community) => (
+          {activeCommunities.slice(0, 2).map((community) => (
             <li key={community.id}>
               <Link
                 href={`/communities/${community.slug}`}
@@ -170,7 +170,7 @@ export function CommunityList({
             Only owners can see archived communities and restore them.
           </p>
           <ul className="mt-4 grid gap-4 sm:grid-cols-2">
-            {archivedCommunities.map((community) => (
+            {archivedCommunities.slice(0, 2).map((community) => (
               <li key={community.id}>
                 <Link
                   href={`/communities/${community.slug}/settings`}
