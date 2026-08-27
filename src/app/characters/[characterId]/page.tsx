@@ -4,7 +4,7 @@ import { getAuthenticatedActor } from "@/auth/actor";
 import { getCharacterDetail, type CharacterSession } from "@/character/characters";
 import { formatCredits, getOwnedCreditLedger } from "@/character/credit-ledger";
 import { CharacterClassIcon } from "@/character/character-class-icon";
-import { listChronicles, type Chronicle } from "@/character/chronicles";
+import { listChronicles, type ChronicleWithGmCredit } from "@/character/chronicles";
 import { CharacterProgress } from "./character-progress";
 import { applyChronicleAction } from "./chronicles/actions";
 import { ChronicleLifecycleButton } from "./chronicles/lifecycle-button";
@@ -16,6 +16,7 @@ import { listOwnedPurchases } from "@/character/purchases";
 import { listOwnedSales } from "@/character/sales";
 import { sellInventoryAction } from "./sales/actions";
 import { SaleForm } from "./sales/sale-form";
+import { GmCreditBadge } from "@/app/gm-credit-badge";
 
 function formatSessionDate(session: CharacterSession) {
   return new Intl.DateTimeFormat("en-US", { timeZone: session.displayTimeZone, year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(session.startsAt);
@@ -34,16 +35,16 @@ function SessionList({ sessions, empty }: { sessions: CharacterSession[]; empty:
   })}</ul>;
 }
 
-function chronicleNumberOrder(left: Chronicle, right: Chronicle) {
+function chronicleNumberOrder(left: ChronicleWithGmCredit, right: ChronicleWithGmCredit) {
   const leftNumber = Number(left.chronicleNumber);
   const rightNumber = Number(right.chronicleNumber);
   if (Number.isFinite(leftNumber) && Number.isFinite(rightNumber)) return leftNumber - rightNumber;
   return (left.chronicleNumber ?? "").localeCompare(right.chronicleNumber ?? "", undefined, { numeric: true });
 }
 
-function ChronicleCard({ chronicle, characterId, isOwner }: { chronicle: Chronicle; characterId: string; isOwner: boolean }) {
+function ChronicleCard({ chronicle, characterId, isOwner }: { chronicle: ChronicleWithGmCredit; characterId: string; isOwner: boolean }) {
   return <li className="rounded-2xl border border-border bg-surface-raised p-5 transition hover:border-brand">
-    <div className="flex items-start justify-between gap-4"><div className="min-w-0">{chronicle.chronicleNumber ? <p className="text-xs font-semibold tracking-wide text-text-muted uppercase">Chronicle {chronicle.chronicleNumber}</p> : null}<Link className={`${chronicle.chronicleNumber ? "mt-1" : ""} block font-semibold text-text-primary hover:text-brand hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand`} href={`/characters/${characterId}/chronicles/${chronicle.id}`}>{chronicle.scenarioNumberSnapshot} — {chronicle.scenarioNameSnapshot}</Link></div>{isOwner && chronicle.status === "pending" ? <div className="shrink-0"><ChronicleLifecycleButton status="pending" action={applyChronicleAction.bind(null, characterId, chronicle.id)} /></div> : null}</div>
+    <div className="flex items-start justify-between gap-4"><div className="min-w-0">{chronicle.chronicleNumber ? <p className="text-xs font-semibold tracking-wide text-text-muted uppercase">Chronicle {chronicle.chronicleNumber}</p> : null}<div className={`${chronicle.chronicleNumber ? "mt-1" : ""} flex flex-wrap items-center gap-2`}><Link className="font-semibold text-text-primary hover:text-brand hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand" href={`/characters/${characterId}/chronicles/${chronicle.id}`}>{chronicle.scenarioNumberSnapshot} — {chronicle.scenarioNameSnapshot}</Link>{chronicle.isGmCredit ? <GmCreditBadge /> : null}</div></div>{isOwner && chronicle.status === "pending" ? <div className="shrink-0"><ChronicleLifecycleButton status="pending" action={applyChronicleAction.bind(null, characterId, chronicle.id)} /></div> : null}</div>
     <div className="mt-2 flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-text-muted">{new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${chronicle.playedOn}T00:00:00Z`))} · Level {chronicle.characterLevel} · {chronicle.xp} XP</p>{isOwner && chronicle.status === "pending" && chronicle.provenance === "manual" ? <Link href={`/characters/${characterId}/chronicles/${chronicle.id}/edit`} aria-label={`Edit ${chronicle.scenarioNumberSnapshot} Chronicle`} title="Edit Chronicle" className="inline-flex size-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-surface hover:text-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-4"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg></Link> : null}</div>
   </li>;
 }
