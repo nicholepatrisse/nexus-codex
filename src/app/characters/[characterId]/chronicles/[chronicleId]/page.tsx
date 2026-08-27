@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { getAuthenticatedActor } from "@/auth/actor";
 import { getCharacterDetail } from "@/character/characters";
 import { formatCredits } from "@/character/credit-ledger";
-import { listChronicles, totalCredits } from "@/character/chronicles";
+import { getNexusChronicleEditTarget, listChronicles, totalCredits } from "@/character/chronicles";
 import { unapplyChronicleAction } from "../actions";
 import { ChronicleLifecycleButton } from "../lifecycle-button";
 import { GmCreditBadge } from "@/app/gm-credit-badge";
@@ -20,6 +20,7 @@ export default async function ChronicleDetailPage({ params }: { params: Promise<
   if (!character) notFound();
   const chronicle = (await listChronicles(characterId)).find(({ id }) => id === chronicleId);
   if (!chronicle) notFound();
+  const editTarget = chronicle.provenance === "nexus" ? await getNexusChronicleEditTarget(actor, characterId, chronicleId) : null;
 
   return <main className="mx-auto min-h-screen max-w-3xl px-6 py-16">
     <Link href={`/characters/${characterId}?tab=chronicles`} className="text-sm font-semibold text-brand hover:underline">← {character.name} Chronicles</Link>
@@ -30,6 +31,7 @@ export default async function ChronicleDetailPage({ params }: { params: Promise<
       {chronicle.playerNotes ? <section className="mt-8 border-t border-border pt-8"><h2 className="text-lg font-semibold">Player notes</h2><p className="mt-2 whitespace-pre-wrap text-text-muted">{chronicle.playerNotes}</p></section> : null}
       {chronicle.gmNotes ? <section className="mt-8 rounded-xl border border-info/30 bg-info/10 p-5"><h2 className="text-sm font-semibold tracking-wide text-info uppercase">GM notes</h2><p className="mt-2 whitespace-pre-wrap">{chronicle.gmNotes}</p></section> : null}
       {character.isOwner && chronicle.provenance === "manual" && chronicle.status === "pending" ? <div className="mt-8 border-t border-border pt-8"><Link href={`/characters/${characterId}/chronicles/${chronicleId}/edit`} className="rounded-full border border-border-strong px-4 py-2 text-sm font-semibold hover:border-brand hover:text-brand">Edit Chronicle</Link></div> : null}
+      {editTarget ? <div className="mt-8 border-t border-border pt-8"><Link href={`/communities/${encodeURIComponent(editTarget.communitySlug)}/sessions/${encodeURIComponent(editTarget.sessionId)}`} className="rounded-full border border-border-strong px-4 py-2 text-sm font-semibold hover:border-brand hover:text-brand">Edit session Chronicles</Link><p className="mt-3 text-sm text-text-muted">Changes are made through the completed session so every Chronicle from the game can be reviewed together.</p></div> : null}
       {character.isOwner && chronicle.provenance === "manual" && chronicle.status === "applied" ? <div className="mt-8 flex items-center justify-between gap-4 border-t border-border pt-8"><div><h2 className="font-semibold">Applied rewards</h2><p className="mt-1 text-sm text-text-muted">Removing these rewards will reverse this Chronicle’s XP and credits.</p></div><ChronicleLifecycleButton status="applied" action={unapplyChronicleAction.bind(null, characterId, chronicleId)} /></div> : null}
     </article>
   </main>;

@@ -2,8 +2,9 @@ import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { AuthenticatedActor } from "@/auth/actor";
+import { resolveCommunityAccessBySlug } from "@/authorization/community-access";
 import { getDb } from "@/db/client";
-import { characterCreditLedgerEntries, characters, chronicles, contentItems, sessionGmCredits } from "@/db/schema";
+import { characterCreditLedgerEntries, characters, chronicles, communities, contentItems, sessionGmCredits, sessions } from "@/db/schema";
 import { calculateEarnIncome, totalChronicleCredits } from "@/character/sfs2-chronicle-rewards";
 
 type Database = ReturnType<typeof getDb>;
@@ -80,6 +81,20 @@ export async function listChronicles(characterId: string, database: Database = g
     .where(eq(chronicles.characterId, characterId))
     .orderBy(desc(chronicles.playedOn), desc(chronicles.id));
   return rows.map(({ chronicle, gmCreditId }) => ({ ...chronicle, isGmCredit: gmCreditId !== null }));
+}
+
+/** Returns the source completion workflow only when the actor manages this Nexus session. */
+export async function getNexusChronicleEditTarget(actor: AuthenticatedActor, characterId: string, chronicleId: string, database: Database = getDb()) {
+  const [source] = await database.select({ sessionId: sessions.id, gmPersonId: sessions.gmPersonId, communitySlug: communities.slug })
+    .from(chronicles)
+    .innerJoin(sessions, eq(sessions.id, chronicles.sessionId))
+    .innerJoin(communities, eq(communities.id, sessions.communityId))
+    .where(and(eq(chronicles.id, chronicleId), eq(chronicles.characterId, characterId), eq(chronicles.provenance, "nexus"), eq(sessions.status, "completed")))
+    .limit(1);
+  if (!source) return null;
+  const access = await resolveCommunityAccessBySlug(source.communitySlug, actor.personId, database);
+  if (access.status !== "available" || (!access.roles.includes("owner") && source.gmPersonId !== actor.personId)) return null;
+  return { communitySlug: source.communitySlug, sessionId: source.sessionId };
 }
 
 export async function listUnappliedChronicles(personId: string, database: Database = getDb()) {
