@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, gt } from "drizzle-orm";
 import { z } from "zod";
 import type { AuthenticatedActor } from "@/auth/actor";
 import { getDb } from "@/db/client";
@@ -44,7 +44,7 @@ async function snapshots(input: z.output<typeof inventoryEntryInputSchema>, char
 
 export async function listOwnedInventory(actor: AuthenticatedActor, characterId: string, database: Database = getDb()) {
   if (!await ownedCharacter(actor, characterId, database)) return null;
-  return database.select().from(characterInventoryEntries).where(eq(characterInventoryEntries.characterId, characterId)).orderBy(asc(characterInventoryEntries.itemNameSnapshot), asc(characterInventoryEntries.createdAt));
+  return database.select().from(characterInventoryEntries).where(and(eq(characterInventoryEntries.characterId, characterId), gt(characterInventoryEntries.quantity, 0))).orderBy(asc(characterInventoryEntries.itemNameSnapshot), asc(characterInventoryEntries.createdAt));
 }
 
 export async function getOwnedInventoryEntry(actor: AuthenticatedActor, characterId: string, entryId: string, database: Database = getDb()) {

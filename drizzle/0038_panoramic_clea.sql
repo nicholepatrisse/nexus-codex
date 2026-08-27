@@ -1,0 +1,1 @@
+ALTER TABLE "character_sales" ADD CONSTRAINT "character_sales_inventory_entry_id_character_inventory_entries_id_fk" FOREIGN KEY ("inventory_entry_id") REFERENCES "public"."character_inventory_entries"("id") ON DELETE restrict ON UPDATE no action;
