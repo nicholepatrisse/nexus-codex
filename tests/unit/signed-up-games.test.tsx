@@ -70,7 +70,12 @@ describe("signed-up games", () => {
     const markup = renderToStaticMarkup(<AllGamesList now={new Date("2030-08-01T00:00:00Z")} games={[game, { ...game, sessionId: "completed", startsAt: new Date("2030-07-01T00:00:00Z"), sessionStatus: "completed", participationRole: "gm" }]} />);
     expect(markup).toContain("Upcoming games");
     expect(markup).toContain("Past games");
-    expect(markup).toContain("Completed");
+    expect(markup).toContain("Chronicles issued");
     expect(markup).toContain('id="past-games-heading"');
+  });
+
+  it("shows reporting completion after Paizo reporting is confirmed", () => {
+    const markup = renderToStaticMarkup(<SignedUpGamesList games={[{ ...game, sessionStatus: "completed", participationRole: "gm", paizoReportedAt: new Date("2030-09-03T00:00:00Z") }]} />);
+    expect(markup).toContain("Reporting complete");
   });
 });

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AdmissionForm } from "./admission-form";
 import { GmAdmissionForm } from "./gm-admission-form";
+import { SessionStatusPill } from "@/app/session-status-pill";
 
 export type CommunityProfileProps = Readonly<{
   community: {
@@ -17,7 +18,7 @@ export type CommunityProfileProps = Readonly<{
   gmState?: "eligible" | "pending" | "active" | "rejected" | "revoked";
   pendingGmRequestId?: string;
   drafts?: { id: string; code: string; title: string; startsAt: string; gmPersonId: string }[];
-  sessions?: { id: string; code: string; title: string; startsAt: string; gmName: string; status?: string; canSignUp?: boolean; signupStatus?: "confirmed" | "waitlisted"; signupCharacterId?: string; signupCharacterName?: string; eligibleCharacters?: { id: string; name: string; societyNumber: string; currentLevel: number }[] }[];
+  sessions?: { id: string; code: string; title: string; startsAt: string; gmName: string; status?: string; paizoReportedAt?: Date | null; canSignUp?: boolean; signupStatus?: "confirmed" | "waitlisted"; signupCharacterId?: string; signupCharacterName?: string; eligibleCharacters?: { id: string; name: string; societyNumber: string; currentLevel: number }[] }[];
   canViewSchedule?: boolean;
   now?: string;
   published?: boolean;
@@ -46,12 +47,12 @@ function SessionList({ communitySlug, sessions, isSignedIn }: Readonly<{
     const href = `/communities/${encodeURIComponent(communitySlug)}/sessions/${encodeURIComponent(session.id)}`;
     return <li key={session.id}>
       <Link href={isSignedIn ? href : `/sign-in?callbackURL=${encodeURIComponent(href)}`} className="block rounded-xl border border-border p-4 transition hover:border-brand focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand">
-        <span className="flex flex-wrap items-start justify-between gap-3">
-          <span><span className="font-semibold">{session.code} — {session.title}</span><span className="mt-1 block text-sm text-text-muted">{new Date(session.startsAt).toLocaleString()}</span><span className="mt-1 block text-sm text-text-muted">GM: {session.gmName}</span></span>
-          <span className="flex shrink-0 flex-wrap justify-end gap-2">
+        <span className="block">
+          <span><span className="block font-semibold">{session.code} — {session.title}</span><span className="mt-1 block text-sm text-text-muted">{new Date(session.startsAt).toLocaleString()}</span><span className="mt-1 block text-sm text-text-muted">GM: {session.gmName}</span></span>
+          <span className="mt-3 flex flex-wrap gap-2">
             {session.signupStatus ? <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${session.signupStatus === "waitlisted" ? "border-warning/30 bg-warning/10 text-warning" : "border-success/30 bg-success/10 text-success"}`}>{session.signupStatus === "waitlisted" ? "Waitlisted" : "Confirmed"}</span> : null}
             {session.signupCharacterName ? <span className="rounded-full border border-info/30 bg-info/10 px-2.5 py-1 text-xs font-semibold text-info">{session.signupCharacterName}</span> : null}
-            {session.status === "completed" ? <span className="rounded-full border border-success/30 bg-success/10 px-2.5 py-1 text-xs font-semibold text-success">Completed</span> : null}
+            <SessionStatusPill status={session.status === "completed" ? "completed" : "published"} startsAt={new Date(session.startsAt)} paizoReportedAt={session.paizoReportedAt} />
           </span>
         </span>
       </Link>
