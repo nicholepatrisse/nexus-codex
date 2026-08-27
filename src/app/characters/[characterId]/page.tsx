@@ -13,6 +13,7 @@ import { createCreditAdjustmentAction } from "./credits/actions";
 import { CreditAdjustmentForm } from "./credits/adjustment-form";
 import { listOwnedInventory } from "@/character/inventory";
 import { deleteInventoryAction } from "./inventory/actions";
+import { listOwnedPurchases } from "@/character/purchases";
 
 function formatSessionDate(session: CharacterSession) {
   return new Intl.DateTimeFormat("en-US", { timeZone: session.displayTimeZone, year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(session.startsAt);
@@ -36,6 +37,7 @@ export default async function CharacterPage({ params }: { params: Promise<{ char
   const chronicles = await listChronicles(characterId);
   const ledger = character.isOwner ? await getOwnedCreditLedger(actor, characterId) : null;
   const inventory = character.isOwner ? await listOwnedInventory(actor, characterId) : null;
+  const purchases = character.isOwner ? await listOwnedPurchases(actor, characterId) : null;
   const hasSessions = character.upcomingSessions.length > 0 || character.pastSessions.length > 0;
   return <main className="mx-auto min-h-screen max-w-3xl px-6 py-16">
     <Link href={character.isOwner ? "/characters" : "/games"} className="text-sm text-brand hover:underline">← {character.isOwner ? "Your characters" : "Games"}</Link>
@@ -65,9 +67,10 @@ export default async function CharacterPage({ params }: { params: Promise<{ char
         </li>)}</ul>}
       </section>
       {inventory ? <section className="mt-10 border-t border-border pt-8">
-        <div className="flex items-center justify-between gap-4"><div><h2 className="text-2xl font-semibold">Inventory</h2><p className="mt-1 text-sm text-text-muted">Current ownership · acquisition lots remain separate</p></div><Link className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white" href={`/characters/${character.id}/inventory/new`}>Add item</Link></div>
+        <div className="flex flex-wrap items-center justify-between gap-4"><div><h2 className="text-2xl font-semibold">Inventory</h2><p className="mt-1 text-sm text-text-muted">Current ownership · acquisition lots remain separate</p></div><Link className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white" href={`/characters/${character.id}/inventory/new`}>Add item</Link></div>
         {!inventory.length ? <div className="mt-5 rounded-xl border border-dashed border-border-strong p-6 text-center"><h3 className="font-semibold">No inventory yet</h3><p className="mt-1 text-sm text-text-muted">Add this character’s current equipment when you’re ready.</p></div> : <ul className="mt-5 space-y-3">{inventory.map((entry) => <li key={entry.id} className="rounded-xl border border-border bg-surface-raised p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-semibold">{entry.quantity} × {entry.itemLinkSnapshot ? <a className="text-brand hover:underline" href={entry.itemLinkSnapshot} target="_blank" rel="noreferrer">{entry.itemNameSnapshot}</a> : entry.itemNameSnapshot}</h3><p className="mt-1 text-sm text-text-muted">{entry.acquisitionType.replaceAll("_", " ")} · {new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${entry.acquiredOn}T00:00:00Z`))}{entry.amountPaidMinor == null ? "" : ` · ${formatCredits(entry.amountPaidMinor)} credits paid`}</p>{entry.notes ? <p className="mt-2 whitespace-pre-wrap text-sm">{entry.notes}</p> : null}</div><div className="flex items-center gap-2"><Link className="text-sm font-semibold text-brand hover:underline" href={`/characters/${character.id}/inventory/${entry.id}/edit`}>Edit</Link><form action={deleteInventoryAction.bind(null, character.id, entry.id)}><button className="text-sm font-semibold text-danger hover:underline" type="submit">Remove</button></form></div></div></li>)}</ul>}
       </section> : null}
+      {purchases?.length ? <section className="mt-10 border-t border-border pt-8"><h2 className="text-2xl font-semibold">Purchase history</h2><p className="mt-1 text-sm text-text-muted">Permanent acquisition records remain after inventory removal.</p><ol className="mt-5 space-y-3">{purchases.map((purchase) => <li key={purchase.id} className="rounded-xl border border-border bg-surface-raised p-4"><p className="font-semibold">{purchase.quantity} × {purchase.itemLinkSnapshot ? <a className="text-brand hover:underline" href={purchase.itemLinkSnapshot} target="_blank" rel="noreferrer">{purchase.itemNameSnapshot}</a> : purchase.itemNameSnapshot}</p><p className="mt-1 text-sm text-text-muted">Purchased {new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${purchase.acquiredOn}T00:00:00Z`))} · {formatCredits(purchase.unitPriceMinor)} each · {formatCredits(purchase.totalPriceMinor)} total</p></li>)}</ol></section> : null}
       {ledger ? <section className="mt-10 border-t border-border pt-8">
         <h2 className="text-2xl font-semibold">Credit ledger</h2><p className="mt-1 text-sm text-text-muted">Owner-only financial history · balance {formatCredits(ledger.balanceMinor, ledger.displayScale)} credits</p>
         <CreditAdjustmentForm action={createCreditAdjustmentAction.bind(null, character.id)} />

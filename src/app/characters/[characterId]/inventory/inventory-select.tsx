@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 
 export interface InventorySelectOption { value: string; label: string }
 
-export function InventorySelect({ name, defaultValue, options, invalid = false }: { name: string; defaultValue: string; options: readonly InventorySelectOption[]; invalid?: boolean }) {
+export function InventorySelect({ name, defaultValue, options, invalid = false, onValueChange }: { name: string; defaultValue: string; options: readonly InventorySelectOption[]; invalid?: boolean; onValueChange?: (value: string) => void }) {
   const [value, setValue] = useState(defaultValue);
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -21,13 +21,14 @@ export function InventorySelect({ name, defaultValue, options, invalid = false }
 
   function choose(nextValue: string) {
     setValue(nextValue);
+    onValueChange?.(nextValue);
     setOpen(false);
   }
 
   function moveSelection(direction: 1 | -1) {
     const currentIndex = Math.max(0, options.findIndex((option) => option.value === value));
     const next = options[(currentIndex + direction + options.length) % options.length];
-    if (next) setValue(next.value);
+    if (next) { setValue(next.value); onValueChange?.(next.value); }
     setOpen(true);
   }
 
