@@ -1,15 +1,10 @@
-import Link from "next/link";
 import type { AuthenticatedActor } from "@/auth/actor";
 import { listUnreportedGmGames, type UnreportedGmGame } from "@/session/session-signups";
-import { SessionStatusPill } from "@/app/session-status-pill";
-
-function formatTime(game: UnreportedGmGame) {
-  return new Intl.DateTimeFormat("en-US", { timeZone: game.displayTimeZone, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(game.startsAt);
-}
+import { GameCard } from "@/app/game-card";
 
 export function GmReportingQueueList({ games, singleColumn = false }: { games: UnreportedGmGame[]; singleColumn?: boolean }) {
   if (!games.length) return null;
-  return <section className="mt-10" aria-labelledby="gm-reporting-heading"><div><p className="text-sm font-semibold tracking-[0.2em] text-warning uppercase">GM follow-up</p><h2 id="gm-reporting-heading" className="mt-2 text-2xl font-semibold tracking-tight">Games awaiting completion</h2><p className="mt-2 text-sm text-text-muted">These games have ended but still need Chronicle reporting and completion.</p></div><ul className={`mt-5 grid gap-4 ${singleColumn ? "grid-cols-1" : "sm:grid-cols-2"}`}>{games.map((game) => <li key={game.sessionId}><Link href={`/communities/${encodeURIComponent(game.communitySlug)}/sessions/${encodeURIComponent(game.sessionId)}`} className="block h-full rounded-2xl border border-warning/30 bg-warning/10 p-5 transition hover:border-warning focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand"><span className="block font-semibold text-text-primary">{game.scenarioCode} — {game.scenarioTitle}</span><span className="mt-3 flex"><SessionStatusPill status="published" startsAt={game.startsAt} /></span><span className="mt-3 block text-sm text-text-muted">{game.communityName}</span><time dateTime={game.startsAt.toISOString()} className="mt-1 block text-sm text-text-muted">{formatTime(game)}</time></Link></li>)}</ul></section>;
+  return <section className="mt-10" aria-labelledby="gm-reporting-heading"><div><p className="text-sm font-semibold tracking-[0.2em] text-warning uppercase">GM follow-up</p><h2 id="gm-reporting-heading" className="mt-2 text-2xl font-semibold tracking-tight">Games awaiting completion</h2><p className="mt-2 text-sm text-text-muted">These games have ended but still need Chronicle reporting and completion.</p></div><ul className={`mt-5 grid gap-4 ${singleColumn ? "grid-cols-1" : "sm:grid-cols-2"}`}>{games.map((game) => <li key={game.sessionId}><GameCard href={`/communities/${encodeURIComponent(game.communitySlug)}/sessions/${encodeURIComponent(game.sessionId)}`} scenarioCode={game.scenarioCode} scenarioTitle={game.scenarioTitle} startsAt={game.startsAt} displayTimeZone={game.displayTimeZone} status="published" communityName={game.communityName} relationship="gm" warning="Chronicles and completion are still required." /></li>)}</ul></section>;
 }
 
 export function GmReportingQueueLoading() {

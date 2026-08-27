@@ -120,7 +120,7 @@ describe("community profile", () => {
     />);
 
     expect(markup).toContain('href="/communities/absalom-station/sessions/session-1"');
-    expect(markup).toContain("Confirmed");
+    expect(markup).toContain("Registered");
     expect(markup).toContain("Navasi");
     expect(markup).toContain("border-success/30");
     expect(markup).not.toContain("Published");

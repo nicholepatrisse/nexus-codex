@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { GameCard } from "@/app/game-card";
 
 export type AdministrationMember = {
   id: string;
@@ -17,18 +18,6 @@ export type AdministrationSession = {
   startsAt: Date;
   displayTimeZone: string;
 };
-
-function formatInstant(value: Date, timeZone: string) {
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZoneName: "short",
-  }).format(value);
-}
 
 export function AdministrationOverview({
   slug,
@@ -72,5 +61,5 @@ export function SessionsOverview({ slug, sessions, readOnly = false }: { slug: s
 
 function SessionList({ slug, sessions, empty }: { slug: string; sessions: AdministrationSession[]; empty: string }) {
   if (!sessions.length) return <p className="mt-3 text-sm text-text-muted">{empty}</p>;
-  return <ul className="mt-3 space-y-3">{sessions.map((session) => <li key={session.id} className={`rounded-xl border p-4 ${session.status === "cancelled" ? "border-danger/30 bg-danger/10" : "border-border"}`}><div className="flex flex-wrap items-start justify-between gap-4"><div><p className="font-semibold">{session.code} — {session.title}</p><p className="mt-1 text-sm text-text-muted">{formatInstant(session.startsAt, session.displayTimeZone)} · GM: {session.gmName}</p><span className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-semibold capitalize ${session.status === "cancelled" ? "bg-danger/10 text-danger" : "bg-success/10 text-success"}`}>{session.status}</span></div><div className="flex gap-3"><Link href={`/communities/${encodeURIComponent(slug)}/sessions/${session.id}`} className="text-sm font-semibold text-brand hover:underline">View</Link>{session.status === "draft" ? <Link href={`/communities/${encodeURIComponent(slug)}/sessions/${session.id}/edit`} className="text-sm font-semibold text-brand hover:underline">Edit</Link> : null}</div></div></li>)}</ul>;
+  return <ul className="mt-3 space-y-3">{sessions.map((session) => { const href = `/communities/${encodeURIComponent(slug)}/sessions/${session.id}`; const status = session.status === "draft" || session.status === "completed" || session.status === "cancelled" ? session.status : "published"; return <li key={session.id}><GameCard href={href} scenarioCode={session.code} scenarioTitle={session.title} startsAt={session.startsAt} displayTimeZone={session.displayTimeZone} status={status} gmName={session.gmName} actions={<><Link href={href} className="text-sm font-semibold text-brand hover:underline">View</Link>{session.status === "draft" ? <Link href={`${href}/edit`} className="text-sm font-semibold text-brand hover:underline">Edit</Link> : null}</>} /></li>; })}</ul>;
 }

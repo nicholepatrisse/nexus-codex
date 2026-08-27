@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { AdmissionForm } from "./admission-form";
 import { GmAdmissionForm } from "./gm-admission-form";
-import { SessionStatusPill } from "@/app/session-status-pill";
+import { GameCard } from "@/app/game-card";
 
 export type CommunityProfileProps = Readonly<{
   community: {
@@ -46,16 +46,7 @@ function SessionList({ communitySlug, sessions, isSignedIn }: Readonly<{
   return <ul className="mt-5 space-y-3">{sessions.map((session) => {
     const href = `/communities/${encodeURIComponent(communitySlug)}/sessions/${encodeURIComponent(session.id)}`;
     return <li key={session.id}>
-      <Link href={isSignedIn ? href : `/sign-in?callbackURL=${encodeURIComponent(href)}`} className="block rounded-xl border border-border p-4 transition hover:border-brand focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand">
-        <span className="block">
-          <span><span className="block font-semibold">{session.code} — {session.title}</span><span className="mt-1 block text-sm text-text-muted">{new Date(session.startsAt).toLocaleString()}</span><span className="mt-1 block text-sm text-text-muted">GM: {session.gmName}</span></span>
-          <span className="mt-3 flex flex-wrap gap-2">
-            {session.signupStatus ? <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${session.signupStatus === "waitlisted" ? "border-warning/30 bg-warning/10 text-warning" : "border-success/30 bg-success/10 text-success"}`}>{session.signupStatus === "waitlisted" ? "Waitlisted" : "Confirmed"}</span> : null}
-            {session.signupCharacterName ? <span className="rounded-full border border-info/30 bg-info/10 px-2.5 py-1 text-xs font-semibold text-info">{session.signupCharacterName}</span> : null}
-            <SessionStatusPill status={session.status === "completed" ? "completed" : "published"} startsAt={new Date(session.startsAt)} paizoReportedAt={session.paizoReportedAt} />
-          </span>
-        </span>
-      </Link>
+      <GameCard href={isSignedIn ? href : `/sign-in?callbackURL=${encodeURIComponent(href)}`} scenarioCode={session.code} scenarioTitle={session.title} startsAt={new Date(session.startsAt)} status={session.status === "completed" ? "completed" : session.status === "cancelled" ? "cancelled" : "published"} paizoReportedAt={session.paizoReportedAt} gmName={session.gmName} communityName={undefined} relationship={session.signupStatus === "waitlisted" ? "waitlisted" : session.signupStatus === "confirmed" ? "registered" : null} characterName={session.signupCharacterName} />
     </li>;
   })}</ul>;
 }
@@ -106,7 +97,7 @@ export function CommunityProfile({ community, isOwner, isSignedIn = false, isMem
         ) : null}
         {isMember && !isOwner && gmState ? <section className="mt-8 border-t border-border pt-6"><h2 className="text-lg font-semibold">Game Master access</h2>{gmState === "active" ? <p className="mt-2 text-sm text-success">You’re an approved GM.</p> : gmState === "pending" ? <GmAdmissionForm slug={community.slug} pendingRequestId={pendingGmRequestId} /> : gmState === "revoked" ? <><p className="mt-2 text-sm text-text-muted">Your previous GM access was revoked. It cannot be restored through self-service.</p>{gmAdmission === "approved_only" ? <GmAdmissionForm slug={community.slug} /> : null}</> : gmAdmission === "self_service" ? <p className="mt-2 text-sm text-text-muted">GM access is granted when you create a game that you will GM. There is no separate request.</p> : gmState === "rejected" ? <><p className="mt-2 text-sm text-text-muted">Your previous GM request was not approved. You may submit a new request.</p><GmAdmissionForm slug={community.slug} /></> : <GmAdmissionForm slug={community.slug} />}</section> : null}
       </section>
-      {drafts.length ? <section className="mt-8 rounded-3xl border border-border bg-surface p-8"><h2 className="text-2xl font-semibold">Session drafts</h2><p className="mt-2 text-sm text-text-muted">Drafts are visible only to authorized community staff.</p><ul className="mt-5 space-y-3">{drafts.map((draft) => <li key={draft.id} className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border p-4"><div><div className="flex flex-wrap items-center gap-2"><p className="font-semibold">{draft.code} — {draft.title}</p><span className="rounded-full border border-warning/30 bg-warning/10 px-2.5 py-1 text-xs font-semibold text-warning">Draft</span></div><p className="mt-1 text-sm text-text-muted">{new Date(draft.startsAt).toLocaleString()}</p></div><Link href={`/communities/${encodeURIComponent(community.slug)}/sessions/${draft.id}`} className="rounded-full border border-border-strong px-4 py-2 text-sm font-semibold hover:border-brand">View draft</Link></li>)}</ul></section> : null}
+      {drafts.length ? <section className="mt-8 rounded-3xl border border-border bg-surface p-8"><h2 className="text-2xl font-semibold">Session drafts</h2><p className="mt-2 text-sm text-text-muted">Drafts are visible only to authorized community staff.</p><ul className="mt-5 space-y-3">{drafts.map((draft) => { const href = `/communities/${encodeURIComponent(community.slug)}/sessions/${draft.id}`; return <li key={draft.id}><GameCard href={href} scenarioCode={draft.code} scenarioTitle={draft.title} startsAt={new Date(draft.startsAt)} status="draft" communityName={community.name} actions={<Link href={href} className="rounded-full border border-border-strong px-4 py-2 text-sm font-semibold hover:border-brand">View draft</Link>} /></li>; })}</ul></section> : null}
       {canViewSchedule ? <div className="mt-8 grid gap-8 lg:grid-cols-2"><section className="rounded-3xl border border-border bg-surface p-6 sm:p-8" aria-labelledby="upcoming-sessions-heading"><h2 id="upcoming-sessions-heading" className="text-2xl font-semibold">Upcoming Sessions</h2>{separatedSessions.upcoming.length ? <SessionList communitySlug={community.slug} sessions={separatedSessions.upcoming} isSignedIn={isSignedIn} /> : <p className="mt-4 text-sm text-text-muted">No upcoming sessions are scheduled.</p>}</section><section className="rounded-3xl border border-border bg-surface p-6 sm:p-8" aria-labelledby="past-sessions-heading"><h2 id="past-sessions-heading" className="text-2xl font-semibold">Past Sessions</h2>{separatedSessions.past.length ? <SessionList communitySlug={community.slug} sessions={separatedSessions.past} isSignedIn={isSignedIn} /> : <p className="mt-4 text-sm text-text-muted">No past sessions yet.</p>}</section></div> : null}
     </main>
   );

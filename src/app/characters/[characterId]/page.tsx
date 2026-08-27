@@ -17,21 +17,13 @@ import { listOwnedSales } from "@/character/sales";
 import { sellInventoryAction } from "./sales/actions";
 import { SaleForm } from "./sales/sale-form";
 import { GmCreditBadge } from "@/app/gm-credit-badge";
-
-function formatSessionDate(session: CharacterSession) {
-  return new Intl.DateTimeFormat("en-US", { timeZone: session.displayTimeZone, year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(session.startsAt);
-}
+import { GameCard } from "@/app/game-card";
 
 function SessionList({ sessions, empty }: { sessions: CharacterSession[]; empty: string }) {
   if (!sessions.length) return <p className="mt-3 text-sm text-text-muted">{empty}</p>;
   return <ul className="mt-4 space-y-3">{sessions.map((session) => {
-    const cancelled = session.sessionStatus === "cancelled";
-    const completed = session.sessionStatus === "completed";
     const needsReporting = session.participationType === "gm_credit" && session.sessionStatus === "published" && session.startsAt < new Date();
-    return <li key={session.id}><Link href={`/communities/${encodeURIComponent(session.communitySlug)}/sessions/${session.id}`} className={`block rounded-2xl border p-5 transition focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand ${cancelled ? "border-danger/30 bg-danger/10 hover:border-danger" : "border-border bg-surface-raised hover:border-brand"}`}>
-      <span className="flex items-start justify-between gap-4"><span className="font-semibold text-text-primary">{session.scenarioCode} — {session.scenarioTitle}</span><span className="flex shrink-0 flex-wrap justify-end gap-2">{session.participationType === "gm_credit" ? <span className="rounded-full border border-info/30 bg-info/10 px-2.5 py-1 text-xs font-semibold text-info">GM</span> : null}{session.participationType === "player" && !completed ? <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${session.signupStatus === "waitlisted" ? "border-warning/30 bg-warning/10 text-warning" : session.signupStatus === "cancelled" ? "border-danger/30 bg-danger/10 text-danger" : "border-success/30 bg-success/10 text-success"}`}>{session.signupStatus === "waitlisted" ? "Waitlisted" : session.signupStatus === "cancelled" ? "Cancelled" : "Confirmed"}</span> : null}{completed ? <span className="rounded-full border border-success/30 bg-success/10 px-2.5 py-1 text-xs font-semibold text-success">Completed</span> : null}{cancelled ? <span className="rounded-full border border-danger/30 bg-danger/10 px-2.5 py-1 text-xs font-semibold text-danger">Cancelled</span> : null}{needsReporting ? <span className="rounded-full border border-warning/30 bg-warning/10 px-2.5 py-1 text-xs font-semibold text-warning">Needs reporting</span> : null}</span></span>
-      <span className="mt-3 block text-sm text-text-muted">{session.communityName}</span><time dateTime={session.startsAt.toISOString()} className={`mt-1 block text-sm ${cancelled ? "text-danger line-through" : "text-text-muted"}`}>{formatSessionDate(session)}</time>
-    </Link></li>;
+    return <li key={session.id}><GameCard href={`/communities/${encodeURIComponent(session.communitySlug)}/sessions/${session.id}`} scenarioCode={session.scenarioCode} scenarioTitle={session.scenarioTitle} startsAt={session.startsAt} displayTimeZone={session.displayTimeZone} status={session.sessionStatus} communityName={session.communityName} relationship={session.participationType === "gm_credit" ? "gm" : session.signupStatus === "waitlisted" ? "waitlisted" : session.signupStatus === "confirmed" ? "registered" : null} warning={needsReporting ? "Chronicles and completion are still required." : null} /></li>;
   })}</ul>;
 }
 
