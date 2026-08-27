@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, count, desc, eq, gte, inArray, isNotNull, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, isNotNull, lt, or } from "drizzle-orm";
 import type { AuthenticatedActor } from "@/auth/actor";
 import { resolveCommunityAccessBySlug } from "@/authorization/community-access";
 import { canPerformCommunityOperation, type CommunityRole } from "@/authorization/policy";
@@ -81,6 +81,34 @@ export async function updateOwnSessionSignup(
   });
 }
 
+/** Lets the assigned GM or community owner repair a signup that is missing a character. */
+export async function assignSignupCharacterAsGm(
+  actor: AuthenticatedActor,
+  slug: string,
+  sessionId: string,
+  signupId: string,
+  characterId: string,
+  database: Database = getDb(),
+): Promise<UpdateSessionSignupResult> {
+  return database.transaction(async (transaction) => {
+    const access = await resolveCommunityAccessBySlug(slug, actor.personId, transaction as Database);
+    if (access.status !== "available") return { status: "not-found" };
+    const [session] = await transaction.select({ id: sessions.id, communityId: sessions.communityId, gmPersonId: sessions.gmPersonId, gameSystemId: rulesets.gameSystemId })
+      .from(sessions).innerJoin(contentItems, eq(contentItems.id, sessions.contentItemId)).innerJoin(organizedPlayPrograms, eq(organizedPlayPrograms.id, contentItems.programId)).innerJoin(rulesets, eq(rulesets.id, organizedPlayPrograms.rulesetId))
+      .where(and(eq(sessions.id, sessionId), eq(sessions.communityId, access.community.id), eq(sessions.status, "published"))).limit(1).for("update");
+    if (!session || (!access.roles.includes("owner") && session.gmPersonId !== actor.personId)) return { status: "unavailable" };
+    const [signup] = await transaction.select({ id: sessionSignups.id, personId: sessionSignups.personId }).from(sessionSignups)
+      .where(and(eq(sessionSignups.id, signupId), eq(sessionSignups.sessionId, session.id), eq(sessionSignups.status, "confirmed"))).limit(1).for("update");
+    if (!signup) return { status: "not-found" };
+    const [character] = await transaction.select({ id: characters.id }).from(characters).where(and(eq(characters.id, characterId), eq(characters.personId, signup.personId), eq(characters.gameSystemId, session.gameSystemId))).limit(1);
+    if (!character) return { status: "unavailable" };
+    const now = new Date();
+    await transaction.update(sessionSignups).set({ characterId: character.id, updatedAt: now }).where(eq(sessionSignups.id, signup.id));
+    await transaction.insert(communityAuditEvents).values({ id: randomUUID(), communityId: session.communityId, actorPersonId: actor.personId, eventType: "session.signup.updated", details: { sessionId, signupId, characterId, assignedByGm: true }, occurredAt: now });
+    return { status: "updated", signupId };
+  });
+}
+
 export interface SignedUpGame {
   sessionId: string;
   communityName: string;
@@ -89,11 +117,30 @@ export interface SignedUpGame {
   scenarioTitle: string;
   startsAt: Date;
   displayTimeZone: string;
-  sessionStatus: "published" | "cancelled";
+  sessionStatus: "published" | "completed" | "cancelled";
   participationRole: "gm" | "player";
   signupStatus: "confirmed" | "waitlisted" | null;
   waitlistPosition: number | null;
   characterName?: string | null;
+}
+
+export interface UnreportedGmGame {
+  sessionId: string;
+  communityName: string;
+  communitySlug: string;
+  scenarioCode: string;
+  scenarioTitle: string;
+  startsAt: Date;
+  endsAt: Date;
+  displayTimeZone: string;
+}
+
+/** Published games assigned to this GM whose scheduled end has passed without completion. */
+export async function listUnreportedGmGames(personId: string, now: Date = new Date(), database: Database = getDb()): Promise<UnreportedGmGame[]> {
+  return database.select({ sessionId: sessions.id, communityName: communities.name, communitySlug: communities.slug, scenarioCode: contentItems.code, scenarioTitle: contentItems.title, startsAt: sessions.startsAt, endsAt: sessions.endsAt, displayTimeZone: sessions.displayTimeZone })
+    .from(sessions).innerJoin(communities, eq(communities.id, sessions.communityId)).innerJoin(contentItems, eq(contentItems.id, sessions.contentItemId))
+    .where(and(eq(sessions.gmPersonId, personId), eq(sessions.status, "published"), lt(sessions.endsAt, now), eq(communities.lifecycleStatus, "active")))
+    .orderBy(desc(sessions.endsAt), desc(sessions.id));
 }
 
 /** Upcoming games the person can still open, either as the GM or as a signed-up player. */
@@ -152,6 +199,20 @@ export async function listUpcomingSignedUpGames(
       signupStatus: row.signupStatus,
       participationRole,
     }];
+  });
+}
+
+/** All viewable game history for the person, including completed and overdue GM sessions. */
+export async function listAllSignedUpGames(personId: string, database: Database = getDb()): Promise<SignedUpGame[]> {
+  const rows = await database.select({ sessionId: sessions.id, gmPersonId: sessions.gmPersonId, communityName: communities.name, communitySlug: communities.slug, scenarioCode: contentItems.code, scenarioTitle: contentItems.title, startsAt: sessions.startsAt, displayTimeZone: sessions.displayTimeZone, sessionStatus: sessions.status, signupStatus: sessionSignups.status, waitlistPosition: sessionSignups.waitlistPosition, characterName: characters.name })
+    .from(sessions).leftJoin(sessionSignups, and(eq(sessionSignups.sessionId, sessions.id), eq(sessionSignups.personId, personId), inArray(sessionSignups.status, ["confirmed", "waitlisted"]))).leftJoin(characters, eq(characters.id, sessionSignups.characterId)).innerJoin(communities, eq(communities.id, sessions.communityId)).innerJoin(contentItems, eq(contentItems.id, sessions.contentItemId)).leftJoin(communityMemberships, and(eq(communityMemberships.communityId, communities.id), eq(communityMemberships.personId, personId), eq(communityMemberships.status, "active")))
+    .where(and(or(eq(sessions.gmPersonId, personId), isNotNull(sessionSignups.id)), inArray(sessions.status, ["published", "completed", "cancelled"]), eq(communities.lifecycleStatus, "active"), or(isNotNull(communityMemberships.id), and(eq(communities.visibility, "public"), eq(communities.scheduleVisibility, "public")))))
+    .orderBy(desc(sessions.startsAt), desc(sessions.id));
+  return rows.flatMap((row): SignedUpGame[] => {
+    if (row.sessionStatus !== "published" && row.sessionStatus !== "completed" && row.sessionStatus !== "cancelled") return [];
+    if (row.signupStatus !== null && row.signupStatus !== "confirmed" && row.signupStatus !== "waitlisted") return [];
+    const { gmPersonId, ...game } = row;
+    return [{ ...game, sessionStatus: row.sessionStatus, signupStatus: row.signupStatus, participationRole: gmPersonId === personId ? "gm" : "player" }];
   });
 }
 

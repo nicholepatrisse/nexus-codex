@@ -225,6 +225,20 @@
       "when": 1787776876124,
       "tag": "0031_panoramic_doctor_strange",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1787777821160,
+      "tag": "0032_dusty_triathlon",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1787782307717,
+      "tag": "0033_apply_completed_nexus_chronicles",
+      "breakpoints": true
     }
   ]
 }

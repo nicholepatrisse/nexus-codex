@@ -12,6 +12,7 @@ import {
 } from "@/session/session-drafts";
 import { publishSession } from "@/session/publish-session";
 import { cancelPublishedSession, updatePublishedSession } from "@/session/published-session";
+import { completeSession, saveSessionCharacterNotes } from "@/session/complete-session";
 
 export type SessionDraftFormState = {
   fieldErrors?: Record<string, string[] | undefined>;
@@ -29,6 +30,41 @@ export type SessionDraftFormState = {
 
 export type PublishSessionState = { error?: string };
 export type CancelSessionState = { error?: string };
+export type CompleteSessionState = { error?: string; saved?: boolean };
+
+function characterNotes(formData: FormData) {
+  return formData.getAll("characterId").map((value) => {
+    const characterId = String(value);
+    const number = (field: string) => Number(formData.get(`${field}:${characterId}`));
+    return { characterId, characterLevel: number("characterLevel"), advancementSpeed: formData.get(`advancementSpeed:${characterId}`) === "slow" ? "slow" as const : "standard" as const, xp: number("xp"), creditsMinor: number("creditsMinor"), reputation: number("reputation"), downtime: number("downtime"), gmNotes: String(formData.get(`note:${characterId}`) ?? "").trim().slice(0, 5000) };
+  });
+}
+
+export async function completeSessionAction(slug: string, sessionId: string, _previous: CompleteSessionState, formData: FormData): Promise<CompleteSessionState> {
+  try {
+    const result = await completeSession(await requireAuthenticatedActor(), slug, sessionId, characterNotes(formData));
+    if (result.status === "forbidden") return { error: "You no longer have permission to complete this session." };
+    if (result.status !== "completed") return { error: "This session can no longer be completed." };
+    revalidatePath(`/communities/${slug}`);
+    revalidatePath(`/communities/${slug}/sessions/${sessionId}`);
+  } catch (error) {
+    if (error instanceof AuthenticationRequiredError) return { error: "Your session expired. Sign in and try again." };
+    return { error: "The session could not be completed. Please try again." };
+  }
+  redirect(`/communities/${encodeURIComponent(slug)}/sessions/${sessionId}?completed=1`);
+}
+
+export async function saveSessionNotesAction(slug: string, sessionId: string, _previous: CompleteSessionState, formData: FormData): Promise<CompleteSessionState> {
+  try {
+    const result = await saveSessionCharacterNotes(await requireAuthenticatedActor(), slug, sessionId, characterNotes(formData));
+    if (result.status !== "updated") return { error: "You no longer have permission to update these Chronicles." };
+    revalidatePath(`/communities/${slug}/sessions/${sessionId}`);
+    return { saved: true };
+  } catch (error) {
+    if (error instanceof AuthenticationRequiredError) return { error: "Your session expired. Sign in and try again." };
+    return { error: "The Chronicles could not be saved. Please try again." };
+  }
+}
 
 function submittedValues(formData: FormData): NonNullable<SessionDraftFormState["values"]> {
   const value = (name: string) => String(formData.get(name) ?? "");

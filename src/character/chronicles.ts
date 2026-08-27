@@ -63,7 +63,7 @@ export async function createManualChronicle(actor: AuthenticatedActor, character
 }
 
 export async function getEditableManualChronicle(actor: AuthenticatedActor, characterId: string, chronicleId: string, database: Database = getDb()) {
-  const [row] = await database.select().from(chronicles).innerJoin(characters, eq(characters.id, chronicles.characterId)).where(and(eq(chronicles.id, chronicleId), eq(chronicles.characterId, characterId), isNull(chronicles.sessionId), eq(characters.personId, actor.personId))).limit(1);
+  const [row] = await database.select().from(chronicles).innerJoin(characters, eq(characters.id, chronicles.characterId)).where(and(eq(chronicles.id, chronicleId), eq(chronicles.characterId, characterId), eq(chronicles.provenance, "manual"), isNull(chronicles.sessionId), eq(characters.personId, actor.personId))).limit(1);
   return row?.chronicles ?? null;
 }
 
@@ -73,7 +73,7 @@ export async function updateManualChronicle(actor: AuthenticatedActor, character
   if (!editable) return null;
   const snapshot = await catalogSnapshot(input.contentItemId, input.scenarioNumber, input.scenarioName, database);
   return database.transaction(async (transaction) => {
-    const [updated] = await transaction.update(chronicles).set({ ...snapshot, playedOn: input.datePlayed, characterLevel: input.characterLevel, advancementSpeed: input.advancementSpeed, xp: input.xp, creditsMinor: input.creditsMinor, reputation: input.reputation, downtime: input.downtime, playerNotes: input.playerNotes, updatedAt: new Date() }).where(and(eq(chronicles.id, chronicleId), eq(chronicles.characterId, characterId), isNull(chronicles.sessionId))).returning();
+    const [updated] = await transaction.update(chronicles).set({ ...snapshot, playedOn: input.datePlayed, characterLevel: input.characterLevel, advancementSpeed: input.advancementSpeed, xp: input.xp, creditsMinor: input.creditsMinor, reputation: input.reputation, downtime: input.downtime, playerNotes: input.playerNotes, updatedAt: new Date() }).where(and(eq(chronicles.id, chronicleId), eq(chronicles.characterId, characterId), eq(chronicles.provenance, "manual"), isNull(chronicles.sessionId))).returning();
     if (!updated) return null;
     const creditDelta = updated.status === "applied" ? updated.creditsMinor - editable.creditsMinor : 0;
     if (creditDelta !== 0) await transaction.insert(characterCreditLedgerEntries).values({ id: randomUUID(), characterId, amountMinor: creditDelta, displayScale: 1, type: "adjustment", effectiveOn: updated.playedOn, source: "chronicle_correction", sourceChronicleId: chronicleId, notes: `Corrected ${updated.scenarioNumberSnapshot} — ${updated.scenarioNameSnapshot}` });
@@ -86,7 +86,7 @@ export async function deleteManualChronicle(actor: AuthenticatedActor, character
   if (!editable) return false;
   const [posted] = await database.select({ id: characterCreditLedgerEntries.id }).from(characterCreditLedgerEntries).where(eq(characterCreditLedgerEntries.sourceChronicleId, chronicleId)).limit(1);
   if (posted) return false;
-  const deleted = await database.delete(chronicles).where(and(eq(chronicles.id, chronicleId), eq(chronicles.characterId, characterId), isNull(chronicles.sessionId), eq(chronicles.status, "pending"))).returning({ id: chronicles.id });
+  const deleted = await database.delete(chronicles).where(and(eq(chronicles.id, chronicleId), eq(chronicles.characterId, characterId), eq(chronicles.provenance, "manual"), isNull(chronicles.sessionId), eq(chronicles.status, "pending"))).returning({ id: chronicles.id });
   return deleted.length === 1;
 }
 

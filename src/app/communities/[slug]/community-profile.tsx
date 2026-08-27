@@ -17,7 +17,7 @@ export type CommunityProfileProps = Readonly<{
   gmState?: "eligible" | "pending" | "active" | "rejected" | "revoked";
   pendingGmRequestId?: string;
   drafts?: { id: string; code: string; title: string; startsAt: string; gmPersonId: string }[];
-  sessions?: { id: string; code: string; title: string; startsAt: string; gmName: string; canSignUp?: boolean; signupStatus?: "confirmed" | "waitlisted"; signupCharacterId?: string; signupCharacterName?: string; eligibleCharacters?: { id: string; name: string; societyNumber: string; currentLevel: number }[] }[];
+  sessions?: { id: string; code: string; title: string; startsAt: string; gmName: string; status?: string; canSignUp?: boolean; signupStatus?: "confirmed" | "waitlisted"; signupCharacterId?: string; signupCharacterName?: string; eligibleCharacters?: { id: string; name: string; societyNumber: string; currentLevel: number }[] }[];
   canViewSchedule?: boolean;
   now?: string;
   published?: boolean;
@@ -29,9 +29,9 @@ export function separateSessions(sessions: CommunitySession[], now: string) {
   const boundary = new Date(now).getTime();
   const chronological = (left: CommunitySession, right: CommunitySession) =>
     new Date(left.startsAt).getTime() - new Date(right.startsAt).getTime();
-  const upcoming = sessions.filter((session) => new Date(session.startsAt).getTime() >= boundary)
+  const upcoming = sessions.filter((session) => session.status !== "completed" && new Date(session.startsAt).getTime() >= boundary)
     .sort(chronological);
-  const past = sessions.filter((session) => new Date(session.startsAt).getTime() < boundary)
+  const past = sessions.filter((session) => session.status === "completed" || new Date(session.startsAt).getTime() < boundary)
     .sort((left, right) => chronological(right, left));
 
   return { upcoming, past };
@@ -51,6 +51,7 @@ function SessionList({ communitySlug, sessions, isSignedIn }: Readonly<{
           <span className="flex shrink-0 flex-wrap justify-end gap-2">
             {session.signupStatus ? <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${session.signupStatus === "waitlisted" ? "border-warning/30 bg-warning/10 text-warning" : "border-success/30 bg-success/10 text-success"}`}>{session.signupStatus === "waitlisted" ? "Waitlisted" : "Confirmed"}</span> : null}
             {session.signupCharacterName ? <span className="rounded-full border border-info/30 bg-info/10 px-2.5 py-1 text-xs font-semibold text-info">{session.signupCharacterName}</span> : null}
+            {session.status === "completed" ? <span className="rounded-full border border-success/30 bg-success/10 px-2.5 py-1 text-xs font-semibold text-success">Completed</span> : null}
           </span>
         </span>
       </Link>
