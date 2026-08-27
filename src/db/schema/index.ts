@@ -591,6 +591,35 @@ export const chronicles = pgTable(
   ],
 );
 
+/** Immutable acquisition history. Inventory may later disappear, but this record remains. */
+export const characterPurchases = pgTable(
+  "character_purchases",
+  {
+    id: text("id").primaryKey(),
+    characterId: text("character_id").notNull().references(() => characters.id, { onDelete: "cascade" }),
+    contentItemId: text("content_item_id").references(() => contentItems.id, { onDelete: "set null" }),
+    itemNameSnapshot: text("item_name_snapshot").notNull(),
+    itemLinkSnapshot: text("item_link_snapshot"),
+    quantity: integer("quantity").notNull(),
+    acquiredOn: date("acquired_on", { mode: "string" }).notNull(),
+    unitPriceMinor: integer("unit_price_minor").notNull(),
+    totalPriceMinor: integer("total_price_minor").notNull(),
+    idempotencyKey: text("idempotency_key").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("character_purchases_character_acquired_idx").on(table.characterId, table.acquiredOn, table.createdAt),
+    index("character_purchases_content_item_idx").on(table.contentItemId),
+    uniqueIndex("character_purchases_character_idempotency_unique").on(table.characterId, table.idempotencyKey),
+    check("character_purchases_name_check", sql`length(btrim(${table.itemNameSnapshot})) between 1 and 200`),
+    check("character_purchases_link_length_check", sql`${table.itemLinkSnapshot} is null or length(${table.itemLinkSnapshot}) <= 2000`),
+    check("character_purchases_quantity_check", sql`${table.quantity} > 0`),
+    check("character_purchases_unit_price_check", sql`${table.unitPriceMinor} > 0`),
+    check("character_purchases_total_price_check", sql`${table.totalPriceMinor} > 0 and ${table.totalPriceMinor} = ${table.unitPriceMinor} * ${table.quantity}`),
+    check("character_purchases_idempotency_key_check", sql`length(btrim(${table.idempotencyKey})) between 1 and 200`),
+  ],
+);
+
 /** Append-only, exact-value financial history. Posted rows are never updated or deleted. */
 export const characterCreditLedgerEntries = pgTable(
   "character_credit_ledger_entries",
@@ -605,6 +634,7 @@ export const characterCreditLedgerEntries = pgTable(
     effectiveOn: date("effective_on", { mode: "string" }).notNull(),
     source: text("source").notNull(),
     sourceChronicleId: text("source_chronicle_id").references(() => chronicles.id, { onDelete: "set null" }),
+    sourcePurchaseId: text("source_purchase_id").references(() => characterPurchases.id, { onDelete: "restrict" }),
     reversesEntryId: text("reverses_entry_id"),
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
@@ -613,12 +643,13 @@ export const characterCreditLedgerEntries = pgTable(
     index("credit_ledger_character_effective_created_id_idx").on(table.characterId, table.effectiveOn, table.createdAt, table.id),
     uniqueIndex("credit_ledger_chronicle_reward_unique").on(table.sourceChronicleId).where(sql`${table.type} = 'chronicle_reward'`),
     uniqueIndex("credit_ledger_starting_credits_unique").on(table.characterId).where(sql`${table.type} = 'starting_credits'`),
+    uniqueIndex("credit_ledger_purchase_unique").on(table.sourcePurchaseId).where(sql`${table.type} = 'purchase'`),
     foreignKey({ columns: [table.reversesEntryId], foreignColumns: [table.id], name: "credit_ledger_reverses_entry_fk" }).onDelete("restrict"),
     check("credit_ledger_amount_nonzero_check", sql`${table.amountMinor} <> 0 or ${table.type} in ('starting_credits', 'chronicle_reward')`),
     check("credit_ledger_display_scale_check", sql`${table.displayScale} = 1`),
-    check("credit_ledger_type_check", sql`${table.type} in ('starting_credits', 'chronicle_reward', 'adjustment')`),
-    check("credit_ledger_source_check", sql`${table.source} in ('character_creation', 'chronicle', 'owner_adjustment', 'chronicle_reversal', 'chronicle_correction')`),
-    check("credit_ledger_source_relationship_check", sql`coalesce((${table.type} = 'chronicle_reward' and ${table.sourceChronicleId} is not null and ${table.reversesEntryId} is null) or (${table.type} = 'starting_credits' and ${table.sourceChronicleId} is null and ${table.reversesEntryId} is null) or (${table.type} = 'adjustment'), false)`),
+    check("credit_ledger_type_check", sql`${table.type} in ('starting_credits', 'chronicle_reward', 'adjustment', 'purchase')`),
+    check("credit_ledger_source_check", sql`${table.source} in ('character_creation', 'chronicle', 'owner_adjustment', 'chronicle_reversal', 'chronicle_correction', 'purchase')`),
+    check("credit_ledger_source_relationship_check", sql`coalesce((${table.type} = 'chronicle_reward' and ${table.sourceChronicleId} is not null and ${table.sourcePurchaseId} is null and ${table.reversesEntryId} is null) or (${table.type} = 'starting_credits' and ${table.sourceChronicleId} is null and ${table.sourcePurchaseId} is null and ${table.reversesEntryId} is null) or (${table.type} = 'purchase' and ${table.sourcePurchaseId} is not null and ${table.sourceChronicleId} is null and ${table.reversesEntryId} is null and ${table.amountMinor} < 0) or (${table.type} = 'adjustment' and ${table.sourcePurchaseId} is null), false)`),
     check("credit_ledger_notes_length_check", sql`${table.notes} is null or length(${table.notes}) <= 1000`),
   ],
 );
@@ -639,6 +670,7 @@ export const characterInventoryEntries = pgTable(
     acquiredOn: date("acquired_on", { mode: "string" }).notNull(),
     amountPaidMinor: integer("amount_paid_minor"),
     sourceChronicleId: text("source_chronicle_id").references(() => chronicles.id, { onDelete: "set null" }),
+    sourcePurchaseId: text("source_purchase_id").references(() => characterPurchases.id, { onDelete: "restrict" }),
     notes: text("notes"),
     /** Stable provenance identity keeps otherwise-similar cost/source lots distinct. */
     lotKey: text("lot_key").notNull(),
@@ -649,6 +681,7 @@ export const characterInventoryEntries = pgTable(
     index("character_inventory_character_acquired_idx").on(table.characterId, table.acquiredOn, table.createdAt),
     index("character_inventory_content_item_idx").on(table.contentItemId),
     index("character_inventory_source_chronicle_idx").on(table.sourceChronicleId),
+    uniqueIndex("character_inventory_source_purchase_unique").on(table.sourcePurchaseId).where(sql`${table.sourcePurchaseId} is not null`),
     uniqueIndex("character_inventory_character_lot_unique").on(table.characterId, table.lotKey),
     check("character_inventory_name_check", sql`length(btrim(${table.itemNameSnapshot})) between 1 and 200`),
     check("character_inventory_link_length_check", sql`${table.itemLinkSnapshot} is null or length(${table.itemLinkSnapshot}) <= 2000`),
