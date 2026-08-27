@@ -3,7 +3,7 @@ import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { AuthenticatedActor } from "@/auth/actor";
 import { getDb } from "@/db/client";
-import { characterCreditLedgerEntries, characters, chronicles, contentItems } from "@/db/schema";
+import { characterCreditLedgerEntries, characters, chronicles, contentItems, sessionGmCredits } from "@/db/schema";
 import { calculateEarnIncome, totalChronicleCredits } from "@/character/sfs2-chronicle-rewards";
 
 type Database = ReturnType<typeof getDb>;
@@ -53,6 +53,7 @@ export const chronicleLifecycleSchema = z.discriminatedUnion("status", [
   z.object({ status: z.literal("applied"), appliedAt: z.date() }),
 ]);
 export type Chronicle = typeof chronicles.$inferSelect;
+export type ChronicleWithGmCredit = Chronicle & { isGmCredit: boolean };
 export const totalCredits = (chronicle: Pick<Chronicle, "baseCreditsMinor" | "downtimeCreditsMinor">) => totalChronicleCredits(chronicle.baseCreditsMinor, chronicle.downtimeCreditsMinor);
 
 /** Allocates a stable, per-character Chronicle sequence number under a transaction lock. */
@@ -72,13 +73,19 @@ function rewardSnapshot(input: z.output<typeof manualChronicleInputSchema>) {
   return { baseCreditsMinor: input.baseCreditsMinor, downtimeDays, downtimeDisposition: input.downtimeDisposition, downtimeEntryMethod: input.downtimeEntryMethod, downtimeCheckTotal: earned ? input.downtimeCheckTotal ?? null : null, downtimeProficiency: earned ? input.downtimeProficiency ?? null : null, downtimeDc: earned?.dc ?? null, downtimeDegree: earned?.degree ?? null, downtimeCalculatedCreditsMinor: earned?.calculatedCreditsMinor ?? null, downtimeSheetCreditsMinor: sheetCredits, downtimeOverrideCreditsMinor: input.downtimeOverrideCreditsMinor ?? null, downtimeCreditsMinor: input.downtimeOverrideCreditsMinor ?? sheetCredits ?? earned?.calculatedCreditsMinor ?? 0, downtimeCorrectionNote: input.downtimeCorrectionNote, downtimeActivity: input.downtimeActivity };
 }
 
-export async function listChronicles(characterId: string, database: Database = getDb()): Promise<Chronicle[]> {
-  return database.select().from(chronicles).where(eq(chronicles.characterId, characterId)).orderBy(desc(chronicles.playedOn), desc(chronicles.id));
+export async function listChronicles(characterId: string, database: Database = getDb()): Promise<ChronicleWithGmCredit[]> {
+  const rows = await database.select({ chronicle: chronicles, gmCreditId: sessionGmCredits.id })
+    .from(chronicles)
+    .leftJoin(sessionGmCredits, and(eq(sessionGmCredits.sessionId, chronicles.sessionId), eq(sessionGmCredits.characterId, chronicles.characterId)))
+    .where(eq(chronicles.characterId, characterId))
+    .orderBy(desc(chronicles.playedOn), desc(chronicles.id));
+  return rows.map(({ chronicle, gmCreditId }) => ({ ...chronicle, isGmCredit: gmCreditId !== null }));
 }
 
 export async function listUnappliedChronicles(personId: string, database: Database = getDb()) {
-  return database.select({ id: chronicles.id, characterId: chronicles.characterId, characterName: characters.name, scenarioNumber: chronicles.scenarioNumberSnapshot, scenarioName: chronicles.scenarioNameSnapshot, playedOn: chronicles.playedOn, characterLevel: chronicles.characterLevel, xp: chronicles.xp, provenance: chronicles.provenance })
+  return database.select({ id: chronicles.id, characterId: chronicles.characterId, characterName: characters.name, scenarioNumber: chronicles.scenarioNumberSnapshot, scenarioName: chronicles.scenarioNameSnapshot, playedOn: chronicles.playedOn, characterLevel: chronicles.characterLevel, xp: chronicles.xp, provenance: chronicles.provenance, isGmCredit: sql<boolean>`${sessionGmCredits.id} is not null` })
     .from(chronicles).innerJoin(characters, eq(characters.id, chronicles.characterId))
+    .leftJoin(sessionGmCredits, and(eq(sessionGmCredits.sessionId, chronicles.sessionId), eq(sessionGmCredits.characterId, chronicles.characterId)))
     .where(and(eq(characters.personId, personId), eq(chronicles.status, "pending")))
     .orderBy(desc(chronicles.playedOn), desc(chronicles.createdAt), desc(chronicles.id));
 }
