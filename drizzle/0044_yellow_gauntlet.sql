@@ -1,0 +1,4 @@
+ALTER TABLE "sessions" ADD COLUMN "paizo_reported_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "sessions" ADD COLUMN "paizo_reported_by_person_id" text;--> statement-breakpoint
+ALTER TABLE "sessions" ADD CONSTRAINT "sessions_paizo_reported_by_person_id_people_id_fk" FOREIGN KEY ("paizo_reported_by_person_id") REFERENCES "public"."people"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "sessions" ADD CONSTRAINT "sessions_paizo_reporting_check" CHECK (("sessions"."paizo_reported_at" is null) = ("sessions"."paizo_reported_by_person_id" is null));

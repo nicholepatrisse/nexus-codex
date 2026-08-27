@@ -11,6 +11,7 @@ import {
   text,
   timestamp,
   uniqueIndex,
+  customType,
 } from "drizzle-orm/pg-core";
 import { SUPPORTED_GAME_SYSTEM } from "@/game-system/config";
 import { sql } from "drizzle-orm";
@@ -459,6 +460,8 @@ export const sessions = pgTable(
     updatedByPersonId: text("updated_by_person_id")
       .notNull()
       .references(() => people.id, { onDelete: "restrict" }),
+    paizoReportedAt: timestamp("paizo_reported_at", { withTimezone: true, mode: "date" }),
+    paizoReportedByPersonId: text("paizo_reported_by_person_id").references(() => people.id, { onDelete: "restrict" }),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
       .notNull()
       .defaultNow(),
@@ -488,6 +491,7 @@ export const sessions = pgTable(
     check("sessions_capacity_check", sql`${table.playerCapacity} = 6`),
     check("sessions_notes_length_check", sql`${table.notes} is null or length(${table.notes}) <= 4000`),
     check("sessions_location_type_check", sql`${table.locationType} in ('virtual', 'physical')`),
+    check("sessions_paizo_reporting_check", sql`(${table.paizoReportedAt} is null) = (${table.paizoReportedByPersonId} is null)`),
   ],
 );
 
@@ -614,6 +618,31 @@ export const chronicles = pgTable(
     check("chronicles_metadata_lengths_check", sql`(${table.chronicleNumber} is null or length(${table.chronicleNumber}) <= 100) and (${table.partnerCode} is null or length(${table.partnerCode}) <= 100) and (${table.eventName} is null or length(${table.eventName}) <= 200) and (${table.eventCode} is null or length(${table.eventCode}) <= 100) and (${table.gmOrganizedPlayId} is null or length(${table.gmOrganizedPlayId}) <= 100)`),
     check("chronicles_player_notes_length_check", sql`${table.playerNotes} is null or length(${table.playerNotes}) <= 5000`),
     check("chronicles_gm_notes_length_check", sql`${table.gmNotes} is null or length(${table.gmNotes}) <= 5000`),
+  ],
+);
+
+const bytea = customType<{ data: Buffer }>({ dataType() { return "bytea"; } });
+
+/** Auditable copies of official sheets issued by a GM. Replaced rows remain as history. */
+export const chronicleSheetAttachments = pgTable(
+  "chronicle_sheet_attachments",
+  {
+    id: text("id").primaryKey(),
+    chronicleId: text("chronicle_id").notNull().references(() => chronicles.id, { onDelete: "restrict" }),
+    originalFilename: text("original_filename").notNull(),
+    contentType: text("content_type").notNull(),
+    byteSize: integer("byte_size").notNull(),
+    contents: bytea("contents").notNull(),
+    uploadedByPersonId: text("uploaded_by_person_id").notNull().references(() => people.id, { onDelete: "restrict" }),
+    uploadedAt: timestamp("uploaded_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    isCurrent: boolean("is_current").notNull().default(true),
+  },
+  (table) => [
+    index("chronicle_sheet_attachments_chronicle_idx").on(table.chronicleId, table.uploadedAt),
+    uniqueIndex("chronicle_sheet_attachments_current_unique").on(table.chronicleId).where(sql`${table.isCurrent}`),
+    check("chronicle_sheet_attachments_filename_check", sql`length(btrim(${table.originalFilename})) between 1 and 255`),
+    check("chronicle_sheet_attachments_content_type_check", sql`${table.contentType} in ('application/pdf', 'image/png', 'image/jpeg')`),
+    check("chronicle_sheet_attachments_size_check", sql`${table.byteSize} between 1 and 10485760`),
   ],
 );
 

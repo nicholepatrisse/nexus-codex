@@ -302,6 +302,20 @@
       "when": 1787847018225,
       "tag": "0042_good_bishop",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1787853361077,
+      "tag": "0043_omniscient_selene",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1787855545126,
+      "tag": "0044_yellow_gauntlet",
+      "breakpoints": true
     }
   ]
 }

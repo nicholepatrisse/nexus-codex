@@ -4,7 +4,7 @@ import type { AuthenticatedActor } from "@/auth/actor";
 import { resolveCommunityAccessBySlug } from "@/authorization/community-access";
 import { getCharacterProgressions } from "@/character/characters";
 import { getDb } from "@/db/client";
-import { characterCreditLedgerEntries, characters, chronicles, communities, communityAuditEvents, contentItems, people, sessionGmCredits, sessionSignups, sessions } from "@/db/schema";
+import { characterCreditLedgerEntries, characters, chronicleSheetAttachments, chronicles, communities, communityAuditEvents, contentItems, people, sessionGmCredits, sessionSignups, sessions } from "@/db/schema";
 import { calculateEarnIncome, totalChronicleCredits } from "@/character/sfs2-chronicle-rewards";
 
 export type SessionChronicleInput = { characterId: string; characterLevel: number; advancementSpeed: "standard" | "slow"; xp: number; baseCreditsMinor: number; downtimeDisposition: "earn_income" | "other" | "declined"; downtimeCheckTotal: number | null; downtimeProficiency: "trained" | "expert" | "master" | null; downtimeOverrideCreditsMinor: number | null; downtimeCorrectionNote: string; downtimeActivity: string; partnerCode: string; eventName: string; eventCode: string; gmOrganizedPlayId: string; gmNotes: string };
@@ -80,15 +80,38 @@ export async function saveSessionCharacterNotes(actor: AuthenticatedActor, slug:
   });
 }
 
-export async function completeSession(actor: AuthenticatedActor, slug: string, sessionId: string, notes: SessionChronicleInput[], database: Database = getDb()) {
+export async function saveSessionReporting(actor: AuthenticatedActor, slug: string, sessionId: string, notes: SessionChronicleInput[], database: Database = getDb()) {
   return database.transaction(async (transaction) => {
     const authorization = await authorize(actor, slug, sessionId, transaction as Database);
     if (authorization.status !== "authorized") return authorization;
     if (authorization.session.status !== "published") return { status: authorization.session.status === "completed" ? "completed" as const : "unavailable" as const };
     if (!await upsertChronicles(authorization.session, notes, transaction as Database)) return { status: "invalid-character" as const };
+    return { status: "saved" as const };
+  });
+}
+
+export async function completeSession(actor: AuthenticatedActor, slug: string, sessionId: string, database: Database = getDb()) {
+  return database.transaction(async (transaction) => {
+    const authorization = await authorize(actor, slug, sessionId, transaction as Database);
+    if (authorization.status !== "authorized") return authorization;
+    if (authorization.session.status !== "published") return { status: authorization.session.status === "completed" ? "completed" as const : "unavailable" as const };
+    const required = await transaction.select({ id: chronicles.id }).from(chronicles).where(and(eq(chronicles.sessionId, sessionId), eq(chronicles.provenance, "nexus")));
+    if (!required.length) return { status: "reporting-required" as const };
+    const attached = await transaction.select({ chronicleId: chronicleSheetAttachments.chronicleId }).from(chronicleSheetAttachments).where(and(eq(chronicleSheetAttachments.isCurrent, true)));
+    const attachedIds = new Set(attached.map(({ chronicleId }) => chronicleId));
+    if (required.some(({ id }) => !attachedIds.has(id))) return { status: "attachments-required" as const };
     const now = new Date();
     await transaction.update(sessions).set({ status: "completed", updatedByPersonId: actor.personId, updatedAt: now }).where(and(eq(sessions.id, sessionId), eq(sessions.status, "published")));
     await transaction.insert(communityAuditEvents).values({ id: randomUUID(), communityId: authorization.access.community.id, actorPersonId: actor.personId, eventType: "session.completed", details: { sessionId }, occurredAt: now });
     return { status: "completed" as const };
   });
+}
+
+export async function markSessionReportedToPaizo(actor: AuthenticatedActor, slug: string, sessionId: string, database: Database = getDb()) {
+  const authorization = await authorize(actor, slug, sessionId, database);
+  if (authorization.status !== "authorized") return authorization;
+  if (authorization.session.status !== "completed") return { status: "unavailable" as const };
+  const now = new Date();
+  await database.update(sessions).set({ paizoReportedAt: now, paizoReportedByPersonId: actor.personId, updatedByPersonId: actor.personId, updatedAt: now }).where(and(eq(sessions.id, sessionId), eq(sessions.status, "completed")));
+  return { status: "reported" as const, reportedAt: now };
 }

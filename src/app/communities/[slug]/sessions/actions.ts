@@ -12,7 +12,8 @@ import {
 } from "@/session/session-drafts";
 import { publishSession } from "@/session/publish-session";
 import { cancelPublishedSession, updatePublishedSession } from "@/session/published-session";
-import { completeSession, saveSessionCharacterNotes } from "@/session/complete-session";
+import { completeSession, markSessionReportedToPaizo, saveSessionCharacterNotes, saveSessionReporting } from "@/session/complete-session";
+import { attachChronicleSheet } from "@/session/chronicle-sheets";
 
 export type SessionDraftFormState = {
   fieldErrors?: Record<string, string[] | undefined>;
@@ -37,25 +38,48 @@ function characterNotes(formData: FormData) {
     const characterId = String(value);
     const number = (field: string) => Number(formData.get(`${field}:${characterId}`));
     const optionalNumber = (field: string) => formData.get(`${field}:${characterId}`) === "" ? null : number(field);
-    const text = (field: string, max = 200) => String(formData.get(`${field}:${characterId}`) ?? "").trim().slice(0, max);
+    const text = (field: string, max = 200) => String(formData.get(`${field}:${characterId}`) ?? formData.get(field) ?? "").trim().slice(0, max);
     const disposition = formData.get(`downtimeDisposition:${characterId}`) as "earn_income" | "other" | "declined" | null;
     const proficiency = formData.get(`downtimeProficiency:${characterId}`) as "trained" | "expert" | "master" | null;
-    return { characterId, characterLevel: number("characterLevel"), advancementSpeed: formData.get(`advancementSpeed:${characterId}`) === "slow" ? "slow" as const : "standard" as const, xp: number("xp"), baseCreditsMinor: number("baseCreditsMinor"), downtimeDisposition: disposition === "earn_income" || disposition === "other" ? disposition : "declined" as const, downtimeCheckTotal: optionalNumber("downtimeCheckTotal"), downtimeProficiency: proficiency === "trained" || proficiency === "expert" || proficiency === "master" ? proficiency : null, downtimeOverrideCreditsMinor: optionalNumber("downtimeOverrideCreditsMinor"), downtimeCorrectionNote: text("downtimeCorrectionNote", 1000), downtimeActivity: text("downtimeActivity"), partnerCode: text("partnerCode", 100), eventName: text("eventName"), eventCode: text("eventCode", 100), gmOrganizedPlayId: text("gmOrganizedPlayId", 100), gmNotes: text("note", 5000) };
+    return { characterId, characterLevel: number("characterLevel"), advancementSpeed: formData.get(`advancementSpeed:${characterId}`) === "slow" ? "slow" as const : "standard" as const, xp: number("xp"), baseCreditsMinor: number("baseCreditsMinor"), downtimeDisposition: disposition === "earn_income" || disposition === "other" ? disposition : "declined" as const, downtimeCheckTotal: optionalNumber("downtimeCheckTotal"), downtimeProficiency: proficiency === "trained" || proficiency === "expert" || proficiency === "master" ? proficiency : null, downtimeOverrideCreditsMinor: optionalNumber("downtimeOverrideCreditsMinor"), downtimeCorrectionNote: text("downtimeCorrectionNote", 1000), downtimeActivity: text("downtimeActivity"), partnerCode: text("partnerCode", 100), eventName: text("eventName"), eventCode: text("eventCode", 100).replaceAll(",", ""), gmOrganizedPlayId: text("gmOrganizedPlayId", 100), gmNotes: text("note", 5000) };
   });
 }
 
 export async function completeSessionAction(slug: string, sessionId: string, _previous: CompleteSessionState, formData: FormData): Promise<CompleteSessionState> {
   try {
-    const result = await completeSession(await requireAuthenticatedActor(), slug, sessionId, characterNotes(formData));
-    if (result.status === "forbidden") return { error: "You no longer have permission to complete this session." };
-    if (result.status !== "completed") return { error: "This session can no longer be completed." };
+    const result = await saveSessionReporting(await requireAuthenticatedActor(), slug, sessionId, characterNotes(formData));
+    if (result.status === "forbidden") return { error: "You no longer have permission to save reporting." };
+    if (result.status !== "saved") return { error: "This reporting can no longer be saved." };
     revalidatePath(`/communities/${slug}`);
     revalidatePath(`/communities/${slug}/sessions/${sessionId}`);
   } catch (error) {
     if (error instanceof AuthenticationRequiredError) return { error: "Your session expired. Sign in and try again." };
-    return { error: "The session could not be completed. Please try again." };
+    return { error: "The reporting could not be saved. Please try again." };
   }
+  redirect(`/communities/${encodeURIComponent(slug)}/sessions/${sessionId}?reporting=saved`);
+}
+
+export async function attachChronicleSheetAction(slug: string, sessionId: string, chronicleId: string, formData: FormData) {
+  const file = formData.get("sheet");
+  if (!(file instanceof File)) return;
+  await attachChronicleSheet(await requireAuthenticatedActor(), slug, sessionId, chronicleId, file);
+  revalidatePath(`/communities/${slug}/sessions/${sessionId}`);
+}
+
+export async function finalizeSessionAction(slug: string, sessionId: string) {
+  const result = await completeSession(await requireAuthenticatedActor(), slug, sessionId);
+  if (result.status !== "completed") return;
+  revalidatePath(`/communities/${slug}`);
   redirect(`/communities/${encodeURIComponent(slug)}/sessions/${sessionId}?completed=1`);
+}
+
+export async function markSessionReportedToPaizoAction(slug: string, sessionId: string) {
+  const result = await markSessionReportedToPaizo(await requireAuthenticatedActor(), slug, sessionId);
+  if (result.status !== "reported") return;
+  revalidatePath("/");
+  revalidatePath("/games");
+  revalidatePath(`/communities/${slug}`);
+  revalidatePath(`/communities/${slug}/sessions/${sessionId}`);
 }
 
 export async function saveSessionNotesAction(slug: string, sessionId: string, _previous: CompleteSessionState, formData: FormData): Promise<CompleteSessionState> {

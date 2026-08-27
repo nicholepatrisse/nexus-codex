@@ -122,6 +122,7 @@ export interface SignedUpGame {
   signupStatus: "confirmed" | "waitlisted" | null;
   waitlistPosition: number | null;
   characterName?: string | null;
+  paizoReportedAt?: Date | null;
 }
 
 export interface UnreportedGmGame {
@@ -162,6 +163,7 @@ export async function listUpcomingSignedUpGames(
     signupStatus: sessionSignups.status,
     waitlistPosition: sessionSignups.waitlistPosition,
     characterName: characters.name,
+    paizoReportedAt: sessions.paizoReportedAt,
   }).from(sessions)
     .leftJoin(sessionSignups, and(
       eq(sessionSignups.sessionId, sessions.id),
@@ -204,7 +206,7 @@ export async function listUpcomingSignedUpGames(
 
 /** All viewable game history for the person, including completed and overdue GM sessions. */
 export async function listAllSignedUpGames(personId: string, database: Database = getDb()): Promise<SignedUpGame[]> {
-  const rows = await database.select({ sessionId: sessions.id, gmPersonId: sessions.gmPersonId, communityName: communities.name, communitySlug: communities.slug, scenarioCode: contentItems.code, scenarioTitle: contentItems.title, startsAt: sessions.startsAt, displayTimeZone: sessions.displayTimeZone, sessionStatus: sessions.status, signupStatus: sessionSignups.status, waitlistPosition: sessionSignups.waitlistPosition, characterName: characters.name })
+  const rows = await database.select({ sessionId: sessions.id, gmPersonId: sessions.gmPersonId, communityName: communities.name, communitySlug: communities.slug, scenarioCode: contentItems.code, scenarioTitle: contentItems.title, startsAt: sessions.startsAt, displayTimeZone: sessions.displayTimeZone, sessionStatus: sessions.status, signupStatus: sessionSignups.status, waitlistPosition: sessionSignups.waitlistPosition, characterName: characters.name, paizoReportedAt: sessions.paizoReportedAt })
     .from(sessions).leftJoin(sessionSignups, and(eq(sessionSignups.sessionId, sessions.id), eq(sessionSignups.personId, personId), inArray(sessionSignups.status, ["confirmed", "waitlisted"]))).leftJoin(characters, eq(characters.id, sessionSignups.characterId)).innerJoin(communities, eq(communities.id, sessions.communityId)).innerJoin(contentItems, eq(contentItems.id, sessions.contentItemId)).leftJoin(communityMemberships, and(eq(communityMemberships.communityId, communities.id), eq(communityMemberships.personId, personId), eq(communityMemberships.status, "active")))
     .where(and(or(eq(sessions.gmPersonId, personId), isNotNull(sessionSignups.id)), inArray(sessions.status, ["published", "completed", "cancelled"]), eq(communities.lifecycleStatus, "active"), or(isNotNull(communityMemberships.id), and(eq(communities.visibility, "public"), eq(communities.scheduleVisibility, "public")))))
     .orderBy(desc(sessions.startsAt), desc(sessions.id));

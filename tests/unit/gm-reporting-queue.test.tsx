@@ -13,7 +13,7 @@ describe("GM reporting queue", () => {
   it("links overdue published games to their completion workflow", () => {
     const markup = renderToStaticMarkup(<GmReportingQueueList games={[game]} />);
     expect(markup).toContain("Games awaiting completion");
-    expect(markup).toContain("Needs reporting");
+    expect(markup).toContain("Awaiting reporting");
     expect(markup).toContain("Chronicle reporting and completion");
     expect(markup).toContain('href="/communities/absalom%20lodge/sessions/session%2Fone"');
   });
