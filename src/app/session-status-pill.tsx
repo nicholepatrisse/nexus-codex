@@ -2,7 +2,7 @@ export type SessionLifecycleStatus = "draft" | "published" | "completed" | "canc
 
 export function sessionLifecycleLabel({ status, startsAt, paizoReportedAt, now = new Date() }: { status: SessionLifecycleStatus; startsAt: Date; paizoReportedAt?: Date | null; now?: Date }) {
   if (status === "cancelled") return { label: "Cancelled", tone: "danger" as const };
-  if (status === "draft") return { label: "Draft", tone: "muted" as const };
+  if (status === "draft") return { label: "Draft", tone: "warning" as const };
   if (status === "completed" && paizoReportedAt) return { label: "Reporting complete", tone: "success" as const };
   if (status === "completed") return { label: "Chronicles issued", tone: "info" as const };
   if (startsAt < now) return { label: "Awaiting reporting", tone: "warning" as const };

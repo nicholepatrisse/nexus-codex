@@ -1,19 +1,7 @@
 import Link from "next/link";
 import type { AuthenticatedActor } from "@/auth/actor";
 import { listUpcomingSignedUpGames, type SignedUpGame } from "@/session/session-signups";
-import { SessionStatusPill } from "@/app/session-status-pill";
-
-function formatGameTime(game: SignedUpGame) {
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: game.displayTimeZone,
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZoneName: "short",
-  }).format(game.startsAt);
-}
+import { GameCard } from "@/app/game-card";
 
 export function SignedUpGamesList({
   games,
@@ -43,26 +31,8 @@ export function SignedUpGamesList({
       <p className="mt-2 text-sm text-text-muted">{emptyMessage}</p>
     </div> : <ul className="mt-6 grid gap-4 sm:grid-cols-2">
       {games.map((game) => {
-        const cancelled = game.sessionStatus === "cancelled";
-        const completed = game.sessionStatus === "completed";
-        const signupLabel = game.signupStatus === "waitlisted"
-          ? `Waitlisted${game.waitlistPosition ? ` · #${game.waitlistPosition}` : ""}`
-          : "Confirmed";
         return <li key={game.sessionId}>
-          <Link href={`/communities/${encodeURIComponent(game.communitySlug)}/sessions/${encodeURIComponent(game.sessionId)}`} className={`block h-full rounded-2xl border p-5 transition focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand ${cancelled ? "border-danger/30 bg-danger/10 hover:border-danger" : "border-border bg-surface-raised hover:border-brand"}`}>
-            <span className="block">
-              <span className="block font-semibold text-text-primary">{game.scenarioCode} — {game.scenarioTitle}</span>
-              <span className="mt-3 flex flex-wrap gap-2">
-                {game.participationRole === "gm" ? <span className="rounded-full border border-info/30 bg-info/10 px-2.5 py-1 text-xs font-semibold text-info">GM</span> : null}
-                {game.participationRole === "player" && !completed ? <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${game.signupStatus === "waitlisted" ? "border-warning/30 bg-warning/10 text-warning" : "border-success/30 bg-success/10 text-success"}`}>{signupLabel}</span> : null}
-                {game.participationRole === "player" && game.characterName ? <span className="rounded-full border border-info/30 bg-info/10 px-2.5 py-1 text-xs font-semibold text-info">{game.characterName}</span> : null}
-                <SessionStatusPill status={game.sessionStatus} startsAt={game.startsAt} paizoReportedAt={game.paizoReportedAt} />
-              </span>
-            </span>
-            <span className="mt-3 block text-sm text-text-muted">{game.communityName}</span>
-            <time dateTime={game.startsAt.toISOString()} className={`mt-1 block text-sm ${cancelled ? "text-danger line-through" : "text-text-muted"}`}>{formatGameTime(game)}</time>
-            {cancelled ? <span className="sr-only">This game was cancelled. You were participating as {game.participationRole === "gm" ? "the GM" : `a player with a ${signupLabel.toLowerCase()} signup`}.</span> : null}
-          </Link>
+          <GameCard href={`/communities/${encodeURIComponent(game.communitySlug)}/sessions/${encodeURIComponent(game.sessionId)}`} scenarioCode={game.scenarioCode} scenarioTitle={game.scenarioTitle} startsAt={game.startsAt} displayTimeZone={game.displayTimeZone} status={game.sessionStatus} paizoReportedAt={game.paizoReportedAt} communityName={game.communityName} relationship={game.participationRole === "gm" ? "gm" : game.signupStatus === "waitlisted" ? "waitlisted" : "registered"} waitlistPosition={game.waitlistPosition} characterName={game.participationRole === "player" ? game.characterName : null} />
         </li>;
       })}
     </ul>}
