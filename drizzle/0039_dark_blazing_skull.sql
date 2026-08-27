@@ -1,0 +1,4 @@
+ALTER TABLE "character_inventory_entries" ADD COLUMN "bulk_snapshot" text;--> statement-breakpoint
+ALTER TABLE "character_purchases" ADD COLUMN "bulk_snapshot" text;--> statement-breakpoint
+ALTER TABLE "character_inventory_entries" ADD CONSTRAINT "character_inventory_bulk_length_check" CHECK ("character_inventory_entries"."bulk_snapshot" is null or length(btrim("character_inventory_entries"."bulk_snapshot")) between 1 and 20);--> statement-breakpoint
+ALTER TABLE "character_purchases" ADD CONSTRAINT "character_purchases_bulk_length_check" CHECK ("character_purchases"."bulk_snapshot" is null or length(btrim("character_purchases"."bulk_snapshot")) between 1 and 20);

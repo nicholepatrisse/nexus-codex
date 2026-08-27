@@ -13,6 +13,7 @@ export const inventoryEntryInputSchema = z.object({
   contentItemId: optionalText(100),
   itemName: z.string().trim().min(1, "Enter an item name.").max(200, "Item name must be 200 characters or fewer."),
   itemLink: optionalLink,
+  bulk: optionalText(20),
   quantity: z.coerce.number().int("Quantity must be a whole number.").positive("Quantity must be at least 1.").max(2_000_000_000),
   acquisitionType: z.enum(["starting_equipment", "purchased", "crafted", "boon_reward", "other"], { error: "Choose an acquisition type." }),
   acquiredOn: z.string().date("Enter a valid acquisition date."),
@@ -29,11 +30,11 @@ async function ownedCharacter(actor: AuthenticatedActor, characterId: string, da
 }
 
 async function snapshots(input: z.output<typeof inventoryEntryInputSchema>, characterId: string, database: Database) {
-  let item = { contentItemId: null as string | null, itemNameSnapshot: input.itemName, itemLinkSnapshot: input.itemLink };
+  let item = { contentItemId: null as string | null, itemNameSnapshot: input.itemName, itemLinkSnapshot: input.itemLink, bulkSnapshot: input.bulk };
   if (input.contentItemId) {
     const [catalog] = await database.select({ id: contentItems.id, title: contentItems.title, code: contentItems.code }).from(contentItems).where(eq(contentItems.id, input.contentItemId)).limit(1);
     if (!catalog) throw new Error("The selected catalog item no longer exists.");
-    item = { contentItemId: catalog.id, itemNameSnapshot: catalog.title, itemLinkSnapshot: input.itemLink };
+    item = { contentItemId: catalog.id, itemNameSnapshot: catalog.title, itemLinkSnapshot: input.itemLink, bulkSnapshot: input.bulk };
   }
   if (input.sourceChronicleId) {
     const [source] = await database.select({ id: chronicles.id }).from(chronicles).where(and(eq(chronicles.id, input.sourceChronicleId), eq(chronicles.characterId, characterId))).limit(1);

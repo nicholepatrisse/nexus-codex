@@ -13,6 +13,7 @@ export const purchaseInputSchema = z.object({
   contentItemId: optionalText(100),
   itemName: z.string().trim().min(1, "Enter an item name.").max(200),
   itemLink: optionalLink,
+  bulk: optionalText(20),
   quantity: z.coerce.number().int("Quantity must be a whole number.").positive().max(2_000_000_000),
   acquiredOn: z.string().date("Enter a valid acquisition date."),
   unitPriceMinor: z.coerce.number().int("Unit price must be a whole number.").positive("Unit price must be positive.").max(2_000_000_000),
@@ -53,11 +54,11 @@ export async function purchaseItem(actor: AuthenticatedActor, characterId: strin
       .where(and(eq(characterPurchases.characterId, characterId), eq(characterPurchases.idempotencyKey, input.idempotencyKey))).limit(1);
     if (existing) return purchaseResult(existing.id, transaction as Database);
 
-    let snapshot = { contentItemId: null as string | null, itemNameSnapshot: input.itemName, itemLinkSnapshot: input.itemLink };
+    let snapshot = { contentItemId: null as string | null, itemNameSnapshot: input.itemName, itemLinkSnapshot: input.itemLink, bulkSnapshot: input.bulk };
     if (input.contentItemId) {
       const [catalog] = await transaction.select({ id: contentItems.id, title: contentItems.title }).from(contentItems).where(eq(contentItems.id, input.contentItemId)).limit(1);
       if (!catalog) throw new Error("The selected catalog item no longer exists.");
-      snapshot = { contentItemId: catalog.id, itemNameSnapshot: catalog.title, itemLinkSnapshot: input.itemLink };
+      snapshot = { contentItemId: catalog.id, itemNameSnapshot: catalog.title, itemLinkSnapshot: input.itemLink, bulkSnapshot: input.bulk };
     }
 
     const [balanceRow] = await transaction.select({ balance: sql<string>`coalesce(sum(${characterCreditLedgerEntries.amountMinor}), 0)` })

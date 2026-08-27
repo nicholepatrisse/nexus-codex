@@ -32,7 +32,7 @@ export function InventorySelect({ name, defaultValue, options, invalid = false, 
     setOpen(true);
   }
 
-  return <div ref={rootRef} className="relative mt-2">
+  return <div ref={rootRef} className="relative mt-1">
     <input type="hidden" name={name} value={value} />
     <button id={name} type="button" role="combobox" aria-haspopup="listbox" aria-expanded={open} aria-controls={listboxId} aria-invalid={invalid} onClick={() => setOpen((current) => !current)} onKeyDown={(event) => {
       if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); moveSelection(event.key === "ArrowDown" ? 1 : -1); }
