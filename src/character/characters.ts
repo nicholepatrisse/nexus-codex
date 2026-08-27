@@ -72,7 +72,7 @@ export async function getCharacterProgressions(
   return new Map(characterRows.map((character) => [character.id, deriveSfs2Progression(character.startingLevel, rewardsByCharacter.get(character.id) ?? [])]));
 }
 export interface CharacterSession { id: string; communityName: string; communitySlug: string; scenarioCode: string; scenarioTitle: string; startsAt: Date; displayTimeZone: string; signupStatus: "confirmed" | "waitlisted" | "cancelled" | null; participationType: "player" | "gm_credit"; sessionStatus: "published" | "completed" | "cancelled"; }
-export interface CharacterDetail { id: string; name: string; societyNumber: string; gameSystemName: string; startingLevel: number; currentLevel: number; xp: number; creditsMinor: number | null; reputation: number; downtime: number; className: string | null; ancestry: string | null; background: string | null; backstory: string | null; notes: string | null; isOwner: boolean; upcomingSessions: CharacterSession[]; pastSessions: CharacterSession[]; }
+export interface CharacterDetail { id: string; name: string; societyNumber: string; gameSystemName: string; startingLevel: number; currentLevel: number; xp: number; creditsMinor: number | null; className: string | null; ancestry: string | null; background: string | null; backstory: string | null; notes: string | null; isOwner: boolean; upcomingSessions: CharacterSession[]; pastSessions: CharacterSession[]; }
 function communityRole(access: { isActiveMember: boolean; roles: ("owner" | "gm")[] }): CommunityRole | "member" | "visitor" {
   if (access.roles.includes("owner")) return "owner";
   if (access.roles.includes("gm")) return "gm";
@@ -103,12 +103,11 @@ export async function getCharacterDetail(actor: AuthenticatedActor, characterId:
   const upcomingSessions = history.filter((session) => session.startsAt >= now && session.sessionStatus === "published" && session.signupStatus !== "cancelled").sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
   const pastSessions = history.filter((session) => session.startsAt < now || session.sessionStatus === "completed" || session.sessionStatus === "cancelled" || session.signupStatus === "cancelled").sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime());
   if (!isOwner && visible.length === 0) return null;
-  const rewards = await database.select({ xp: chronicles.xp, creditsMinor: chronicles.creditsMinor, reputation: chronicles.reputation, downtime: chronicles.downtime }).from(chronicles).where(and(eq(chronicles.characterId, character.id), eq(chronicles.status, "applied")));
+  const rewards = await database.select({ xp: chronicles.xp }).from(chronicles).where(and(eq(chronicles.characterId, character.id), eq(chronicles.status, "applied")));
   const progression = deriveSfs2Progression(character.startingLevel, rewards.map(({ xp }) => xp));
-  const nonFinancialTotals = rewards.reduce((sum, reward) => ({ reputation: sum.reputation + reward.reputation, downtime: sum.downtime + reward.downtime }), { reputation: 0, downtime: 0 });
   const ledgerRows = isOwner ? await database.select({ amountMinor: characterCreditLedgerEntries.amountMinor }).from(characterCreditLedgerEntries).where(eq(characterCreditLedgerEntries.characterId, character.id)) : [];
   const creditsMinor = isOwner ? ledgerRows.reduce((sum, entry) => sum + entry.amountMinor, 0) : null;
-  return { id: character.id, name: character.name, societyNumber: character.societyNumber, gameSystemName: character.gameSystemName, startingLevel: character.startingLevel, currentLevel: progression.currentLevel, xp: progression.totalXp, creditsMinor, ...nonFinancialTotals, className: character.className, ancestry: character.ancestry, background: character.background, backstory: character.backstory, notes: character.notes, isOwner, upcomingSessions, pastSessions };
+  return { id: character.id, name: character.name, societyNumber: character.societyNumber, gameSystemName: character.gameSystemName, startingLevel: character.startingLevel, currentLevel: progression.currentLevel, xp: progression.totalXp, creditsMinor, className: character.className, ancestry: character.ancestry, background: character.background, backstory: character.backstory, notes: character.notes, isOwner, upcomingSessions, pastSessions };
 }
 export async function createCharacter(actor: AuthenticatedActor, rawInput: CreateCharacterInput, database: Database = getDb()) {
   const input = createCharacterInputSchema.parse(rawInput);

@@ -13,6 +13,7 @@ export interface CreateCommunityFormState {
   fieldErrors?: {
     name?: string[];
     requestedSlug?: string[];
+    eventCode?: string[];
   };
   formError?: string;
 }
@@ -24,6 +25,7 @@ export async function createCommunityAction(
   const parsed = createCommunityInputSchema.safeParse({
     name: formData.get("name"),
     requestedSlug: formData.get("requestedSlug") || undefined,
+    eventCode: formData.get("eventCode") || undefined,
   });
   if (!parsed.success) {
     return { fieldErrors: z.flattenError(parsed.error).fieldErrors };

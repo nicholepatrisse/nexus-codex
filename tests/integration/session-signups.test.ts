@@ -16,6 +16,7 @@ import {
   contentItems,
   gameSystems,
   organizedPlayPrograms,
+  people,
   rulesets,
   sessionSignups,
   sessions,
@@ -54,6 +55,7 @@ async function identity(label: string) {
     sessions: 0,
   });
   authUserIds.push(created.authUser.id);
+  await getDb().update(people).set({ societyPlayNumber: `OP-${label}` }).where(eq(people.id, created.person.id));
   const actor = {
     personId: created.person.id,
     authUserId: created.authUser.id,

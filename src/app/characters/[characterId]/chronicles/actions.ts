@@ -3,10 +3,10 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { AuthenticationRequiredError, requireAuthenticatedActor } from "@/auth/actor";
-import { applyManualChronicle, createManualChronicle, deleteManualChronicle, manualChronicleInputSchema, unapplyManualChronicle, updateManualChronicle } from "@/character/chronicles";
+import { applyChronicle, createManualChronicle, deleteManualChronicle, manualChronicleInputSchema, unapplyManualChronicle, updateManualChronicle } from "@/character/chronicles";
 
 export interface ChronicleFormState { fieldErrors?: Record<string, string[] | undefined>; formError?: string }
-function input(formData: FormData) { return { contentItemId: formData.get("contentItemId"), scenarioNumber: formData.get("scenarioNumber"), scenarioName: formData.get("scenarioName"), datePlayed: formData.get("datePlayed"), characterLevel: formData.get("characterLevel"), advancementSpeed: formData.get("advancementSpeed"), xp: formData.get("xp"), creditsMinor: formData.get("creditsMinor"), reputation: formData.get("reputation"), downtime: formData.get("downtime"), playerNotes: formData.get("playerNotes") }; }
+function input(formData: FormData) { const nullableNumber = (name: string) => formData.get(name) === "" || formData.get(name) == null ? null : formData.get(name); return { contentItemId: formData.get("contentItemId"), scenarioNumber: formData.get("scenarioNumber"), scenarioName: formData.get("scenarioName"), datePlayed: formData.get("datePlayed"), characterLevel: formData.get("characterLevel"), advancementSpeed: formData.get("advancementSpeed"), xp: formData.get("xp"), baseCreditsMinor: formData.get("baseCreditsMinor"), downtimeDisposition: formData.get("downtimeDisposition"), downtimeEntryMethod: formData.get("downtimeEntryMethod") || "calculated", downtimeCheckTotal: nullableNumber("downtimeCheckTotal"), downtimeProficiency: formData.get("downtimeProficiency") || null, downtimeSheetCreditsMinor: nullableNumber("downtimeSheetCreditsMinor"), downtimeOverrideCreditsMinor: nullableNumber("downtimeOverrideCreditsMinor"), downtimeCorrectionNote: formData.get("downtimeCorrectionNote"), downtimeActivity: formData.get("downtimeActivity"), partnerCode: formData.get("partnerCode"), eventName: formData.get("eventName"), eventCode: formData.get("eventCode"), gmOrganizedPlayId: formData.get("gmOrganizedPlayId"), playerNotes: formData.get("playerNotes") }; }
 
 export async function createChronicleAction(characterId: string, _state: ChronicleFormState, formData: FormData): Promise<ChronicleFormState> {
   const parsed = manualChronicleInputSchema.safeParse(input(formData));
@@ -42,7 +42,7 @@ export async function deleteChronicleAction(characterId: string, chronicleId: st
 }
 
 export async function applyChronicleAction(characterId: string, chronicleId: string) {
-  await applyManualChronicle(await requireAuthenticatedActor(), characterId, chronicleId);
+  await applyChronicle(await requireAuthenticatedActor(), characterId, chronicleId);
   revalidatePath(`/characters/${characterId}`);
 }
 
