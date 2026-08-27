@@ -17,6 +17,7 @@ import {
   contentItems,
   gameSystems,
   organizedPlayPrograms,
+  people,
   rulesets,
   sessions,
 } from "@/db/schema";
@@ -52,6 +53,7 @@ async function identity(label: string): Promise<AuthenticatedActor> {
     sessions: 0,
   });
   authUserIds.push(created.authUser.id);
+  await getDb().update(people).set({ societyPlayNumber: `OP-${label}` }).where(eq(people.id, created.person.id));
   return { personId: created.person.id, authUserId: created.authUser.id, sessionId: `session-${label}` };
 }
 
@@ -163,6 +165,13 @@ describeWithDatabase("session drafts", () => {
     await expect(createSessionDraft(owner, community.slug, {
       ...draftInput(), contentItemId: unsupportedScenarioId, gmPersonId: gmOne.personId,
     })).rejects.toBeInstanceOf(SessionDraftValidationError);
+  });
+
+  it("requires the selected GM to have an Organized Play number", async () => {
+    await getDb().update(people).set({ societyPlayNumber: null }).where(eq(people.id, gmOne.personId));
+    await expect(createSessionDraft(owner, community.slug, { ...draftInput(), gmPersonId: gmOne.personId }))
+      .rejects.toThrow("must add an Organized Play number");
+    await getDb().update(people).set({ societyPlayNumber: "OP-gm-one" }).where(eq(people.id, gmOne.personId));
   });
 
   it("atomically promotes a self-service member with their first draft", async () => {

@@ -13,6 +13,7 @@ import {
   communityRoleGrants,
   communitySupportedPrograms,
   contentItems,
+  people,
   sessions,
 } from "@/db/schema";
 import { SUPPORTED_GAME_SYSTEM } from "@/game-system/config";
@@ -77,8 +78,9 @@ async function lockAndValidateAssignedGm(
   gmPersonId: string,
 ) {
   const [membership] = await transaction
-    .select({ id: communityMemberships.id })
+    .select({ id: communityMemberships.id, organizedPlayNumber: people.societyPlayNumber })
     .from(communityMemberships)
+    .innerJoin(people, eq(people.id, communityMemberships.personId))
     .where(and(
       eq(communityMemberships.communityId, communityId),
       eq(communityMemberships.personId, gmPersonId),
@@ -86,6 +88,7 @@ async function lockAndValidateAssignedGm(
     ))
     .limit(1);
   if (!membership) throw new SessionDraftValidationError("Choose an active community GM.");
+  if (!membership.organizedPlayNumber?.trim()) throw new SessionDraftValidationError("The selected GM must add an Organized Play number to their profile before a session can be created.");
 
   const [grant] = await transaction
     .select({ id: communityRoleGrants.id })

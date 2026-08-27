@@ -11,6 +11,8 @@ const settings = {
   membershipApproval: "manual",
   gmAdmission: "approved_only",
   scheduleVisibility: "members",
+  eventName: "Absalom Station Organized Play",
+  eventCode: "EV-12345",
 };
 
 describe("community settings UI", () => {
@@ -20,6 +22,10 @@ describe("community settings UI", () => {
     );
 
     expect(markup).toContain('value="Absalom Lodge"');
+    expect(markup).toContain('name="eventName"');
+    expect(markup).toContain('value="Absalom Station Organized Play"');
+    expect(markup).toContain('name="eventCode"');
+    expect(markup).toContain('value="EV-12345"');
     expect(markup).not.toContain("Default time zone");
     expect(markup).not.toContain("Supported programs");
     expect(markup).not.toContain('name="supportedProgramIds"');

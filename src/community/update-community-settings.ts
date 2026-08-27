@@ -5,7 +5,7 @@ import type { AuthenticatedActor } from "@/auth/actor";
 import { authorizeCommunityBySlug } from "@/authorization/community-guard";
 import type { AuthorizationDenialSink } from "@/authorization/denial-audit";
 import { resolveCommunityAccessBySlug } from "@/authorization/community-access";
-import { normalizeCommunitySlug } from "@/community/create-community";
+import { communitySlugCandidate, normalizeCommunitySlug } from "@/community/create-community";
 import { getDb } from "@/db/client";
 import {
   communities,
@@ -20,6 +20,8 @@ export const updateCommunitySettingsInputSchema = z.object({
   name: z.string().trim().min(1, "Community name is required.").max(120),
   requestedSlug: z.string().trim().min(1).max(MAX_SLUG_LENGTH),
   description: z.string().trim().max(2_000).nullable(),
+  eventName: z.string().trim().max(200).nullable().optional().transform((value) => value || null),
+  eventCode: z.string().trim().max(100).nullable().optional().transform((value) => value || null),
   supportedProgramIds: z.array(z.string().trim().min(1)).max(100).transform((ids) => [...new Set(ids)]),
   visibility: z.enum(["private", "public"]),
   membershipApproval: z.enum(["manual", "automatic"]),
@@ -43,12 +45,6 @@ export class CommunitySettingsUpdateError extends Error {
   }
 }
 
-function slugWithSuffix(base: string, suffix: number): string {
-  if (suffix === 1) return base;
-  const ending = `-${suffix}`;
-  return `${base.slice(0, MAX_SLUG_LENGTH - ending.length).replace(/-+$/g, "")}${ending}`;
-}
-
 async function allocateSlug(
   base: string,
   communityId: string,
@@ -56,8 +52,8 @@ async function allocateSlug(
 ): Promise<string> {
   await transaction.execute(sql`select pg_advisory_xact_lock(hashtextextended(${base}, 0))`);
 
-  for (let suffix = 1; suffix <= 10_000; suffix += 1) {
-    const candidate = slugWithSuffix(base, suffix);
+  for (let collisionIndex = 0; collisionIndex < 10_000; collisionIndex += 1) {
+    const candidate = communitySlugCandidate(base, collisionIndex);
     const [occupied] = await transaction
       .select({ id: communities.id })
       .from(communities)
@@ -119,6 +115,8 @@ export async function updateCommunitySettings(
           name: parsed.name,
           slug,
           description: parsed.description || null,
+          eventName: parsed.eventName,
+          eventCode: parsed.eventCode,
           visibility: parsed.visibility,
           membershipApproval: parsed.membershipApproval,
           gmAdmission: parsed.gmAdmission,
@@ -155,6 +153,8 @@ export async function updateCommunitySettings(
             "name",
             "slug",
             "description",
+            "eventName",
+            "eventCode",
             "supportedPrograms",
             "visibility",
             "membershipApproval",

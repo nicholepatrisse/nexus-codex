@@ -46,7 +46,7 @@ describeWithDatabase("community creation service", () => {
   it("atomically creates a private community with its default program, membership, and owner grant", async () => {
     const created = await createCommunity(
       { personId },
-      { name: `Absalom Station ${suffix}`, requestedSlug: `Absalom Station ${suffix}` },
+      { name: `Absalom Station ${suffix}`, requestedSlug: `Absalom Station ${suffix}`, eventCode: "2,690,298" },
     );
     createdCommunityIds.push(created.id);
 
@@ -68,6 +68,8 @@ describeWithDatabase("community creation service", () => {
       .where(eq(communitySupportedPrograms.communityId, created.id));
 
     expect(community).toMatchObject({
+      eventName: `Absalom Station ${suffix}`,
+      eventCode: "2,690,298",
       visibility: "private",
       scheduleVisibility: "members",
       membershipApproval: "manual",
@@ -94,7 +96,7 @@ describeWithDatabase("community creation service", () => {
     const second = await createCommunity({ personId }, { name });
     createdCommunityIds.push(first.id, second.id);
 
-    expect(second.slug).toBe(`${first.slug}-2`);
+    expect(second.slug).toBe(`${first.slug}-astral`);
     const memberships = await getDb()
       .select()
       .from(communityMemberships)
@@ -115,7 +117,7 @@ describeWithDatabase("community creation service", () => {
     createdCommunityIds.push(first.id, second.id);
 
     expect(first.slug).toBe(requestedSlug);
-    expect(second.slug).toBe(`${"a".repeat(78)}-2`);
+    expect(second.slug).toBe(`${"a".repeat(73)}-astral`);
     expect(second.slug).toHaveLength(80);
   });
 
@@ -129,7 +131,7 @@ describeWithDatabase("community creation service", () => {
 
     expect(created.map(({ slug }) => slug).sort()).toEqual([
       requestedSlug,
-      `${requestedSlug}-2`,
+      `${requestedSlug}-astral`,
     ]);
   });
 

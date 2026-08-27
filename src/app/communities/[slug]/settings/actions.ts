@@ -28,6 +28,8 @@ export async function updateCommunitySettingsAction(
     name: formData.get("name"),
     requestedSlug: formData.get("requestedSlug"),
     description: formData.get("description") || null,
+    eventName: formData.get("eventName") || null,
+    eventCode: formData.get("eventCode") || null,
     supportedProgramIds: [SUPPORTED_GAME_SYSTEM.organizedPlayProgramId],
     visibility: formData.get("visibility"),
     membershipApproval: formData.get("membershipApproval"),

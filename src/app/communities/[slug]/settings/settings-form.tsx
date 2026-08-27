@@ -9,6 +9,8 @@ interface Settings {
   name: string;
   slug: string;
   description: string | null;
+  eventName?: string | null;
+  eventCode?: string | null;
   visibility: string;
   membershipApproval: string;
   gmAdmission: string;
@@ -43,6 +45,7 @@ export function CommunitySettingsForm({ settings }: { settings: Settings }) {
       <div><label htmlFor="name" className="text-sm font-semibold">Name</label><input id="name" name="name" defaultValue={settings.name} maxLength={120} required className={inputClass} />{error("name") ? <p role="alert" className="mt-2 text-sm text-danger">{error("name")}</p> : null}</div>
       <div><label htmlFor="requestedSlug" className="text-sm font-semibold">Web address</label><input id="requestedSlug" name="requestedSlug" defaultValue={settings.slug} maxLength={80} required className={inputClass} />{error("requestedSlug") ? <p role="alert" className="mt-2 text-sm text-danger">{error("requestedSlug")}</p> : null}</div>
       <div><label htmlFor="description" className="text-sm font-semibold">Description</label><textarea id="description" name="description" defaultValue={settings.description ?? ""} maxLength={2000} rows={4} className={inputClass} /></div>
+      <div className="grid gap-5 sm:grid-cols-2"><div><label htmlFor="eventName" className="text-sm font-semibold">Organized Play event name</label><input id="eventName" name="eventName" defaultValue={settings.eventName ?? settings.name} maxLength={200} className={inputClass} /><p className="mt-2 text-xs text-text-muted">Prefills the Event name on session Chronicles.</p>{error("eventName") ? <p role="alert" className="mt-2 text-sm text-danger">{error("eventName")}</p> : null}</div><div><label htmlFor="eventCode" className="text-sm font-semibold">Organized Play event number / code</label><input id="eventCode" name="eventCode" defaultValue={settings.eventCode ?? ""} maxLength={100} className={inputClass} /><p className="mt-2 text-xs text-text-muted">Prefills the Event number/code on session Chronicles.</p>{error("eventCode") ? <p role="alert" className="mt-2 text-sm text-danger">{error("eventCode")}</p> : null}</div></div>
       <div className="grid gap-5 sm:grid-cols-2">
         <Select key={`visibility:${state.saved?.visibility ?? "initial"}`} label="Community visibility" name="visibility" value={state.saved?.visibility ?? settings.visibility} options={[["private", "Private"], ["public", "Public"]]} />
         <Select key={`scheduleVisibility:${state.saved?.scheduleVisibility ?? "initial"}`} label="Schedule visibility" name="scheduleVisibility" value={state.saved?.scheduleVisibility ?? settings.scheduleVisibility} options={[["members", "Members"], ["public", "Public"]]} />

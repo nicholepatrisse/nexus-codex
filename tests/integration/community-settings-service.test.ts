@@ -37,6 +37,8 @@ function settings(overrides: Record<string, unknown> = {}) {
     name: `Updated Lodge ${suffix}`,
     requestedSlug: `updated-lodge-${suffix}`,
     description: "Games every other Starday.",
+    eventName: "Absalom Station Organized Play",
+    eventCode: "EV-12345",
     supportedProgramIds: [programId, programId],
     visibility: "private" as const,
     membershipApproval: "manual" as const,
@@ -99,6 +101,8 @@ describeWithDatabase("community settings service", () => {
       name: `Updated Lodge ${suffix}`,
       slug: `updated-lodge-${suffix}`,
       description: "Games every other Starday.",
+      eventName: "Absalom Station Organized Play",
+      eventCode: "EV-12345",
       visibility: "private",
       scheduleVisibility: "public",
     });
@@ -153,7 +157,7 @@ describeWithDatabase("community settings service", () => {
       communitySlug,
       settings({ requestedSlug: collision.slug }),
     );
-    expect(result).toMatchObject({ status: "updated", community: { slug: `${collision.slug}-2` } });
+    expect(result).toMatchObject({ status: "updated", community: { slug: `${collision.slug}-astral` } });
     if (result.status === "updated") communitySlug = result.community.slug;
   });
 });

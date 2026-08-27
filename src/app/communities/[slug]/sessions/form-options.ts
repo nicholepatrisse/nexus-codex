@@ -24,7 +24,7 @@ export async function loadSessionFormOptions(communityId: string) {
       .where(eq(contentItems.contentType, "scenario"))
       .orderBy(asc(contentItems.normalizedCode)),
     database
-      .selectDistinct({ id: people.id, label: people.displayName })
+      .selectDistinct({ id: people.id, displayName: people.displayName, organizedPlayNumber: people.societyPlayNumber })
       .from(communityRoleGrants)
       .innerJoin(people, eq(people.id, communityRoleGrants.personId))
       .innerJoin(
@@ -45,6 +45,6 @@ export async function loadSessionFormOptions(communityId: string) {
   ]);
   return {
     scenarios: scenarios.map(({ id, code, title }) => ({ id, label: `${code} — ${title}` })),
-    gms,
+    gms: gms.map(({ id, displayName, organizedPlayNumber }) => ({ id, label: organizedPlayNumber ? `${displayName} · ${organizedPlayNumber}` : `${displayName} · Organized Play number required`, disabled: !organizedPlayNumber })),
   };
 }

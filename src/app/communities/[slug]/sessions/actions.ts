@@ -36,7 +36,11 @@ function characterNotes(formData: FormData) {
   return formData.getAll("characterId").map((value) => {
     const characterId = String(value);
     const number = (field: string) => Number(formData.get(`${field}:${characterId}`));
-    return { characterId, characterLevel: number("characterLevel"), advancementSpeed: formData.get(`advancementSpeed:${characterId}`) === "slow" ? "slow" as const : "standard" as const, xp: number("xp"), creditsMinor: number("creditsMinor"), reputation: number("reputation"), downtime: number("downtime"), gmNotes: String(formData.get(`note:${characterId}`) ?? "").trim().slice(0, 5000) };
+    const optionalNumber = (field: string) => formData.get(`${field}:${characterId}`) === "" ? null : number(field);
+    const text = (field: string, max = 200) => String(formData.get(`${field}:${characterId}`) ?? "").trim().slice(0, max);
+    const disposition = formData.get(`downtimeDisposition:${characterId}`) as "earn_income" | "other" | "declined" | null;
+    const proficiency = formData.get(`downtimeProficiency:${characterId}`) as "trained" | "expert" | "master" | null;
+    return { characterId, characterLevel: number("characterLevel"), advancementSpeed: formData.get(`advancementSpeed:${characterId}`) === "slow" ? "slow" as const : "standard" as const, xp: number("xp"), baseCreditsMinor: number("baseCreditsMinor"), downtimeDisposition: disposition === "earn_income" || disposition === "other" ? disposition : "declined" as const, downtimeCheckTotal: optionalNumber("downtimeCheckTotal"), downtimeProficiency: proficiency === "trained" || proficiency === "expert" || proficiency === "master" ? proficiency : null, downtimeOverrideCreditsMinor: optionalNumber("downtimeOverrideCreditsMinor"), downtimeCorrectionNote: text("downtimeCorrectionNote", 1000), downtimeActivity: text("downtimeActivity"), partnerCode: text("partnerCode", 100), eventName: text("eventName"), eventCode: text("eventCode", 100), gmOrganizedPlayId: text("gmOrganizedPlayId", 100), gmNotes: text("note", 5000) };
   });
 }
 

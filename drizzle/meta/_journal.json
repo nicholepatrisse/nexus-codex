@@ -281,6 +281,27 @@
       "when": 1787838847804,
       "tag": "0039_dark_blazing_skull",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1787843846390,
+      "tag": "0040_adorable_ultimates",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1787846099854,
+      "tag": "0041_polite_supreme_intelligence",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1787847018225,
+      "tag": "0042_good_bishop",
+      "breakpoints": true
     }
   ]
 }
