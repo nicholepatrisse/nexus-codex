@@ -14,8 +14,8 @@ import { CreditAdjustmentForm } from "./credits/adjustment-form";
 import { listOwnedInventory } from "@/character/inventory";
 import { InventoryCard } from "./inventory/inventory-card";
 import { sellInventoryAction } from "./sales/actions";
-import { GmCreditBadge } from "@/app/gm-credit-badge";
 import { GameCard } from "@/app/game-card";
+import { ChronicleSummaryCard } from "@/app/chronicle-summary-card";
 
 function SessionList({ sessions, empty }: { sessions: CharacterSession[]; empty: string }) {
   if (!sessions.length) return <p className="mt-3 text-sm text-text-muted">{empty}</p>;
@@ -41,10 +41,9 @@ const transactionLabels: Record<string, string> = {
 };
 
 function ChronicleCard({ chronicle, characterId, isOwner }: { chronicle: ChronicleWithGmCredit; characterId: string; isOwner: boolean }) {
-  return <li className="card-standard card-interactive p-5">
-    <div className="flex items-start justify-between gap-4"><div className="min-w-0">{chronicle.chronicleNumber ? <p className="text-xs font-semibold tracking-wide text-text-muted uppercase">Chronicle {chronicle.chronicleNumber}</p> : null}<div className={`${chronicle.chronicleNumber ? "mt-1" : ""} flex flex-wrap items-center gap-2`}><Link className="font-semibold text-text-primary hover:text-brand hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand" href={`/characters/${characterId}/chronicles/${chronicle.id}`}>{chronicle.scenarioNumberSnapshot} — {chronicle.scenarioNameSnapshot}</Link>{chronicle.isGmCredit ? <GmCreditBadge /> : null}</div></div>{isOwner && chronicle.status === "pending" ? <div className="shrink-0"><ChronicleLifecycleButton status="pending" action={applyChronicleAction.bind(null, characterId, chronicle.id)} /></div> : null}</div>
-    <div className="mt-2 flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-text-muted">{new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${chronicle.playedOn}T00:00:00Z`))} · Level {chronicle.characterLevel} · {chronicle.xp} XP</p>{isOwner && chronicle.status === "pending" && chronicle.provenance === "manual" ? <Link href={`/characters/${characterId}/chronicles/${chronicle.id}/edit`} aria-label={`Edit ${chronicle.scenarioNumberSnapshot} Chronicle`} title="Edit Chronicle" className="inline-flex size-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-surface hover:text-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-4"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg></Link> : null}</div>
-  </li>;
+  const applyAction = isOwner && chronicle.status === "pending" ? <ChronicleLifecycleButton status="pending" action={applyChronicleAction.bind(null, characterId, chronicle.id)} /> : null;
+  const editAction = isOwner && chronicle.status === "pending" && chronicle.provenance === "manual" ? <Link href={`/characters/${characterId}/chronicles/${chronicle.id}/edit`} aria-label={`Edit ${chronicle.scenarioNumberSnapshot} Chronicle`} title="Edit Chronicle" className="inline-flex size-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-surface hover:text-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-4"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg></Link> : null;
+  return <li><ChronicleSummaryCard href={`/characters/${characterId}/chronicles/${chronicle.id}`} scenarioNumber={chronicle.scenarioNumberSnapshot} scenarioName={chronicle.scenarioNameSnapshot} playedOn={chronicle.playedOn} characterLevel={chronicle.characterLevel} xp={chronicle.xp} status={chronicle.status === "applied" ? "applied" : "pending"} isGmCredit={chronicle.isGmCredit} chronicleNumber={chronicle.chronicleNumber} actions={applyAction} secondaryActions={editAction} /></li>;
 }
 
 const ownerTabs = ["overview", "chronicles", "sessions", "inventory"] as const;
