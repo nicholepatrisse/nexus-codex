@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { TabRow, tabClassName } from "@/app/tab-row";
 import { notFound, redirect } from "next/navigation";
 import { getAuthenticatedActor } from "@/auth/actor";
 import { getCharacterDetail, type CharacterSession } from "@/character/characters";
@@ -75,10 +76,10 @@ export default async function CharacterPage({ params, searchParams }: { params: 
       <h1 className="responsive-title mt-2 break-words font-semibold sm:mt-3">{character.name}</h1>
       {character.isOwner ? <Link href={`/characters/${character.id}/edit`} className="mt-3 inline-block text-sm font-semibold text-brand hover:underline sm:mt-4">Edit character</Link> : null}</div>
       <div className="shrink-0"><CharacterClassIcon className={character.className} /></div></div>
-      <nav aria-label="Character sections" className="-mx-1 mt-5 overflow-x-auto border-b border-border px-1 sm:-mx-2 sm:mt-8 sm:px-2">
-        <div className="flex min-w-max gap-1">
-          {(character.isOwner ? ownerTabs : ownerTabs.filter((item) => item !== "inventory")).map((item) => <Link key={item} href={item === "overview" ? `/characters/${character.id}` : `/characters/${character.id}?tab=${item}`} aria-current={tab === item ? "page" : undefined} className={`border-b-2 px-3 py-2.5 text-sm font-semibold capitalize transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:px-4 sm:py-3 ${tab === item ? "border-brand text-brand" : "border-transparent text-text-muted hover:border-border-strong hover:text-text-primary"}`}>{item}</Link>)}
-        </div>
+      <nav aria-label="Character sections">
+        <TabRow className="-mx-1 mt-5 px-1 sm:-mx-2 sm:mt-8 sm:px-2">
+          {(character.isOwner ? ownerTabs : ownerTabs.filter((item) => item !== "inventory")).map((item) => <Link key={item} href={item === "overview" ? `/characters/${character.id}` : `/characters/${character.id}?tab=${item}`} aria-current={tab === item ? "page" : undefined} className={tabClassName(tab === item, "capitalize")}>{item}</Link>)}
+        </TabRow>
       </nav>
       {tab === "overview" ? <>
       <dl className="mt-6 grid gap-4 sm:mt-8 sm:grid-cols-2 sm:gap-5"><div><dt className="text-sm text-text-muted">Society number</dt><dd className="mt-1 font-semibold">{character.societyNumber}</dd></div><CharacterProgress startingLevel={character.startingLevel} currentLevel={character.currentLevel} xp={character.xp} />
