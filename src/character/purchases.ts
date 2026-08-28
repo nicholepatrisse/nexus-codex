@@ -67,7 +67,7 @@ export async function purchaseItem(actor: AuthenticatedActor, characterId: strin
 
     const purchaseId = randomUUID();
     const [purchase] = await transaction.insert(characterPurchases).values({ id: purchaseId, characterId, ...snapshot, quantity: input.quantity, acquiredOn: input.acquiredOn, unitPriceMinor: input.unitPriceMinor, totalPriceMinor: input.totalPriceMinor, idempotencyKey: input.idempotencyKey }).returning();
-    const [inventory] = await transaction.insert(characterInventoryEntries).values({ id: randomUUID(), characterId, ...snapshot, quantity: input.quantity, acquisitionType: "purchased", acquiredOn: input.acquiredOn, amountPaidMinor: input.totalPriceMinor, sourceChronicleId: null, sourcePurchaseId: purchaseId, notes: null, lotKey: purchaseId }).returning();
+    const [inventory] = await transaction.insert(characterInventoryEntries).values({ id: randomUUID(), characterId, ...snapshot, quantity: input.quantity, acquisitionType: "purchased", acquiredOn: input.acquiredOn, amountPaidMinor: input.totalPriceMinor, valueMinor: input.unitPriceMinor, sourceChronicleId: null, sourcePurchaseId: purchaseId, notes: null, lotKey: purchaseId }).returning();
     const [ledgerEntry] = await transaction.insert(characterCreditLedgerEntries).values({ id: randomUUID(), characterId, amountMinor: -input.totalPriceMinor, displayScale: 1, type: "purchase", effectiveOn: input.acquiredOn, source: "purchase", sourceChronicleId: null, sourcePurchaseId: purchaseId, notes: `${input.quantity} × ${snapshot.itemNameSnapshot}` }).returning();
     if (!purchase || !inventory || !ledgerEntry) throw new Error("Purchase transaction did not return all created records.");
     return { purchase, inventory, ledgerEntry };

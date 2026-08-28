@@ -43,12 +43,10 @@ export function validateNethysItemUrl(value: string) {
 
 const clean = (value?: string | null) => value?.replace(/\s+/g, " ").trim() || undefined;
 
-export function parseNethysItemHtml(html: string, sourceUrl: string): NethysItem {
-  const $ = load(html);
-  const root = $(".treasure, .armor, .shield, .weapon").first();
-  if (!root.length) throw new NethysItemError("not_item", "The referenced page does not appear to contain a supported item.");
+function parseItemRoot($: ReturnType<typeof load>, root: ReturnType<ReturnType<typeof load>>, sourceUrl: string): NethysItem {
+  const rootElement = root.get(0);
 
-  const title = root.find("h1.title").first().clone();
+  const title = root.children("h1.title, h2.title").first().clone();
   const levelText = clean(title.find(".feature-level").text());
   title.find(".feature-level, .sfs, img").remove();
   const name = clean(title.text());
@@ -56,7 +54,7 @@ export function parseNethysItemHtml(html: string, sourceUrl: string): NethysItem
   if (!name || !levelMatch) throw new NethysItemError("parse_failed", "Nethys returned the page, but its required item details could not be read.");
 
   const values = new Map<string, string>();
-  root.find("b, strong").each((_index, element) => {
+  root.find("b, strong").filter((_index, element) => $(element).closest(".treasure, .armor, .shield, .weapon").get(0) === rootElement).each((_index, element) => {
     const label = clean($(element).text())?.replace(/:$/, "").toLowerCase();
     const parent = $(element).parent().clone();
     parent.find("b, strong").first().remove();
@@ -65,7 +63,7 @@ export function parseNethysItemHtml(html: string, sourceUrl: string): NethysItem
   });
   const price = values.get("price");
   const creditMatch = price?.match(/^([\d,]+(?:\.\d+)?)\s+credits?$/i);
-  const traits = root.find(".trait, .traits a, a.link-trait").map((_index, element) => clean($(element).text())).get().filter((value): value is string => Boolean(value));
+  const traits = root.find(".trait, .traits a, a.link-trait").filter((_index, element) => $(element).closest(".treasure, .armor, .shield, .weapon").get(0) === rootElement).map((_index, element) => clean($(element).text())).get().filter((value): value is string => Boolean(value));
   const rarity = traits.find((trait) => /^(common|uncommon|rare|unique)$/i.test(trait));
   const pathCategory = new URL(sourceUrl).pathname.split("/")[1];
 
@@ -77,8 +75,8 @@ export function parseNethysItemHtml(html: string, sourceUrl: string): NethysItem
     priceCredits: creditMatch?.[1] ? Number(creditMatch[1].replaceAll(",", "")) : undefined,
     hands: values.get("hands"),
     bulk: values.get("bulk"),
-    source: clean(root.find(".sources").first().text())?.replace(/^Source\s*/i, ""),
-    description: clean(root.find(".treasure-description, .description").first().text()),
+    source: clean(root.children(".sources").first().text())?.replace(/^Source\s*/i, ""),
+    description: clean(root.children(".treasure-description, .description").first().text()),
     traits: [...new Set(traits)],
     rarity,
     usage: values.get("usage"),
@@ -86,7 +84,23 @@ export function parseNethysItemHtml(html: string, sourceUrl: string): NethysItem
   };
 }
 
+export function parseNethysItemsHtml(html: string, sourceUrl: string): NethysItem[] {
+  const $ = load(html);
+  const root = $(".treasure, .armor, .shield, .weapon").first();
+  if (!root.length) throw new NethysItemError("not_item", "The referenced page does not appear to contain a supported item.");
+  const variants = root.children(".treasure, .armor, .shield, .weapon");
+  return (variants.length ? variants.toArray().map((element) => $(element)) : [root]).map((itemRoot) => parseItemRoot($, itemRoot, sourceUrl));
+}
+
+export function parseNethysItemHtml(html: string, sourceUrl: string): NethysItem {
+  return parseNethysItemsHtml(html, sourceUrl)[0]!;
+}
+
 export async function fetchNethysItem(value: string, fetcher: typeof fetch = fetch) {
+  return (await fetchNethysItems(value, fetcher))[0]!;
+}
+
+export async function fetchNethysItems(value: string, fetcher: typeof fetch = fetch) {
   const url = validateNethysItemUrl(value);
   let response: Response;
   try {
@@ -95,7 +109,7 @@ export async function fetchNethysItem(value: string, fetcher: typeof fetch = fet
     throw new NethysItemError("unavailable", "Archives of Nethys is unavailable right now. You can still enter the item manually.");
   }
   if (!response.ok) throw new NethysItemError("unavailable", "Archives of Nethys is unavailable right now. You can still enter the item manually.");
-  return parseNethysItemHtml(await response.text(), url.href);
+  return parseNethysItemsHtml(await response.text(), url.href);
 }
 
 export function nethysItemNotes(item: NethysItem) {

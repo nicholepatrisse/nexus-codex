@@ -3,16 +3,16 @@ import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 import type { AuthenticatedActor } from "@/auth/actor";
 import { getDb } from "@/db/client";
-import { characterCreditLedgerEntries, characterInventoryEntries, characterPurchases, characterSales, characters } from "@/db/schema";
+import { characterCreditLedgerEntries, characterInventoryEntries, characterSales, characters } from "@/db/schema";
 
 type Database = ReturnType<typeof getDb>;
 
-/** SFS2 ordinary gear sales return half the actual price paid, rounded down to whole credits. */
+/** SFS2 ordinary gear sales return half the item's value, rounded down to whole credits. */
 export const SFS2_ORDINARY_SALE_POLICY = "sfs2-ordinary-half-paid-floor-v1";
-export function sfs2OrdinarySaleProceeds(originalUnitPaidMinor: number, quantity: number) {
-  if (!Number.isSafeInteger(originalUnitPaidMinor) || originalUnitPaidMinor < 0) throw new RangeError("Original unit price must be a non-negative whole credit amount.");
+export function sfs2OrdinarySaleProceeds(unitValueMinor: number, quantity: number) {
+  if (!Number.isSafeInteger(unitValueMinor) || unitValueMinor < 0) throw new RangeError("Item value must be a non-negative whole credit amount.");
   if (!Number.isSafeInteger(quantity) || quantity <= 0) throw new RangeError("Sale quantity must be a positive whole number.");
-  return Math.floor((originalUnitPaidMinor * quantity) / 2);
+  return Math.floor((unitValueMinor * quantity) / 2);
 }
 
 export const saleInputSchema = z.object({
@@ -59,30 +59,22 @@ export async function sellInventory(actor: AuthenticatedActor, characterId: stri
       .where(and(eq(characterInventoryEntries.id, input.inventoryEntryId), eq(characterInventoryEntries.characterId, characterId))).for("update").limit(1);
     if (!lot || lot.quantity < input.quantity) throw new InsufficientInventoryError();
 
-    let originalUnitPaidMinor: number;
-    if (lot.sourcePurchaseId) {
-      const [purchase] = await transaction.select({ unitPriceMinor: characterPurchases.unitPriceMinor }).from(characterPurchases).where(eq(characterPurchases.id, lot.sourcePurchaseId)).limit(1);
-      if (!purchase) throw new UnsellableInventoryError("The acquisition price for this lot is unavailable.");
-      originalUnitPaidMinor = purchase.unitPriceMinor;
-    } else {
-      if (lot.amountPaidMinor == null || lot.quantity === 0 || lot.amountPaidMinor % lot.quantity !== 0) throw new UnsellableInventoryError("This lot needs an exact per-unit acquisition price before it can be sold.");
-      originalUnitPaidMinor = lot.amountPaidMinor / lot.quantity;
-    }
-    const originalTotalPaidMinor = originalUnitPaidMinor * input.quantity;
-    const saleAmountMinor = sfs2OrdinarySaleProceeds(originalUnitPaidMinor, input.quantity);
+    if (lot.valueMinor == null) throw new UnsellableInventoryError("This item needs a value before it can be sold.");
+    const totalValueMinor = lot.valueMinor * input.quantity;
+    const saleAmountMinor = sfs2OrdinarySaleProceeds(lot.valueMinor, input.quantity);
     if (saleAmountMinor <= 0) throw new UnsellableInventoryError();
 
     const saleId = randomUUID();
     const [sale] = await transaction.insert(characterSales).values({
       id: saleId, characterId, inventoryEntryId: lot.id, sourcePurchaseId: lot.sourcePurchaseId,
       contentItemId: lot.contentItemId, itemNameSnapshot: lot.itemNameSnapshot, itemLinkSnapshot: lot.itemLinkSnapshot,
-      quantity: input.quantity, originalUnitPaidMinor, originalTotalPaidMinor, saleAmountMinor,
+      quantity: input.quantity, unitValueMinor: lot.valueMinor, totalValueMinor, saleAmountMinor,
       soldOn: input.soldOn, saleKind: "ordinary", pricingPolicy: SFS2_ORDINARY_SALE_POLICY, idempotencyKey: input.idempotencyKey,
     }).returning();
     const remainingQuantity = lot.quantity - input.quantity;
     const [inventory] = await transaction.update(characterInventoryEntries).set({
       quantity: remainingQuantity,
-      amountPaidMinor: lot.amountPaidMinor == null ? null : Math.max(0, lot.amountPaidMinor - originalTotalPaidMinor),
+      amountPaidMinor: lot.amountPaidMinor == null ? null : Math.max(0, lot.amountPaidMinor - Math.floor((lot.amountPaidMinor / lot.quantity) * input.quantity)),
       updatedAt: new Date(),
     }).where(and(eq(characterInventoryEntries.id, lot.id), eq(characterInventoryEntries.quantity, lot.quantity))).returning();
     if (!inventory) throw new InsufficientInventoryError();

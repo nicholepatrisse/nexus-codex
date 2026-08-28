@@ -54,6 +54,6 @@ export function ChronicleForm({ characterId, chronicle, catalogItems, action }: 
       <div className="sm:col-span-2"><label htmlFor="playerNotes" className="block text-sm font-semibold">Player notes <span className="font-normal text-text-muted">(optional)</span></label><textarea id="playerNotes" name="playerNotes" rows={6} maxLength={5000} defaultValue={chronicle?.playerNotes ?? ""} className={`${inputClass} resize-y`} />{error("playerNotes")}</div>
     </div>
     {state.formError ? <p role="alert" className="rounded-xl bg-danger/10 p-4 text-danger">{state.formError}</p> : null}
-    <div className="flex items-center gap-4"><SubmitButton editing={Boolean(chronicle)} /><Link href={`/characters/${characterId}`} className="text-sm text-text-muted hover:text-text-primary">Cancel</Link></div>
+    <div className="flex items-center gap-4"><SubmitButton editing={Boolean(chronicle)} /><Link href={`/characters/${characterId}?tab=chronicles`} className="text-sm text-text-muted hover:text-text-primary">Cancel</Link></div>
   </form>;
 }

@@ -11,11 +11,8 @@ import { ChronicleLifecycleButton } from "./chronicles/lifecycle-button";
 import { createCreditAdjustmentAction } from "./credits/actions";
 import { CreditAdjustmentForm } from "./credits/adjustment-form";
 import { listOwnedInventory } from "@/character/inventory";
-import { deleteInventoryAction } from "./inventory/actions";
-import { listOwnedPurchases } from "@/character/purchases";
-import { listOwnedSales } from "@/character/sales";
+import { InventoryCard } from "./inventory/inventory-card";
 import { sellInventoryAction } from "./sales/actions";
-import { SaleForm } from "./sales/sale-form";
 import { GmCreditBadge } from "@/app/gm-credit-badge";
 import { GameCard } from "@/app/game-card";
 
@@ -33,6 +30,14 @@ function chronicleNumberOrder(left: ChronicleWithGmCredit, right: ChronicleWithG
   if (Number.isFinite(leftNumber) && Number.isFinite(rightNumber)) return leftNumber - rightNumber;
   return (left.chronicleNumber ?? "").localeCompare(right.chronicleNumber ?? "", undefined, { numeric: true });
 }
+
+const transactionLabels: Record<string, string> = {
+  starting_credits: "Starting credits",
+  chronicle_reward: "Chronicle",
+  adjustment: "Adjustment",
+  purchase: "Purchase",
+  sale: "Sale",
+};
 
 function ChronicleCard({ chronicle, characterId, isOwner }: { chronicle: ChronicleWithGmCredit; characterId: string; isOwner: boolean }) {
   return <li className="rounded-2xl border border-border bg-surface-raised p-5 transition hover:border-brand">
@@ -61,8 +66,6 @@ export default async function CharacterPage({ params, searchParams }: { params: 
   const chronicles = await listChronicles(characterId);
   const ledger = character.isOwner ? await getOwnedCreditLedger(actor, characterId) : null;
   const inventory = character.isOwner ? await listOwnedInventory(actor, characterId) : null;
-  const purchases = character.isOwner ? await listOwnedPurchases(actor, characterId) : null;
-  const sales = character.isOwner ? await listOwnedSales(actor, characterId) : null;
   const appliedChronicles = chronicles.filter(({ status }) => status === "applied").sort(chronicleNumberOrder);
   const unappliedChronicles = chronicles.filter(({ status }) => status === "pending");
   const hasSessions = character.upcomingSessions.length > 0 || character.pastSessions.length > 0;
@@ -96,16 +99,14 @@ export default async function CharacterPage({ params, searchParams }: { params: 
       </section> : null}
       {tab === "sessions" ? <section className="mt-8">{!hasSessions ? <div className="rounded-xl border border-dashed border-border-strong p-6 text-center"><h2 className="text-xl font-semibold">No sessions yet</h2><p className="mt-2 text-text-muted">This character has not been used for a game yet.</p></div> : <div className="space-y-10"><section><h2 className="text-2xl font-semibold">Upcoming sessions</h2><SessionList sessions={character.upcomingSessions} empty="No upcoming sessions." /></section><section className="border-t border-border pt-8"><h2 className="text-2xl font-semibold">Past sessions</h2><SessionList sessions={character.pastSessions} empty="No past sessions." /></section></div>}</section> : null}
       {tab === "inventory" && inventory ? <div className="mt-8 space-y-10"><section>
-        <div className="flex flex-wrap items-center justify-between gap-4"><div><h2 className="text-2xl font-semibold">Inventory</h2><p className="mt-1 text-sm text-text-muted">Current ownership · acquisition lots remain separate</p></div><Link className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white" href={`/characters/${character.id}/inventory/new`}>Add item</Link></div>
-        {!inventory.length ? <div className="mt-5 rounded-xl border border-dashed border-border-strong p-6 text-center"><h3 className="font-semibold">No inventory yet</h3><p className="mt-1 text-sm text-text-muted">Add this character’s current equipment when you’re ready.</p></div> : <ul className="mt-5 space-y-3">{inventory.map((entry) => <li key={entry.id} className="rounded-xl border border-border bg-surface-raised p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-semibold">{entry.quantity} × {entry.itemLinkSnapshot ? <a className="text-brand hover:underline" href={entry.itemLinkSnapshot} target="_blank" rel="noreferrer">{entry.itemNameSnapshot}</a> : entry.itemNameSnapshot}</h3><p className="mt-1 text-sm text-text-muted">{entry.acquisitionType.replaceAll("_", " ")} · {new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${entry.acquiredOn}T00:00:00Z`))}{entry.bulkSnapshot ? ` · Bulk ${entry.bulkSnapshot} each` : ""}{entry.amountPaidMinor == null ? "" : ` · ${formatCredits(entry.amountPaidMinor)} credits paid`}</p>{entry.notes ? <p className="mt-2 whitespace-pre-wrap text-sm">{entry.notes}</p> : null}</div><div className="flex items-center gap-2"><Link className="text-sm font-semibold text-brand hover:underline" href={`/characters/${character.id}/inventory/${entry.id}/edit`}>Edit</Link><form action={deleteInventoryAction.bind(null, character.id, entry.id)}><button className="text-sm font-semibold text-danger hover:underline" type="submit">Remove</button></form></div></div>{entry.amountPaidMinor != null ? <SaleForm available={entry.quantity} action={sellInventoryAction.bind(null, character.id, entry.id)} /> : null}</li>)}</ul>}
+        <div className="flex flex-wrap items-center justify-between gap-4"><div><h2 className="text-2xl font-semibold">Inventory</h2><p className="mt-1 text-sm text-text-muted">Items currently owned by this character.</p></div><Link className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white" href={`/characters/${character.id}/inventory/new`}>Add item</Link></div>
+        {!inventory.length ? <div className="mt-5 rounded-xl border border-dashed border-border-strong p-6 text-center"><h3 className="font-semibold">No inventory yet</h3><p className="mt-1 text-sm text-text-muted">Add this character’s current equipment when you’re ready.</p></div> : <ul className="mt-5 space-y-4">{inventory.map((entry) => <InventoryCard key={entry.id} characterId={character.id} entry={entry} saleAction={sellInventoryAction.bind(null, character.id, entry.id)} />)}</ul>}
       </section>
-      <section className="border-t border-border pt-8"><h2 className="text-2xl font-semibold">Purchase history</h2><p className="mt-1 text-sm text-text-muted">Permanent acquisition records remain after inventory removal.</p>{purchases?.length ? <ol className="mt-5 space-y-3">{purchases.map((purchase) => <li key={purchase.id} className="rounded-xl border border-border bg-surface-raised p-4"><p className="font-semibold">{purchase.quantity} × {purchase.itemLinkSnapshot ? <a className="text-brand hover:underline" href={purchase.itemLinkSnapshot} target="_blank" rel="noreferrer">{purchase.itemNameSnapshot}</a> : purchase.itemNameSnapshot}</p><p className="mt-1 text-sm text-text-muted">Purchased {new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${purchase.acquiredOn}T00:00:00Z`))} · {formatCredits(purchase.unitPriceMinor)} each · {formatCredits(purchase.totalPriceMinor)} total</p></li>)}</ol> : <p className="mt-4 text-sm text-text-muted">No purchases recorded yet.</p>}</section>
-      <section className="border-t border-border pt-8"><h2 className="text-2xl font-semibold">Sale history</h2><p className="mt-1 text-sm text-text-muted">Permanent disposition records retain the original acquisition price and lot.</p>{sales?.length ? <ol className="mt-5 space-y-3">{sales.map((sale) => <li key={sale.id} className="rounded-xl border border-border bg-surface-raised p-4"><p className="font-semibold">{sale.quantity} × {sale.itemLinkSnapshot ? <a className="text-brand hover:underline" href={sale.itemLinkSnapshot} target="_blank" rel="noreferrer">{sale.itemNameSnapshot}</a> : sale.itemNameSnapshot}</p><p className="mt-1 text-sm text-text-muted">Sold {new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${sale.soldOn}T00:00:00Z`))} · paid {formatCredits(sale.originalTotalPaidMinor)} · received {formatCredits(sale.saleAmountMinor)} credits</p></li>)}</ol> : <p className="mt-4 text-sm text-text-muted">No sales recorded yet.</p>}</section>
       {ledger ? <section className="border-t border-border pt-8">
-        <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-2xl font-semibold">Credit ledger</h2><p className="mt-1 text-sm text-text-muted">Owner-only financial history · balance {formatCredits(ledger.balanceMinor, ledger.displayScale)} credits</p></div><CreditAdjustmentForm action={createCreditAdjustmentAction.bind(null, character.id)} /></div>
-        <ol className="mt-5 space-y-3">{ledger.entries.map((entry) => <li key={entry.id} className="grid gap-2 rounded-xl border border-border bg-surface-raised p-4 text-sm sm:grid-cols-[8rem_1fr_auto]">
-          <time className="text-text-muted">{new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${entry.effectiveOn}T00:00:00Z`))}</time><div><p className="font-semibold capitalize">{entry.type.replaceAll("_", " ")}</p><p className="text-text-muted">{entry.source.replaceAll("_", " ")}{entry.notes ? ` · ${entry.notes}` : ""}</p></div><span className="font-semibold tabular-nums">{entry.amountMinor > 0 ? "+" : ""}{formatCredits(entry.amountMinor, entry.displayScale)}</span>
-        </li>)}</ol>
+        <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-2xl font-semibold">Transaction history</h2><p className="mt-1 text-sm text-text-muted">Chronicles, purchases, sales, and adjustments by date · balance {formatCredits(ledger.balanceMinor, ledger.displayScale)} credits</p></div><CreditAdjustmentForm action={createCreditAdjustmentAction.bind(null, character.id)} /></div>
+        {ledger.entries.length ? <ol className="mt-5 space-y-3">{ledger.entries.toReversed().map((entry) => <li key={entry.id} className="grid gap-2 rounded-xl border border-border bg-surface-raised p-4 text-sm sm:grid-cols-[8rem_1fr_auto]">
+          <time className="text-text-muted">{new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${entry.effectiveOn}T00:00:00Z`))}</time><div><p className="font-semibold">{transactionLabels[entry.type] ?? entry.type.replaceAll("_", " ")}</p>{entry.notes ? <p className="text-text-muted">{entry.notes}</p> : null}</div><span className={`font-semibold tabular-nums ${entry.amountMinor > 0 ? "text-success" : entry.amountMinor < 0 ? "text-danger" : "text-text-muted"}`}>{entry.amountMinor > 0 ? "+" : ""}{formatCredits(entry.amountMinor, entry.displayScale)} credits</span>
+        </li>)}</ol> : <p className="mt-5 text-sm text-text-muted">No transactions recorded yet.</p>}
       </section> : null}</div> : null}
     </section>
   </main>;
