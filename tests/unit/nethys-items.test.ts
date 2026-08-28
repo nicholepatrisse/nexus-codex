@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { fetchNethysItem, NethysItemError, nethysItemNotes, parseNethysItemHtml, validateNethysItemUrl } from "@/nethys/items";
+import { fetchNethysItem, NethysItemError, nethysItemNotes, parseNethysItemHtml, parseNethysItemsHtml, validateNethysItemUrl } from "@/nethys/items";
 
 const hygieneKit = `<div class="treasure"><h1 class="title"><span class="sfs">icon</span> Hygiene Kit <span class="feature-level">Item 0</span></h1><div class="sources"><strong>Source</strong> <a>Player Core pg. 241</a></div><div><b>Price</b> 2 credits</div><div><div><b>Hands</b> 2</div><div><b>Bulk</b> L</div></div><hr><div class="treasure-description">Everything needed for good grooming.</div></div>`;
+const sunshades = `<div class="treasure"><h1 class="title">Sunshades <span class="feature-level">Item 0+</span></h1><div class="treasure-description">Sunshades make everyone look cooler.</div><div class="treasure"><h2 class="title">Sunshades (Commercial) <span class="feature-level">Item 0</span></h2><div class="sources"><strong>Source</strong> Player Core pg. 241</div><div><b>Price</b> 2 credits</div><div><b>Bulk</b> —</div></div><div class="treasure"><h2 class="title">Sunshades (Tactical) <span class="feature-level">Item 3</span></h2><div class="sources"><strong>Source</strong> Player Core pg. 241</div><div><b>Price</b> 450 credits</div><div><b>Bulk</b> —</div><div class="treasure-description">Protects against blinded and dazzled.</div></div></div>`;
 
 describe("Archives of Nethys item import", () => {
   it("parses the Hygiene Kit fields", () => {
@@ -9,6 +10,13 @@ describe("Archives of Nethys item import", () => {
     expect(item).toMatchObject({ name: "Hygiene Kit", level: 0, price: "2 credits", priceCredits: 2, hands: "2", bulk: "L", source: "Player Core pg. 241", description: "Everything needed for good grooming.", category: "Treasure" });
     expect(nethysItemNotes(item)).toContain("Item level: 0\nPrice: 2 credits\nHands: 2\nSource: Player Core pg. 241");
     expect(nethysItemNotes(item)).not.toContain("Bulk:");
+  });
+
+  it("returns nested item variants as separate import choices", () => {
+    expect(parseNethysItemsHtml(sunshades, "https://2e.aonsrd.com/treasure/33-sunshades")).toEqual([
+      expect.objectContaining({ name: "Sunshades (Commercial)", level: 0, priceCredits: 2, bulk: "—" }),
+      expect.objectContaining({ name: "Sunshades (Tactical)", level: 3, priceCredits: 450, description: "Protects against blinded and dazzled." }),
+    ]);
   });
 
   it("only accepts recognized HTTPS item URLs", () => {

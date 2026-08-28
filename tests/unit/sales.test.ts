@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { saleInputSchema, sfs2OrdinarySaleProceeds } from "@/character/sales";
 
 describe("SFS2 ordinary sale pricing", () => {
-  it.each([[10, 1, 5], [5, 1, 2], [5, 3, 7], [0, 4, 0]])("returns half actual paid cost and floors to whole credits", (unit, quantity, expected) => {
+  it.each([[10, 1, 5], [5, 1, 2], [5, 3, 7], [0, 4, 0]])("returns half item value and floors to whole credits", (unit, quantity, expected) => {
     expect(sfs2OrdinarySaleProceeds(unit, quantity)).toBe(expected);
   });
 
