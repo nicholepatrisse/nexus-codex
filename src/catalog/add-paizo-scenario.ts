@@ -8,7 +8,7 @@ import { fetchPaizoScenarioPage, type PaizoScenarioDetails } from "@/catalog/pai
 import { normalizeContentCode } from "@/catalog/normalization";
 import { getDb } from "@/db/client";
 import { communitySupportedPrograms, contentItems } from "@/db/schema";
-import { SFS2_PROGRAM_ID } from "@/catalog/seed-sfs2";
+import { SUPPORTED_GAME_SYSTEM } from "@/game-system/config";
 
 export type AddScenarioResult =
   | { status: "ready"; scenario: PaizoScenarioDetails }
@@ -18,6 +18,7 @@ export type AddScenarioResult =
   | { status: "not-found" };
 
 type Database = ReturnType<typeof getDb>;
+const SFS2_PROGRAM_ID = SUPPORTED_GAME_SYSTEM.organizedPlayProgramId;
 
 function role(roles: readonly string[]): CommunityRole {
   return roles.includes("owner") ? "owner" : roles.includes("gm") ? "gm" : "member";
