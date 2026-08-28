@@ -14,6 +14,7 @@ import { publishSession } from "@/session/publish-session";
 import { cancelPublishedSession, updatePublishedSession } from "@/session/published-session";
 import { completeSession, markSessionReportedToPaizo, saveSessionCharacterNotes, saveSessionReporting } from "@/session/complete-session";
 import { attachChronicleSheet } from "@/session/chronicle-sheets";
+import { addPaizoScenario, previewPaizoScenario } from "@/catalog/add-paizo-scenario";
 
 export type SessionDraftFormState = {
   fieldErrors?: Record<string, string[] | undefined>;
@@ -32,6 +33,32 @@ export type SessionDraftFormState = {
 export type PublishSessionState = { error?: string };
 export type CancelSessionState = { error?: string };
 export type CompleteSessionState = { error?: string; saved?: boolean };
+export type ScenarioLookupState = { error?: string; scenario?: { code: string; title: string; sourceUrl: string; minimumLevel: number; maximumLevel: number; productCode: string | null }; contentItemId?: string; existing?: boolean };
+
+function scenarioError(error: unknown) {
+  if (error instanceof AuthenticationRequiredError) return "Your session expired. Sign in and try again.";
+  return error instanceof Error ? error.message : "The Paizo scenario could not be fetched.";
+}
+
+export async function previewPaizoScenarioAction(slug: string, url: string): Promise<ScenarioLookupState> {
+  try {
+    const result = await previewPaizoScenario(await requireAuthenticatedActor(), slug, url);
+    if (result.status === "forbidden") return { error: "Only an authorized community GM can add scenarios." };
+    if (result.status === "not-found") return { error: "This community does not support that scenario catalog." };
+    return { scenario: result.scenario, contentItemId: result.status === "existing" ? result.contentItemId : undefined, existing: result.status === "existing" };
+  } catch (error) { return { error: scenarioError(error) }; }
+}
+
+export async function addPaizoScenarioAction(slug: string, url: string): Promise<ScenarioLookupState> {
+  try {
+    const result = await addPaizoScenario(await requireAuthenticatedActor(), slug, url);
+    if (result.status === "forbidden") return { error: "Only an authorized community GM can add scenarios." };
+    if (result.status === "not-found") return { error: "This community does not support that scenario catalog." };
+    if (result.status === "ready") return { error: "The scenario was not added. Please try again." };
+    revalidatePath(`/communities/${slug}/sessions/new`);
+    return { scenario: result.scenario, contentItemId: result.contentItemId, existing: result.status === "existing" };
+  } catch (error) { return { error: scenarioError(error) }; }
+}
 
 function characterNotes(formData: FormData) {
   return formData.getAll("characterId").map((value) => {

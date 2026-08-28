@@ -16,8 +16,6 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "catalog:refresh:sfs2": "tsx scripts/refresh-sfs2-catalog.ts",
-    "catalog:seed:sfs2": "tsx scripts/seed-sfs2-catalog.ts",
     "db:generate": "drizzle-kit generate",
     "db:check": "drizzle-kit check",
     "db:migrate": "drizzle-kit migrate",

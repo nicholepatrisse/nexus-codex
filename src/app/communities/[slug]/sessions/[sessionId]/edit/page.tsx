@@ -5,7 +5,7 @@ import { getAuthenticatedActor } from "@/auth/actor";
 import { resolveCommunityAccessBySlug } from "@/authorization/community-access";
 import { getDb } from "@/db/client";
 import { sessions } from "@/db/schema";
-import { updateSessionDraftAction } from "../../actions";
+import { addPaizoScenarioAction, previewPaizoScenarioAction, updateSessionDraftAction } from "../../actions";
 import { loadSessionFormOptions } from "../../form-options";
 import { SessionDraftForm } from "../../session-draft-form";
 
@@ -33,5 +33,5 @@ export default async function EditSessionDraftPage({ params }: { params: Promise
   const locationType = draft.locationType === "physical" ? "physical" as const : "virtual" as const;
 
   if (draft.status === "cancelled") notFound();
-  return <main className="mx-auto min-h-screen max-w-3xl px-6 py-16"><Link href={`/communities/${slug}`} className="text-sm text-brand hover:underline">← {access.community.name}</Link><h1 className="mt-8 text-4xl font-semibold">Edit {draft.status === "draft" ? "session draft" : "published session"}</h1><SessionDraftForm action={updateSessionDraftAction.bind(null, slug, sessionId)} slug={slug} scenarioGroups={options.scenarioGroups} gms={options.gms} canAssignGm={isOwner} actorPersonId={actor.personId} initial={{ ...draft, startsAt: draft.startsAt.toISOString(), endsAt: draft.endsAt.toISOString(), locationType }} /></main>;
+  return <main className="mx-auto min-h-screen max-w-3xl px-6 py-16"><Link href={`/communities/${slug}`} className="text-sm text-brand hover:underline">← {access.community.name}</Link><h1 className="mt-8 text-4xl font-semibold">Edit {draft.status === "draft" ? "session draft" : "published session"}</h1><SessionDraftForm action={updateSessionDraftAction.bind(null, slug, sessionId)} previewScenario={previewPaizoScenarioAction.bind(null, slug)} addScenario={addPaizoScenarioAction.bind(null, slug)} slug={slug} scenarioGroups={options.scenarioGroups} gms={options.gms} canAssignGm={isOwner} actorPersonId={actor.personId} initial={{ ...draft, startsAt: draft.startsAt.toISOString(), endsAt: draft.endsAt.toISOString(), locationType }} /></main>;
 }
