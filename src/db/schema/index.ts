@@ -153,6 +153,7 @@ export const characters = pgTable(
     name: text("name").notNull(),
     societyNumber: text("society_number").notNull(),
     startingLevel: integer("starting_level").notNull().default(1),
+    startingLevelLocked: boolean("starting_level_locked").notNull().default(false),
     className: text("class"),
     ancestry: text("ancestry"),
     background: text("background"),

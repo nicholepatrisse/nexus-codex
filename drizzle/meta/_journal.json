@@ -330,6 +330,13 @@
       "when": 1787929648157,
       "tag": "0046_equal_darkhawk",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1787943056703,
+      "tag": "0047_fixed_apocalypse",
+      "breakpoints": true
     }
   ]
 }

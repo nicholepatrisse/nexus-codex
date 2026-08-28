@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { AuthenticatedActor } from "@/auth/actor";
 import { resolveCommunityAccessBySlug } from "@/authorization/community-access";
@@ -15,13 +15,15 @@ import { fetchNethysItems, nethysItemNotes } from "@/nethys/items";
 const optionalCharacterClassSchema = z.string().trim()
   .pipe(z.union([z.literal(""), z.enum(CHARACTER_CLASSES, { error: "Choose a supported class." })]))
   .nullable().optional().transform((value) => value || null);
+const startingLevelSchema = z.coerce.number().refine((level): level is 1 | 3 | 5 | 7 => [1, 3, 5, 7].includes(level), "Starting level must be 1, 3, 5, or 7.");
+const startingItemSchema = z.object({ url: z.string().url(), name: z.string().trim().min(1).max(200) });
 
 export const createCharacterInputSchema = z.object({
   name: z.string().trim().min(1, "Enter a character name.").max(100, "Character name must be 100 characters or fewer."),
   characterNumber: z.string().trim().regex(/^(0?[1-9]|[1-9]\d)$/, "Enter a character number from 1 to 99."),
-  startingLevel: z.coerce.number().refine((level): level is 1 | 3 | 5 | 7 => [1, 3, 5, 7].includes(level), "Starting level must be 1, 3, 5, or 7.").default(1),
+  startingLevel: startingLevelSchema.default(1),
   startingCredits: z.coerce.number().int().nonnegative().optional(),
-  startingItems: z.array(z.object({ url: z.string().url(), name: z.string().trim().min(1).max(200) })).default([]),
+  startingItems: z.array(startingItemSchema).default([]),
   idempotencyKey: z.string().uuid().optional(),
   className: optionalCharacterClassSchema,
   ancestry: z.string().trim().max(100, "Ancestry must be 100 characters or fewer.").nullable().optional().transform((value) => value || null),
@@ -45,15 +47,30 @@ export const createCharacterInputSchema = z.object({
 export type CreateCharacterInput = z.input<typeof createCharacterInputSchema>;
 export const updateCharacterInputSchema = z.object({
   name: z.string().trim().min(1, "Enter a character name.").max(100, "Character name must be 100 characters or fewer."),
+  startingLevel: startingLevelSchema.optional(),
+  startingCredits: z.coerce.number().int().nonnegative().optional(),
+  startingItems: z.array(startingItemSchema).optional(),
   className: optionalCharacterClassSchema,
   ancestry: z.string().trim().max(100, "Ancestry must be 100 characters or fewer.").nullable().optional().transform((value) => value || null),
   background: z.string().trim().max(100, "Background must be 100 characters or fewer.").nullable().optional().transform((value) => value || null),
   backstory: z.string().trim().max(5000, "Backstory must be 5,000 characters or fewer.").nullable().optional().transform((value) => value || null),
   notes: z.string().trim().max(5000, "Notes must be 5,000 characters or fewer.").nullable().optional().transform((value) => value || null),
+}).superRefine((input, context) => {
+  const fields = [input.startingLevel, input.startingCredits, input.startingItems];
+  if (fields.every((value) => value === undefined)) return;
+  if (fields.some((value) => value === undefined)) {
+    context.addIssue({ code: "custom", path: ["startingCredits"], message: "Choose a complete starting wealth option." });
+    return;
+  }
+  const level = input.startingLevel as Sfs2StartingLevel;
+  if (!isValidStartingCredits(level, input.startingCredits!)) context.addIssue({ code: "custom", path: ["startingCredits"], message: "Choose a starting wealth option available at this level." });
+  const requiredItems = usesPermanentStartingItems(level, input.startingCredits!) ? SFS2_STARTING_ITEM_LEVELS[level] : [];
+  if (input.startingItems!.length !== requiredItems.length) context.addIssue({ code: "custom", path: ["startingItems"], message: requiredItems.length ? "Select every permanent starting item." : "Starting items are only allowed with the permanent-items option." });
 });
 export type UpdateCharacterInput = z.input<typeof updateCharacterInputSchema>;
 type Database = ReturnType<typeof getDb>;
 export class CharacterCreationError extends Error {}
+export class StartingLevelLockedError extends Error {}
 
 export function formatSocietyNumber(societyPlayNumber: string, characterNumber: string) {
   const prefix = SUPPORTED_GAME_SYSTEM.societyCharacterPrefix;
@@ -80,7 +97,7 @@ export async function getCharacterProgressions(
   return new Map(characterRows.map((character) => [character.id, deriveSfs2Progression(character.startingLevel, rewardsByCharacter.get(character.id) ?? [])]));
 }
 export interface CharacterSession { id: string; communityName: string; communitySlug: string; scenarioCode: string; scenarioTitle: string; startsAt: Date; displayTimeZone: string; signupStatus: "confirmed" | "waitlisted" | "cancelled" | null; participationType: "player" | "gm_credit"; sessionStatus: "published" | "completed" | "cancelled"; }
-export interface CharacterDetail { id: string; name: string; societyNumber: string; gameSystemName: string; startingLevel: number; currentLevel: number; xp: number; creditsMinor: number | null; className: string | null; ancestry: string | null; background: string | null; backstory: string | null; notes: string | null; isOwner: boolean; upcomingSessions: CharacterSession[]; pastSessions: CharacterSession[]; }
+export interface CharacterDetail { id: string; name: string; societyNumber: string; gameSystemName: string; startingLevel: number; startingLevelLocked: boolean; startingCredits: number; startingItems: { url: string; name: string }[]; currentLevel: number; xp: number; creditsMinor: number | null; className: string | null; ancestry: string | null; background: string | null; backstory: string | null; notes: string | null; isOwner: boolean; upcomingSessions: CharacterSession[]; pastSessions: CharacterSession[]; }
 function communityRole(access: { isActiveMember: boolean; roles: ("owner" | "gm")[] }): CommunityRole | "member" | "visitor" {
   if (access.roles.includes("owner")) return "owner";
   if (access.roles.includes("gm")) return "gm";
@@ -88,7 +105,7 @@ function communityRole(access: { isActiveMember: boolean; roles: ("owner" | "gm"
 }
 /** Returns only character and game data the actor is authorized to see. */
 export async function getCharacterDetail(actor: AuthenticatedActor, characterId: string, now: Date = new Date(), database: Database = getDb()): Promise<CharacterDetail | null> {
-  const [character] = await database.select({ id: characters.id, personId: characters.personId, name: characters.name, societyNumber: characters.societyNumber, gameSystemName: gameSystems.name, startingLevel: characters.startingLevel, className: characters.className, ancestry: characters.ancestry, background: characters.background, backstory: characters.backstory, notes: characters.notes }).from(characters).innerJoin(gameSystems, eq(gameSystems.id, characters.gameSystemId)).where(eq(characters.id, characterId)).limit(1);
+  const [character] = await database.select({ id: characters.id, personId: characters.personId, name: characters.name, societyNumber: characters.societyNumber, gameSystemName: gameSystems.name, startingLevel: characters.startingLevel, startingLevelLocked: characters.startingLevelLocked, className: characters.className, ancestry: characters.ancestry, background: characters.background, backstory: characters.backstory, notes: characters.notes }).from(characters).innerJoin(gameSystems, eq(gameSystems.id, characters.gameSystemId)).where(eq(characters.id, characterId)).limit(1);
   if (!character) return null;
   const isOwner = character.personId === actor.personId;
   if (!isOwner) {
@@ -115,7 +132,16 @@ export async function getCharacterDetail(actor: AuthenticatedActor, characterId:
   const progression = deriveSfs2Progression(character.startingLevel, rewards.map(({ xp }) => xp));
   const ledgerRows = isOwner ? await database.select({ amountMinor: characterCreditLedgerEntries.amountMinor }).from(characterCreditLedgerEntries).where(eq(characterCreditLedgerEntries.characterId, character.id)) : [];
   const creditsMinor = isOwner ? ledgerRows.reduce((sum, entry) => sum + entry.amountMinor, 0) : null;
-  return { id: character.id, name: character.name, societyNumber: character.societyNumber, gameSystemName: character.gameSystemName, startingLevel: character.startingLevel, currentLevel: progression.currentLevel, xp: progression.totalXp, creditsMinor, className: character.className, ancestry: character.ancestry, background: character.background, backstory: character.backstory, notes: character.notes, isOwner, upcomingSessions, pastSessions };
+  const [startingCredit] = isOwner ? await database.select({ amountMinor: characterCreditLedgerEntries.amountMinor }).from(characterCreditLedgerEntries).where(and(eq(characterCreditLedgerEntries.characterId, character.id), eq(characterCreditLedgerEntries.type, "starting_credits"))).limit(1) : [];
+  const startingEquipment = isOwner ? await database.select({ url: characterInventoryEntries.itemLinkSnapshot, name: characterInventoryEntries.itemNameSnapshot, notes: characterInventoryEntries.notes }).from(characterInventoryEntries).where(and(eq(characterInventoryEntries.characterId, character.id), eq(characterInventoryEntries.acquisitionType, "starting_equipment"), sql`${characterInventoryEntries.notes} like 'Starting wealth permanent item (%)%'`)) : [];
+  const remainingEquipment = [...startingEquipment];
+  const startingItems = SFS2_STARTING_ITEM_LEVELS[character.startingLevel as Sfs2StartingLevel].flatMap((level) => {
+    const index = remainingEquipment.findIndex((item) => item.notes?.startsWith(`Starting wealth permanent item (level ${level}).`) && item.url);
+    if (index < 0) return [];
+    const [item] = remainingEquipment.splice(index, 1);
+    return item?.url ? [{ url: item.url, name: item.name }] : [];
+  });
+  return { id: character.id, name: character.name, societyNumber: character.societyNumber, gameSystemName: character.gameSystemName, startingLevel: character.startingLevel, startingLevelLocked: character.startingLevelLocked, startingCredits: startingCredit?.amountMinor ?? SFS2_STARTING_WEALTH[character.startingLevel as Sfs2StartingLevel][0].credits, startingItems, currentLevel: progression.currentLevel, xp: progression.totalXp, creditsMinor, className: character.className, ancestry: character.ancestry, background: character.background, backstory: character.backstory, notes: character.notes, isOwner, upcomingSessions, pastSessions };
 }
 export async function createCharacter(actor: AuthenticatedActor, rawInput: CreateCharacterInput, database: Database = getDb()) {
   const input = createCharacterInputSchema.parse(rawInput);
@@ -160,8 +186,32 @@ export async function createCharacter(actor: AuthenticatedActor, rawInput: Creat
 
 export async function updateCharacter(actor: AuthenticatedActor, characterId: string, rawInput: UpdateCharacterInput, database: Database = getDb()) {
   const input = updateCharacterInputSchema.parse(rawInput);
-  const [updated] = await database.update(characters).set({ ...input, updatedAt: new Date() })
-    .where(and(eq(characters.id, characterId), eq(characters.personId, actor.personId)))
-    .returning({ id: characters.id, name: characters.name });
-  return updated ?? null;
+  const changingStartingSetup = input.startingLevel !== undefined;
+  const startingLevel = input.startingLevel as Sfs2StartingLevel | undefined;
+  const requiredLevels = startingLevel && input.startingCredits !== undefined && usesPermanentStartingItems(startingLevel, input.startingCredits) ? SFS2_STARTING_ITEM_LEVELS[startingLevel] : [];
+  const selectedItems = await Promise.all((input.startingItems ?? []).map(async (selection, index) => {
+    const item = (await fetchNethysItems(selection.url)).find((candidate) => candidate.name === selection.name && candidate.level === requiredLevels[index]);
+    if (!item) throw new CharacterCreationError(`Starting item ${index + 1} must be an available level ${requiredLevels[index]} item.`);
+    if (item.rarity && item.rarity.toLowerCase() !== "common") throw new CharacterCreationError(`${item.name} requires access that character editing cannot verify.`);
+    return item;
+  }));
+  return database.transaction(async (transaction) => {
+    const { startingCredits } = input;
+    const details = { name: input.name, startingLevel: input.startingLevel, className: input.className, ancestry: input.ancestry, background: input.background, backstory: input.backstory, notes: input.notes };
+    const [updated] = await transaction.update(characters).set({ ...details, updatedAt: new Date() })
+      .where(and(eq(characters.id, characterId), eq(characters.personId, actor.personId), changingStartingSetup ? eq(characters.startingLevelLocked, false) : undefined))
+      .returning({ id: characters.id, name: characters.name });
+    if (!updated) {
+      const [owned] = await transaction.select({ startingLevelLocked: characters.startingLevelLocked }).from(characters).where(and(eq(characters.id, characterId), eq(characters.personId, actor.personId))).limit(1);
+      if (owned?.startingLevelLocked && changingStartingSetup) throw new StartingLevelLockedError("Starting level and wealth cannot be changed after Society play has been recorded for this character.");
+      return null;
+    }
+    if (changingStartingSetup && startingLevel !== undefined && startingCredits !== undefined) {
+      const now = new Date();
+      await transaction.update(characterCreditLedgerEntries).set({ amountMinor: startingCredits, notes: startingWealthNote(startingLevel, startingCredits) }).where(and(eq(characterCreditLedgerEntries.characterId, characterId), eq(characterCreditLedgerEntries.type, "starting_credits")));
+      await transaction.delete(characterInventoryEntries).where(and(eq(characterInventoryEntries.characterId, characterId), eq(characterInventoryEntries.acquisitionType, "starting_equipment"), sql`${characterInventoryEntries.notes} like 'Starting wealth permanent item (%)%'`));
+      if (selectedItems.length) await transaction.insert(characterInventoryEntries).values(selectedItems.map((item, index) => ({ id: randomUUID(), characterId, contentItemId: null, itemNameSnapshot: item.name, itemLinkSnapshot: item.url, bulkSnapshot: item.bulk ?? null, quantity: 1, acquisitionType: "starting_equipment", acquiredOn: now.toISOString().slice(0, 10), amountPaidMinor: null, valueMinor: item.priceCredits ?? null, sourceChronicleId: null, sourcePurchaseId: null, notes: `Starting wealth permanent item (level ${requiredLevels[index]}).\n\n${nethysItemNotes(item)}`, lotKey: randomUUID() })));
+    }
+    return updated;
+  });
 }
