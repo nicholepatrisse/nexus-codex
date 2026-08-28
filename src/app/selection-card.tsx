@@ -1,0 +1,21 @@
+import type { ReactNode } from "react";
+
+export function SelectionCard({ name, value, title, description, metadata, checked, defaultChecked, required, disabled, onChange }: {
+  name: string;
+  value: string | number;
+  title: ReactNode;
+  description?: ReactNode;
+  metadata?: ReactNode;
+  checked?: boolean;
+  defaultChecked?: boolean;
+  required?: boolean;
+  disabled?: boolean;
+  onChange?: () => void;
+}) {
+  return <label className="group relative flex min-h-16 cursor-pointer items-start gap-3 rounded-xl border border-border-strong bg-linear-to-br from-surface to-surface-raised p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-brand hover:shadow-md has-checked:border-brand has-checked:from-brand/12 has-checked:to-surface has-checked:ring-1 has-checked:ring-brand has-checked:shadow-md has-disabled:cursor-not-allowed has-disabled:border-border has-disabled:bg-surface has-disabled:opacity-60 has-disabled:hover:translate-y-0 has-disabled:hover:shadow-sm">
+    <input type="radio" name={name} value={value} checked={checked} defaultChecked={defaultChecked} required={required} disabled={disabled} onChange={onChange} className="peer sr-only" />
+    <span aria-hidden="true" className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border-2 border-border-strong bg-surface shadow-inner transition peer-checked:border-[5px] peer-checked:border-brand peer-focus-visible:outline-2 peer-focus-visible:outline-offset-3 peer-focus-visible:outline-brand" />
+    <span className="min-w-0 flex-1"><span className="block font-semibold text-text-primary">{title}</span>{description ? <span className="mt-1 block text-sm leading-6 text-text-muted">{description}</span> : null}</span>
+    {metadata ? <span className="shrink-0 rounded-full border border-border bg-surface-raised px-3 py-1 text-xs font-semibold text-text-muted shadow-sm">{metadata}</span> : null}
+  </label>;
+}
