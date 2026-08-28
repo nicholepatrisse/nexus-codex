@@ -31,6 +31,22 @@
   --foreground: var(--theme-text-primary);
   --muted: var(--theme-text-muted);
   --accent: var(--theme-accent);
+
+  /* Shared responsive layout rhythm. Mobile is deliberately denser; the
+     desktop values are restored at the first comfortable content width. */
+  --layout-page-gutter: 1rem;
+  --layout-page-block: 2.5rem;
+  --layout-card-padding: 1.25rem;
+  --layout-section-gap: 1.5rem;
+}
+
+@media (min-width: 640px) {
+  :root {
+    --layout-page-gutter: 1.5rem;
+    --layout-page-block: 4rem;
+    --layout-card-padding: 2rem;
+    --layout-section-gap: 2rem;
+  }
 }
 
 /* CSS media queries apply before first paint and continue tracking operating
@@ -93,6 +109,25 @@ body {
     var(--theme-background);
   color: var(--theme-text-primary);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+@utility page-shell {
+  padding-inline: var(--layout-page-gutter);
+  padding-block: var(--layout-page-block);
+}
+
+@utility page-gutter {
+  padding-inline: var(--layout-page-gutter);
+}
+
+@utility responsive-card {
+  padding: var(--layout-card-padding);
+}
+
+@utility responsive-title {
+  font-size: clamp(1.875rem, 8vw, 2.5rem);
+  line-height: 1.1;
+  letter-spacing: -0.025em;
 }
 
 /* Native controls inherit the semantic system even when a component only

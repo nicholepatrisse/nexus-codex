@@ -69,19 +69,19 @@ export default async function CharacterPage({ params, searchParams }: { params: 
   const appliedChronicles = chronicles.filter(({ status }) => status === "applied").sort(chronicleNumberOrder);
   const unappliedChronicles = chronicles.filter(({ status }) => status === "pending");
   const hasSessions = character.upcomingSessions.length > 0 || character.pastSessions.length > 0;
-  return <main className="mx-auto min-h-screen max-w-3xl px-6 py-16">
-    <section className="relative rounded-3xl border border-border bg-surface p-8 sm:p-10">
-      <div className="pr-20 sm:pr-24"><p className="text-sm font-semibold tracking-[0.2em] text-brand uppercase">{character.isOwner ? "Your character" : "Character · Read only"}</p>
-      <h1 className="mt-3 text-4xl font-semibold">{character.name}</h1>
-      {character.isOwner ? <Link href={`/characters/${character.id}/edit`} className="mt-4 inline-block text-sm font-semibold text-brand hover:underline">Edit character</Link> : null}</div>
-      <div className="absolute top-5 right-5 sm:top-7 sm:right-7"><CharacterClassIcon className={character.className} /></div>
-      <nav aria-label="Character sections" className="-mx-2 mt-8 overflow-x-auto border-b border-border px-2">
+  return <main className="page-shell mx-auto min-h-screen max-w-3xl">
+    <section className="responsive-card relative rounded-3xl border border-border bg-surface sm:p-10">
+      <div className="flex items-start gap-3 sm:gap-5"><div className="min-w-0 flex-1"><p className="text-xs font-semibold tracking-[0.18em] text-brand uppercase sm:text-sm sm:tracking-[0.2em]">{character.isOwner ? "Your character" : "Character · Read only"}</p>
+      <h1 className="responsive-title mt-2 break-words font-semibold sm:mt-3">{character.name}</h1>
+      {character.isOwner ? <Link href={`/characters/${character.id}/edit`} className="mt-3 inline-block text-sm font-semibold text-brand hover:underline sm:mt-4">Edit character</Link> : null}</div>
+      <div className="shrink-0"><CharacterClassIcon className={character.className} /></div></div>
+      <nav aria-label="Character sections" className="-mx-1 mt-5 overflow-x-auto border-b border-border px-1 sm:-mx-2 sm:mt-8 sm:px-2">
         <div className="flex min-w-max gap-1">
-          {(character.isOwner ? ownerTabs : ownerTabs.filter((item) => item !== "inventory")).map((item) => <Link key={item} href={item === "overview" ? `/characters/${character.id}` : `/characters/${character.id}?tab=${item}`} aria-current={tab === item ? "page" : undefined} className={`border-b-2 px-4 py-3 text-sm font-semibold capitalize transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${tab === item ? "border-brand text-brand" : "border-transparent text-text-muted hover:border-border-strong hover:text-text-primary"}`}>{item}</Link>)}
+          {(character.isOwner ? ownerTabs : ownerTabs.filter((item) => item !== "inventory")).map((item) => <Link key={item} href={item === "overview" ? `/characters/${character.id}` : `/characters/${character.id}?tab=${item}`} aria-current={tab === item ? "page" : undefined} className={`border-b-2 px-3 py-2.5 text-sm font-semibold capitalize transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:px-4 sm:py-3 ${tab === item ? "border-brand text-brand" : "border-transparent text-text-muted hover:border-border-strong hover:text-text-primary"}`}>{item}</Link>)}
         </div>
       </nav>
       {tab === "overview" ? <>
-      <dl className="mt-8 grid gap-5 sm:grid-cols-2"><div><dt className="text-sm text-text-muted">Society number</dt><dd className="mt-1 font-semibold">{character.societyNumber}</dd></div><CharacterProgress startingLevel={character.startingLevel} currentLevel={character.currentLevel} xp={character.xp} />
+      <dl className="mt-6 grid gap-4 sm:mt-8 sm:grid-cols-2 sm:gap-5"><div><dt className="text-sm text-text-muted">Society number</dt><dd className="mt-1 font-semibold">{character.societyNumber}</dd></div><CharacterProgress startingLevel={character.startingLevel} currentLevel={character.currentLevel} xp={character.xp} />
         {character.isOwner ? <div><dt className="text-sm text-text-muted">Credit balance</dt><dd className="mt-1 font-semibold">{formatCredits(character.creditsMinor ?? 0)} credits</dd></div> : null}
         {character.className ? <div><dt className="text-sm text-text-muted">Class</dt><dd className="mt-1 font-semibold">{character.className}</dd></div> : null}
         {character.ancestry ? <div><dt className="text-sm text-text-muted">Ancestry</dt><dd className="mt-1 font-semibold">{character.ancestry}</dd></div> : null}

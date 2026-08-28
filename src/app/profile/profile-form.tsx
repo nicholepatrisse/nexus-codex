@@ -18,7 +18,7 @@ function Field({ name, label, value, maximum, help, state }: { name: keyof Profi
 
 export function ProfileForm({ profile }: { profile: ProfileValues }) {
   const [state, action] = useActionState(updateProfileAction, {});
-  return <form action={action} className="mt-8 space-y-7" noValidate>
+  return <form action={action} className="space-y-6 sm:space-y-7" noValidate>
     <Field name="displayName" label="Display name / nickname" value={profile.displayName} maximum={100} help="Shown to players and GMs. Clear it to use your account name." state={state} />
     <Field name="discordHandle" label="Discord handle" value={profile.discordHandle} maximum={100} help="Shown where session organizers need contact information." state={state} />
     <Field name="societyPlayNumber" label="Society play number" value={profile.societyPlayNumber} maximum={50} help="Shown to session organizers for organized-play reporting." state={state} />

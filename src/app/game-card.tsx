@@ -50,7 +50,7 @@ function RelationshipPill({ relationship, waitlistPosition }: { relationship: Ga
 export function GameCard({ href, scenarioCode, scenarioTitle, startsAt, displayTimeZone, status, paizoReportedAt, gmName, communityName, confirmedCount, capacity, relationship, waitlistPosition, characterName, warning, actions }: GameCardProps) {
   const cancelled = status === "cancelled";
   const scenario = scenarioCode ? `${scenarioCode} — ${scenarioTitle}` : scenarioTitle;
-  return <article className={`flex h-full min-w-0 flex-col rounded-2xl border p-5 transition ${cancelled ? "border-danger/30 bg-danger/10" : warning ? "border-warning/30 bg-warning/10" : "border-border bg-surface-raised"}`}>
+  return <article className={`flex h-full min-w-0 flex-col rounded-2xl border p-4 transition sm:p-5 ${cancelled ? "border-danger/30 bg-danger/10" : warning ? "border-warning/30 bg-warning/10" : "border-border bg-surface-raised"}`}>
     <div className="min-w-0">
       <h3 className="min-w-0 font-semibold text-text-primary">
         <Link href={href} className="break-words hover:text-brand hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand">{scenario}</Link>

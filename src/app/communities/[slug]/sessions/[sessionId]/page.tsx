@@ -107,11 +107,11 @@ export default async function SessionPage({ params, searchParams }: { params: Pr
     const sessionCharacters = await listCharacters(actor);
     const [sessionSystem] = await getDb().select({ gameSystemId: sessions.gameSystemId }).from(sessions).where(eq(sessions.id, session.id)).limit(1);
     eligibleCharacters = sessionCharacters.filter(({ gameSystemId }) => gameSystemId === sessionSystem?.gameSystemId).map(({ id, name, societyNumber, currentLevel }) => ({ id, name, societyNumber, currentLevel }));
-    return <main className="mx-auto min-h-screen max-w-3xl px-6 py-16">
+    return <main className="page-shell mx-auto min-h-screen max-w-3xl">
       <Link href={`/communities/${encodeURIComponent(slug)}`} className="text-sm text-brand hover:underline">← {access.community.name}</Link>
-      <section className="mt-8 rounded-3xl border border-border bg-surface p-8 sm:p-10">
-        <div><p className="text-sm font-semibold tracking-[0.2em] text-brand uppercase">Session</p><h1 className="mt-3 text-3xl font-semibold">{session.scenarioCode} — {session.scenarioTitle}</h1></div>
-        <section className="mt-8 rounded-2xl border border-border bg-surface p-5" aria-labelledby="signup-heading"><h2 id="signup-heading" className="text-lg font-semibold">Sign up for this game</h2><SessionSignupControl slug={slug} sessionId={session.id} characters={eligibleCharacters} /></section>
+      <section className="responsive-card mt-6 rounded-3xl border border-border bg-surface sm:mt-8 sm:p-10">
+        <div><p className="text-sm font-semibold tracking-[0.2em] text-brand uppercase">Session</p><h1 className="mt-3 break-words text-2xl font-semibold sm:text-3xl">{session.scenarioCode} — {session.scenarioTitle}</h1></div>
+        <section className="mt-6 rounded-2xl border border-border bg-surface p-4 sm:mt-8 sm:p-5" aria-labelledby="signup-heading"><h2 id="signup-heading" className="text-lg font-semibold">Sign up for this game</h2><SessionSignupControl slug={slug} sessionId={session.id} characters={eligibleCharacters} /></section>
         <dl className="mt-8 grid gap-6 sm:grid-cols-2"><div><dt className="text-sm text-text-muted">Game Master</dt><dd className="mt-1 font-semibold">{session.gmName}</dd></div><div><dt className="text-sm text-text-muted">Player capacity</dt><dd className="mt-1 font-semibold">{session.playerCapacity}</dd></div><div><dt className="text-sm text-text-muted">Your local time</dt><dd className="mt-1">{formatInstant(session.startsAt, browserZone)} – {formatInstant(session.endsAt, browserZone)}</dd></div><div><dt className="text-sm text-text-muted">Location</dt><dd className="mt-1 capitalize">{session.locationType}</dd></div></dl>
         {session.notes ? <div className="mt-8 border-t border-border pt-6"><h2 className="text-sm font-semibold text-text-muted">Notes</h2><p className="mt-2 whitespace-pre-wrap">{session.notes}</p></div> : null}
         <SessionRoster capacity={session.playerCapacity} confirmedCount={confirmedCount} waitlistedCount={waitlistedCount} />
@@ -141,13 +141,13 @@ export default async function SessionPage({ params, searchParams }: { params: Pr
   completionCharacters = completionCharacters.map((character) => ({ ...character, scenario: `${session.scenarioCode} — ${session.scenarioTitle}`, playedOn: session.startsAt.toISOString().slice(0, 10) }));
   const completed = session.status === "completed";
   const justCompleted = (await searchParams)?.completed === "1";
-  return <main className="mx-auto min-h-screen max-w-3xl px-6 py-16">
+  return <main className="page-shell mx-auto min-h-screen max-w-3xl">
     <Link href={`/communities/${encodeURIComponent(slug)}`} className="text-sm text-brand hover:underline">← {access.community.name}</Link>
-    <section className="mt-8 rounded-3xl border border-border bg-surface p-8 sm:p-10">
+    <section className="responsive-card mt-6 rounded-3xl border border-border bg-surface sm:mt-8 sm:p-10">
       {cancelled ? <p role="status" className="mb-6 rounded-xl bg-danger/10 p-4 font-semibold text-danger">This session has been cancelled.</p> : null}
       {completed ? <p role="status" className="mb-6 rounded-xl bg-success/10 p-4 font-semibold text-success">{justCompleted ? "Session completed. Chronicle records are ready for player review." : "Completed"}</p> : null}
       <div className="flex flex-wrap items-start justify-between gap-5">
-        <div><div className="flex flex-wrap items-center gap-3"><p className="text-sm font-semibold tracking-[0.2em] text-brand uppercase">{session.status === "draft" ? "Session draft" : "Session"}</p><SessionStatusPill status={session.status === "draft" ? "draft" : session.status === "completed" ? "completed" : session.status === "cancelled" ? "cancelled" : "published"} startsAt={session.startsAt} paizoReportedAt={session.paizoReportedAt} /></div><h1 className="mt-3 text-3xl font-semibold">{session.scenarioCode} — {session.scenarioTitle}</h1></div>
+        <div className="min-w-0"><div className="flex flex-wrap items-center gap-3"><p className="text-sm font-semibold tracking-[0.2em] text-brand uppercase">{session.status === "draft" ? "Session draft" : "Session"}</p><SessionStatusPill status={session.status === "draft" ? "draft" : session.status === "completed" ? "completed" : session.status === "cancelled" ? "cancelled" : "published"} startsAt={session.startsAt} paizoReportedAt={session.paizoReportedAt} /></div><h1 className="mt-3 break-words text-2xl font-semibold sm:text-3xl">{session.scenarioCode} — {session.scenarioTitle}</h1></div>
         {isManager ? <div className="flex flex-wrap gap-3">{session.status === "published" ? <CompleteSessionForm slug={slug} sessionId={session.id} characters={completionCharacters} participantsWithoutCharacters={participantsWithoutCharacters} completed={false} future={session.startsAt > new Date()} /> : null}{!cancelled && !completed ? <Link href={`/communities/${encodeURIComponent(slug)}/sessions/${session.id}/edit`} className="rounded-full border border-border-strong px-5 py-2.5 text-sm font-semibold">Edit {session.status === "draft" ? "draft" : "session"}</Link> : null}{session.status === "draft" ? <PublishSessionButton slug={slug} sessionId={session.id} /> : session.status === "published" ? <CancelSessionButton slug={slug} sessionId={session.id} /> : null}</div> : null}
       </div>
       {ownSignup ? <OwnSessionSignup signup={ownSignup} /> : null}

@@ -17,9 +17,9 @@ export default async function NewCharacterPage({ searchParams }: { searchParams:
   const societyPlayNumber = profile?.societyPlayNumber?.match(/^\d+$/)?.[0] ?? "";
   const societyPrefix = `${societyPlayNumber}-27`;
   const usedCharacterNumbers = characters.flatMap(({ societyNumber }) => societyNumber.startsWith(societyPrefix) ? [societyNumber.slice(societyPrefix.length)] : []);
-  return <main className="mx-auto min-h-screen max-w-2xl px-6 py-16">
+  return <main className="page-shell mx-auto min-h-screen max-w-2xl">
     <p className="text-sm font-semibold tracking-[0.2em] text-brand uppercase">Characters</p>
-    <h1 className="mt-3 text-4xl font-semibold">Add a character</h1>
+    <h1 className="responsive-title mt-3 font-semibold">Add a character</h1>
     <p className="mt-3 text-text-muted">Create a character attached to your account.</p>
     <SocietyNumberGate initialSocietyPlayNumber={societyPlayNumber} usedCharacterNumbers={usedCharacterNumbers} returnTo={returnTo} />
   </main>;
