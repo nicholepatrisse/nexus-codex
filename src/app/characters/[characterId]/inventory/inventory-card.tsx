@@ -12,7 +12,7 @@ const formatCredits = (value: number) => new Intl.NumberFormat("en-US").format(v
 export function InventoryCard({ characterId, entry, saleAction }: { characterId: string; entry: InventoryEntry; saleAction: (state: SaleState, data: FormData) => Promise<SaleState> }) {
   const details = useRef<HTMLDialogElement>(null);
   const acquisition = entry.acquisitionType.replaceAll("_", " ");
-  return <li className="group relative overflow-hidden rounded-2xl border border-border bg-surface-raised transition hover:border-brand focus-within:border-brand">
+  return <li className="card-standard card-interactive group relative overflow-hidden">
     <button type="button" onClick={() => details.current?.showModal()} className="block w-full p-4 pr-16 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand">
       <span className="block min-w-0"><span className="block truncate font-semibold text-text-primary">{entry.itemNameSnapshot}</span><span className="mt-0.5 block text-sm text-text-muted">Quantity {entry.quantity}{entry.bulkSnapshot ? ` · Bulk ${entry.bulkSnapshot} each` : ""}</span></span>
     </button>

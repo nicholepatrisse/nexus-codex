@@ -41,7 +41,7 @@ const transactionLabels: Record<string, string> = {
 };
 
 function ChronicleCard({ chronicle, characterId, isOwner }: { chronicle: ChronicleWithGmCredit; characterId: string; isOwner: boolean }) {
-  return <li className="rounded-2xl border border-border bg-surface-raised p-5 transition hover:border-brand">
+  return <li className="card-standard card-interactive p-5">
     <div className="flex items-start justify-between gap-4"><div className="min-w-0">{chronicle.chronicleNumber ? <p className="text-xs font-semibold tracking-wide text-text-muted uppercase">Chronicle {chronicle.chronicleNumber}</p> : null}<div className={`${chronicle.chronicleNumber ? "mt-1" : ""} flex flex-wrap items-center gap-2`}><Link className="font-semibold text-text-primary hover:text-brand hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand" href={`/characters/${characterId}/chronicles/${chronicle.id}`}>{chronicle.scenarioNumberSnapshot} — {chronicle.scenarioNameSnapshot}</Link>{chronicle.isGmCredit ? <GmCreditBadge /> : null}</div></div>{isOwner && chronicle.status === "pending" ? <div className="shrink-0"><ChronicleLifecycleButton status="pending" action={applyChronicleAction.bind(null, characterId, chronicle.id)} /></div> : null}</div>
     <div className="mt-2 flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-text-muted">{new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${chronicle.playedOn}T00:00:00Z`))} · Level {chronicle.characterLevel} · {chronicle.xp} XP</p>{isOwner && chronicle.status === "pending" && chronicle.provenance === "manual" ? <Link href={`/characters/${characterId}/chronicles/${chronicle.id}/edit`} aria-label={`Edit ${chronicle.scenarioNumberSnapshot} Chronicle`} title="Edit Chronicle" className="inline-flex size-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-surface hover:text-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-4"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg></Link> : null}</div>
   </li>;
@@ -71,7 +71,7 @@ export default async function CharacterPage({ params, searchParams }: { params: 
   const unappliedChronicles = chronicles.filter(({ status }) => status === "pending");
   const hasSessions = character.upcomingSessions.length > 0 || character.pastSessions.length > 0;
   return <main className="page-shell mx-auto min-h-screen max-w-3xl">
-    <section className="responsive-card relative rounded-3xl border border-border bg-surface sm:p-10">
+    <section className="card-standard responsive-card relative sm:rounded-3xl sm:p-10">
       <div className="flex items-start gap-3 sm:gap-5"><div className="min-w-0 flex-1"><p className="text-xs font-semibold tracking-[0.18em] text-brand uppercase sm:text-sm sm:tracking-[0.2em]">{character.isOwner ? "Your character" : "Character · Read only"}</p>
       <h1 className="responsive-title mt-2 break-words font-semibold sm:mt-3">{character.name}</h1>
       {character.isOwner ? <Link href={`/characters/${character.id}/edit`} className="mt-3 inline-block text-sm font-semibold text-brand hover:underline sm:mt-4">Edit character</Link> : null}</div>

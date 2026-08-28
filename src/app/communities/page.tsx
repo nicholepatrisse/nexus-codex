@@ -23,7 +23,7 @@ export default async function CommunitiesPage({ searchParams }: CommunitiesPageP
   if (!result) {
     return (
       <main className="page-shell mx-auto min-h-screen max-w-5xl sm:py-24">
-        <section className="responsive-card rounded-2xl border border-border bg-surface">
+        <section className="card-standard responsive-card">
           <h1 className="text-3xl font-semibold">Community directory unavailable</h1>
           <p className="mt-3 text-text-muted">Please try again in a moment.</p>
         </section>
