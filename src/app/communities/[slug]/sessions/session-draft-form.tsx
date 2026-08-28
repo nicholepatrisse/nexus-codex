@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
+import { StyledSelect } from "@/app/styled-select";
 import type { SessionDraftFormState } from "./actions";
 
 type Option = { id: string; label: string; disabled?: boolean };
+type OptionGroup = { label: string; options: Option[] };
 type InitialDraft = {
   contentItemId: string;
   gmPersonId: string;
@@ -35,7 +37,7 @@ function SubmitButton({ editing }: { editing: boolean }) {
 export function SessionDraftForm({
   action,
   slug,
-  scenarios,
+  scenarioGroups,
   gms,
   canAssignGm,
   actorPersonId,
@@ -43,7 +45,7 @@ export function SessionDraftForm({
 }: {
   action: (state: SessionDraftFormState, data: FormData) => Promise<SessionDraftFormState>;
   slug: string;
-  scenarios: Option[];
+  scenarioGroups: OptionGroup[];
   gms: Option[];
   canAssignGm: boolean;
   actorPersonId: string;
@@ -53,6 +55,8 @@ export function SessionDraftForm({
   const editing = Boolean(initial);
   const values = state.values;
   const [contentItemId, setContentItemId] = useState(values?.contentItemId ?? initial?.contentItemId ?? "");
+  const initialSeason = scenarioGroups.find((group) => group.options.some((option) => option.id === (values?.contentItemId ?? initial?.contentItemId)))?.label ?? "";
+  const [season, setSeason] = useState(initialSeason);
   const [gmPersonId, setGmPersonId] = useState(values?.gmPersonId ?? initial?.gmPersonId ?? "");
   const [localStartsAt, setLocalStartsAt] = useState(values?.localStartsAt ?? localInputValue(initial?.startsAt));
   const [localEndsAt, setLocalEndsAt] = useState(values?.localEndsAt ?? localInputValue(initial?.endsAt));
@@ -62,6 +66,9 @@ export function SessionDraftForm({
       : "virtual",
   );
   const [notes, setNotes] = useState(values?.notes ?? initial?.notes ?? "");
+  const soleGm = canAssignGm && gms.length === 1 ? gms[0] : null;
+  const scenarioOptions = scenarioGroups.find((group) => group.label === season)?.options ?? [];
+  const selectOptions = (options: Option[]) => options.map((option) => ({ value: option.id, label: option.label }));
 
   return <form action={formAction} className="mt-10 space-y-6" noValidate onSubmit={(event) => {
     const form = event.currentTarget;
@@ -77,11 +84,11 @@ export function SessionDraftForm({
     <input type="hidden" name="startsAt" />
     <input type="hidden" name="endsAt" />
     <input type="hidden" name="displayTimeZone" />
-    <div><label htmlFor="contentItemId" className="block text-sm font-semibold">Scenario</label><select id="contentItemId" name="contentItemId" required value={contentItemId} onChange={(event) => setContentItemId(event.currentTarget.value)} className="mt-2 w-full rounded-xl border border-border-strong bg-surface-raised px-4 py-3"><option value="" disabled>Choose a scenario</option>{scenarios.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select>{state.fieldErrors?.contentItemId ? <p role="alert" className="mt-2 text-sm text-danger">{state.fieldErrors.contentItemId[0]}</p> : null}</div>
-    {canAssignGm ? <div><label htmlFor="gmPersonId" className="block text-sm font-semibold">Game Master</label><select id="gmPersonId" name="gmPersonId" required value={gmPersonId} onChange={(event) => setGmPersonId(event.currentTarget.value)} className="mt-2 w-full rounded-xl border border-border-strong bg-surface-raised px-4 py-3"><option value="" disabled>Choose an active GM</option>{gms.map((option) => <option key={option.id} value={option.id} disabled={option.disabled}>{option.label}</option>)}</select><p className="mt-2 text-xs text-text-muted">The selected GM must have an Organized Play number in their profile.</p></div> : <input type="hidden" name="gmPersonId" value={actorPersonId} />}
+    <div className="grid gap-5 sm:grid-cols-2"><div><label htmlFor="season" className="block text-sm font-semibold">Season</label><StyledSelect name="season" label="Season" value={season} options={[{ value: "", label: "Choose a season" }, ...scenarioGroups.map((group) => ({ value: group.label, label: group.label }))]} onValueChange={(nextSeason) => { setSeason(nextSeason); setContentItemId(""); }} /></div><div><label htmlFor="contentItemId" className="block text-sm font-semibold">Scenario</label><StyledSelect name="contentItemId" label="Scenario" value={contentItemId} disabled={!season} invalid={Boolean(state.fieldErrors?.contentItemId)} options={[{ value: "", label: season ? "Choose a scenario" : "Choose a season first" }, ...selectOptions(scenarioOptions)]} onValueChange={setContentItemId} />{state.fieldErrors?.contentItemId ? <p role="alert" className="mt-2 text-sm text-danger">{state.fieldErrors.contentItemId[0]}</p> : null}</div></div>
+    {canAssignGm ? soleGm ? <input type="hidden" name="gmPersonId" value={soleGm.id} /> : <div><label htmlFor="gmPersonId" className="block text-sm font-semibold">Game Master</label><StyledSelect name="gmPersonId" label="Game Master" value={gmPersonId} options={[{ value: "", label: "Choose an active GM" }, ...selectOptions(gms)]} onValueChange={setGmPersonId} /></div> : <input type="hidden" name="gmPersonId" value={actorPersonId} />}
     <div className="grid gap-5 sm:grid-cols-2"><div><label htmlFor="localStartsAt" className="block text-sm font-semibold">Starts</label><input id="localStartsAt" name="localStartsAt" type="datetime-local" required value={localStartsAt} onChange={(event) => { const start = event.currentTarget.value; setLocalStartsAt(start); setLocalEndsAt(defaultEndFromStart(start)); }} className="mt-2 w-full rounded-xl border border-border-strong bg-surface-raised px-4 py-3" /></div><div><label htmlFor="localEndsAt" className="block text-sm font-semibold">Ends</label><input id="localEndsAt" name="localEndsAt" type="datetime-local" required value={localEndsAt} onChange={(event) => setLocalEndsAt(event.currentTarget.value)} className="mt-2 w-full rounded-xl border border-border-strong bg-surface-raised px-4 py-3" />{state.fieldErrors?.endsAt ? <p role="alert" className="mt-2 text-sm text-danger">{state.fieldErrors.endsAt[0]}</p> : null}</div></div>
     <p className="text-sm text-text-muted">Times use this device’s time zone. The saved instant will not change if its display zone changes later.</p>
-    <fieldset><legend className="text-sm font-semibold">Location type</legend><div className="mt-3 flex gap-6"><label><input type="radio" name="locationType" value="virtual" checked={locationType === "virtual"} onChange={() => setLocationType("virtual")} /> <span className="ml-2">Virtual</span></label><label><input type="radio" name="locationType" value="physical" checked={locationType === "physical"} onChange={() => setLocationType("physical")} /> <span className="ml-2">Physical</span></label></div></fieldset>
+    <div><label htmlFor="locationType" className="block text-sm font-semibold">Style</label><StyledSelect name="locationType" label="Style" value={locationType} options={[{ value: "virtual", label: "Virtual — played online" }, { value: "physical", label: "Physical — played in person" }]} onValueChange={(value) => setLocationType(value as "virtual" | "physical")} /></div>
     <div><label htmlFor="notes" className="block text-sm font-semibold">Notes <span className="font-normal text-text-muted">(optional)</span></label><textarea id="notes" name="notes" maxLength={4000} value={notes} onChange={(event) => setNotes(event.currentTarget.value)} rows={5} className="mt-2 w-full rounded-xl border border-border-strong bg-surface-raised px-4 py-3" /></div>
     <p className="rounded-xl border border-border bg-surface-raised p-4 text-sm text-text-muted">Player capacity is fixed at the standard Society table size of six.</p>
     {state.formError ? <p role="alert" className="rounded-xl bg-danger/10 p-4 text-danger">{state.formError}</p> : null}{state.success ? <p role="status" className="rounded-xl bg-success/10 p-4 text-success">{state.success}</p> : null}

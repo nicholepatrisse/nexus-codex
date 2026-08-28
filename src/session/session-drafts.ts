@@ -105,6 +105,28 @@ async function lockAndValidateAssignedGm(
   if (!grant) throw new SessionDraftValidationError("Choose an active community GM.");
 }
 
+async function eligibleGmIds(transaction: Transaction, communityId: string) {
+  const rows = await transaction
+    .selectDistinct({ id: people.id, organizedPlayNumber: people.societyPlayNumber })
+    .from(communityRoleGrants)
+    .innerJoin(people, eq(people.id, communityRoleGrants.personId))
+    .innerJoin(
+      communityMemberships,
+      and(
+        eq(communityMemberships.communityId, communityRoleGrants.communityId),
+        eq(communityMemberships.personId, communityRoleGrants.personId),
+        eq(communityMemberships.status, "active"),
+      ),
+    )
+    .where(and(
+      eq(communityRoleGrants.communityId, communityId),
+      inArray(communityRoleGrants.role, ["owner", "gm"]),
+      eq(communityRoleGrants.status, "active"),
+      isNull(communityRoleGrants.revokedAt),
+    ));
+  return rows.filter(({ organizedPlayNumber }) => organizedPlayNumber?.trim()).map(({ id }) => id);
+}
+
 async function validateSupportedScenario(
   transaction: Transaction,
   communityId: string,
@@ -200,8 +222,7 @@ export async function createSessionDraft(
   }
 
   if (!canPerformSessionOperation(role, "session.create")) return { status: "forbidden" };
-  const gmPersonId = role === "owner" ? input.gmPersonId : actor.personId;
-  if (!gmPersonId) throw new SessionDraftValidationError("Choose an active community GM.");
+  const requestedGmPersonId = role === "owner" ? input.gmPersonId : actor.personId;
   if (role === "gm" && input.gmPersonId && input.gmPersonId !== actor.personId) {
     return { status: "forbidden" };
   }
@@ -211,6 +232,19 @@ export async function createSessionDraft(
     if (current.status !== "available") return { status: "not-found" };
     const currentRole = effectiveRole(current);
     if (!canPerformSessionOperation(currentRole, "session.create")) return { status: "forbidden" };
+    const eligibleIds = currentRole === "owner"
+      ? await eligibleGmIds(transaction, current.community.id)
+      : [actor.personId];
+    if (eligibleIds.length === 0) {
+      throw new SessionDraftValidationError("No eligible Game Master is available.");
+    }
+    const gmPersonId = currentRole === "owner" && eligibleIds.length === 1
+      ? eligibleIds[0]
+      : requestedGmPersonId;
+    if (!gmPersonId) throw new SessionDraftValidationError("Choose an active community GM.");
+    if (currentRole === "owner" && !eligibleIds.includes(gmPersonId)) {
+      throw new SessionDraftValidationError("Choose an active community GM.");
+    }
     if (currentRole === "gm" && gmPersonId !== actor.personId) return { status: "forbidden" };
     const sessionId = await insertDraft(
       transaction,
