@@ -8,7 +8,7 @@ export default async function GamesPage() {
   if (!actor) redirect("/sign-in?callbackURL=%2Fgames");
 
   const games = await listAllSignedUpGames(actor.personId);
-  return <main className="mx-auto min-h-screen max-w-5xl px-6 py-10">
+  return <main className="page-shell mx-auto min-h-screen max-w-5xl sm:py-10">
     <AllGamesList games={games} />
   </main>;
 }

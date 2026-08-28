@@ -22,8 +22,8 @@ export default async function CommunitiesPage({ searchParams }: CommunitiesPageP
 
   if (!result) {
     return (
-      <main className="mx-auto min-h-screen max-w-5xl px-6 py-16 sm:py-24">
-        <section className="rounded-2xl border border-border bg-surface p-7">
+      <main className="page-shell mx-auto min-h-screen max-w-5xl sm:py-24">
+        <section className="responsive-card rounded-2xl border border-border bg-surface">
           <h1 className="text-3xl font-semibold">Community directory unavailable</h1>
           <p className="mt-3 text-text-muted">Please try again in a moment.</p>
         </section>
@@ -34,12 +34,12 @@ export default async function CommunitiesPage({ searchParams }: CommunitiesPageP
   const pageCount = Math.max(1, Math.ceil(result.total / result.pageSize));
 
   return (
-    <main className="mx-auto min-h-screen max-w-5xl px-6 py-16 sm:py-24">
+    <main className="page-shell mx-auto min-h-screen max-w-5xl sm:py-24">
       <section>
         <p className="text-sm font-semibold tracking-[0.2em] text-brand uppercase">
           Community directory
         </p>
-        <h1 className="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">
+        <h1 className="responsive-title mt-3 font-semibold sm:text-5xl">
           Public communities
         </h1>
         <p className="mt-4 max-w-2xl leading-7 text-text-muted">
