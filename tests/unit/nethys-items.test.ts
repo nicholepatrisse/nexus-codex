@@ -19,6 +19,14 @@ describe("Archives of Nethys item import", () => {
     ]);
   });
 
+  it("returns weapon grade-table rows as separate import choices", () => {
+    const weapon = `<div class="weapon"><h1 class="title"><span class="sfs">SFS Standard</span> Arc Pistol</h1><div><b>Price</b> 25 credits</div><div><b>Bulk</b> 1</div><div><b>Hands</b> 1</div><table><thead><tr><th>Grade</th><th>Level</th><th>Upgrade Price</th><th>Total Price</th></tr></thead><tbody><tr><td>Commercial Arc Pistol</td><td>0</td><td>—</td><td>25 credits</td></tr><tr><td>Tactical Arc Pistol</td><td>2</td><td>+350 credits</td><td>375 credits</td></tr></tbody></table></div>`;
+    expect(parseNethysItemsHtml(weapon, "https://2e.aonsrd.com/equipment/weapons/36-arc-pistol")).toEqual([
+      expect.objectContaining({ name: "Commercial Arc Pistol", level: 0, price: "25 credits", priceCredits: 25, bulk: "1", hands: "1" }),
+      expect.objectContaining({ name: "Tactical Arc Pistol", level: 2, price: "375 credits", priceCredits: 375, bulk: "1", hands: "1" }),
+    ]);
+  });
+
   it("only accepts recognized HTTPS item URLs", () => {
     expect(validateNethysItemUrl("https://2e.aonsrd.com/treasure/19-hygiene-kit").href).toBe("https://2e.aonsrd.com/treasure/19-hygiene-kit");
     expect(() => validateNethysItemUrl("not a url")).toThrowError(NethysItemError);

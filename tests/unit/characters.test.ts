@@ -6,7 +6,7 @@ import { nextAvailableCharacterNumber, normalizeCharacterNumber } from "@/app/ch
 import { CharacterProgress } from "@/app/characters/[characterId]/character-progress";
 describe("character creation", () => {
   it("accepts and normalizes required fields", () => {
-    expect(createCharacterInputSchema.parse({ name: "  Navasi  ", characterNumber: " 01 " })).toEqual({ name: "Navasi", characterNumber: "01", startingLevel: 1, startingCredits: 150, className: null, ancestry: null, background: null, backstory: null, notes: null });
+    expect(createCharacterInputSchema.parse({ name: "  Navasi  ", characterNumber: " 01 " })).toEqual({ name: "Navasi", characterNumber: "01", startingLevel: 1, startingCredits: 150, startingItems: [], className: null, ancestry: null, background: null, backstory: null, notes: null });
   });
   it.each([
     { name: "", characterNumber: "01" },
@@ -17,7 +17,7 @@ describe("character creation", () => {
 
   it("normalizes optional character details", () => {
     expect(createCharacterInputSchema.parse({ name: "Navasi", characterNumber: "01", startingLevel: "7", className: "  Envoy ", ancestry: "  Human  ", background: "   " })).toEqual({
-      name: "Navasi", characterNumber: "01", startingLevel: 7, startingCredits: 7200, className: "Envoy", ancestry: "Human", background: null, backstory: null, notes: null,
+      name: "Navasi", characterNumber: "01", startingLevel: 7, startingCredits: 7200, startingItems: [], className: "Envoy", ancestry: "Human", background: null, backstory: null, notes: null,
     });
   });
 
@@ -34,8 +34,18 @@ describe("character creation", () => {
     expect(createCharacterInputSchema.safeParse({ name: "Navasi", characterNumber: "01", startingLevel }).success).toBe(true);
   });
 
-  it.each([[1, 150], [3, 750], [3, 250], [5, 2700], [5, 500], [7, 7200], [7, 1250]])("accepts %i credits at starting level %i", (startingLevel, startingCredits) => {
+  it.each([[1, 150], [3, 750], [5, 2700], [7, 7200]])("accepts %i credits at starting level %i", (startingLevel, startingCredits) => {
     expect(createCharacterInputSchema.safeParse({ name: "Navasi", characterNumber: "01", startingLevel, startingCredits }).success).toBe(true);
+  });
+
+  it.each([[3, 250, 3], [5, 500, 6], [7, 1250, 6]])("requires every item for level %i permanent wealth", (startingLevel, startingCredits, count) => {
+    const startingItems = Array.from({ length: count }, (_, index) => ({ url: `https://2e.aonsrd.com/treasure/${index + 1}-item`, name: `Item ${index + 1}` }));
+    expect(createCharacterInputSchema.safeParse({ name: "Navasi", characterNumber: "01", startingLevel, startingCredits }).success).toBe(false);
+    expect(createCharacterInputSchema.safeParse({ name: "Navasi", characterNumber: "01", startingLevel, startingCredits, startingItems }).success).toBe(true);
+  });
+
+  it("rejects starting items with the credits-only option", () => {
+    expect(createCharacterInputSchema.safeParse({ name: "Navasi", characterNumber: "01", startingLevel: 3, startingCredits: 750, startingItems: [{ url: "https://2e.aonsrd.com/treasure/1-item", name: "Item" }] }).success).toBe(false);
   });
 
   it.each([[1, 250], [3, 150], [5, 750], [7, 2700], [7, -1]])("rejects %i credits at starting level %i", (startingLevel, startingCredits) => {
