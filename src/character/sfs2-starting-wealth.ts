@@ -16,6 +16,13 @@ export const SFS2_STARTING_WEALTH = {
 
 export type Sfs2StartingLevel = keyof typeof SFS2_STARTING_WEALTH;
 
+export const SFS2_STARTING_ITEM_LEVELS: Record<Sfs2StartingLevel, readonly number[]> = {
+  1: [],
+  3: [2, 1, 1],
+  5: [4, 3, 3, 2, 1, 1],
+  7: [6, 5, 5, 4, 3, 3],
+};
+
 export function startingWealthOptions(level: Sfs2StartingLevel) {
   return SFS2_STARTING_WEALTH[level];
 }
@@ -27,4 +34,8 @@ export function isValidStartingCredits(level: Sfs2StartingLevel, credits: number
 export function startingWealthNote(level: Sfs2StartingLevel, credits: number) {
   const option = startingWealthOptions(level).find((candidate) => candidate.credits === credits);
   return option?.kind === "permanent_items" ? "Starting wealth — permanent items option" : "Starting wealth — credits-only option";
+}
+
+export function usesPermanentStartingItems(level: Sfs2StartingLevel, credits: number) {
+  return startingWealthOptions(level).some((option) => option.credits === credits && option.kind === "permanent_items");
 }

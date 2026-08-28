@@ -89,6 +89,31 @@ export function parseNethysItemsHtml(html: string, sourceUrl: string): NethysIte
   const root = $(".treasure, .armor, .shield, .weapon").first();
   if (!root.length) throw new NethysItemError("not_item", "The referenced page does not appear to contain a supported item.");
   const variants = root.children(".treasure, .armor, .shield, .weapon");
+  if (root.hasClass("weapon")) {
+    const gradeTable = root.find("table").filter((_index, table) => {
+      const headings = $(table).find("thead th").map((_headingIndex, heading) => clean($(heading).text())?.toLowerCase()).get();
+      return headings.includes("grade") && headings.includes("level") && headings.includes("total price");
+    }).first();
+    if (gradeTable.length) {
+      const headings = gradeTable.find("thead th").map((_index, heading) => clean($(heading).text())?.toLowerCase()).get();
+      const gradeIndex = headings.indexOf("grade");
+      const levelIndex = headings.indexOf("level");
+      const priceIndex = headings.indexOf("total price");
+      const weaponVariants = gradeTable.find("tbody tr").toArray().flatMap((row) => {
+        const cells = $(row).children("td").toArray().map((cell) => clean($(cell).text()));
+        const name = cells[gradeIndex];
+        const level = Number(cells[levelIndex]);
+        const price = cells[priceIndex];
+        if (!name || !Number.isInteger(level) || level < 0) return [];
+        const variant = root.clone();
+        variant.children("h1.title, h2.title").first().html(`${name}<span class="feature-level">Item ${level}</span>`);
+        const parsed = parseItemRoot($, variant, sourceUrl);
+        const creditMatch = price?.match(/^([\d,]+(?:\.\d+)?)\s+credits?$/i);
+        return [{ ...parsed, name, level, price, priceCredits: creditMatch?.[1] ? Number(creditMatch[1].replaceAll(",", "")) : undefined }];
+      });
+      if (weaponVariants.length) return weaponVariants;
+    }
+  }
   return (variants.length ? variants.toArray().map((element) => $(element)) : [root]).map((itemRoot) => parseItemRoot($, itemRoot, sourceUrl));
 }
 

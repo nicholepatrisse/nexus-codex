@@ -5,11 +5,12 @@ import type { AuthenticatedActor } from "@/auth/actor";
 import { resolveCommunityAccessBySlug } from "@/authorization/community-access";
 import { canPerformCommunityOperation, type CommunityRole } from "@/authorization/policy";
 import { getDb } from "@/db/client";
-import { characterCreditLedgerEntries, characters, chronicles, communities, contentItems, gameSystems, people, sessionGmCredits, sessionSignups, sessions } from "@/db/schema";
+import { characterCreditLedgerEntries, characterInventoryEntries, characters, chronicles, communities, contentItems, gameSystems, people, sessionGmCredits, sessionSignups, sessions } from "@/db/schema";
 import { SUPPORTED_GAME_SYSTEM } from "@/game-system/config";
 import { CHARACTER_CLASSES } from "@/character/class-options";
 import { deriveSfs2Progression } from "@/character/sfs2-progression";
-import { isValidStartingCredits, SFS2_STARTING_WEALTH, startingWealthNote, type Sfs2StartingLevel } from "@/character/sfs2-starting-wealth";
+import { isValidStartingCredits, SFS2_STARTING_ITEM_LEVELS, SFS2_STARTING_WEALTH, startingWealthNote, usesPermanentStartingItems, type Sfs2StartingLevel } from "@/character/sfs2-starting-wealth";
+import { fetchNethysItems, nethysItemNotes } from "@/nethys/items";
 
 const optionalCharacterClassSchema = z.string().trim()
   .pipe(z.union([z.literal(""), z.enum(CHARACTER_CLASSES, { error: "Choose a supported class." })]))
@@ -20,6 +21,8 @@ export const createCharacterInputSchema = z.object({
   characterNumber: z.string().trim().regex(/^(0?[1-9]|[1-9]\d)$/, "Enter a character number from 1 to 99."),
   startingLevel: z.coerce.number().refine((level): level is 1 | 3 | 5 | 7 => [1, 3, 5, 7].includes(level), "Starting level must be 1, 3, 5, or 7.").default(1),
   startingCredits: z.coerce.number().int().nonnegative().optional(),
+  startingItems: z.array(z.object({ url: z.string().url(), name: z.string().trim().min(1).max(200) })).default([]),
+  idempotencyKey: z.string().uuid().optional(),
   className: optionalCharacterClassSchema,
   ancestry: z.string().trim().max(100, "Ancestry must be 100 characters or fewer.").nullable().optional().transform((value) => value || null),
   background: z.string().trim().max(100, "Background must be 100 characters or fewer.").nullable().optional().transform((value) => value || null),
@@ -30,6 +33,11 @@ export const createCharacterInputSchema = z.object({
   const startingCredits = input.startingCredits ?? SFS2_STARTING_WEALTH[startingLevel][0].credits;
   if (!isValidStartingCredits(startingLevel, startingCredits)) {
     context.addIssue({ code: "custom", path: ["startingCredits"], message: "Choose a starting wealth option available at this level." });
+    return z.NEVER;
+  }
+  const requiredItems = usesPermanentStartingItems(startingLevel, startingCredits) ? SFS2_STARTING_ITEM_LEVELS[startingLevel] : [];
+  if (input.startingItems.length !== requiredItems.length) {
+    context.addIssue({ code: "custom", path: ["startingItems"], message: requiredItems.length ? "Select every permanent starting item." : "Starting items are only allowed with the permanent-items option." });
     return z.NEVER;
   }
   return { ...input, startingCredits };
@@ -111,6 +119,13 @@ export async function getCharacterDetail(actor: AuthenticatedActor, characterId:
 }
 export async function createCharacter(actor: AuthenticatedActor, rawInput: CreateCharacterInput, database: Database = getDb()) {
   const input = createCharacterInputSchema.parse(rawInput);
+  const requiredLevels = SFS2_STARTING_ITEM_LEVELS[input.startingLevel as Sfs2StartingLevel];
+  const selectedItems = await Promise.all(input.startingItems.map(async (selection, index) => {
+    const item = (await fetchNethysItems(selection.url)).find((candidate) => candidate.name === selection.name && candidate.level === requiredLevels[index]);
+    if (!item) throw new CharacterCreationError(`Starting item ${index + 1} must be an available level ${requiredLevels[index]} item.`);
+    if (item.rarity && item.rarity.toLowerCase() !== "common") throw new CharacterCreationError(`${item.name} requires access that character creation cannot verify.`);
+    return item;
+  }));
   const [[system], [profile]] = await Promise.all([
     database.select({ id: gameSystems.id }).from(gameSystems).where(eq(gameSystems.id, SUPPORTED_GAME_SYSTEM.id)).limit(1),
     database.select({ societyPlayNumber: people.societyPlayNumber }).from(people).where(eq(people.id, actor.personId)).limit(1),
@@ -128,6 +143,13 @@ export async function createCharacter(actor: AuthenticatedActor, rawInput: Creat
       }).returning({ id: characters.id, name: characters.name });
       if (!created) throw new CharacterCreationError("The character could not be created.");
       await transaction.insert(characterCreditLedgerEntries).values({ id: randomUUID(), characterId: created.id, amountMinor: input.startingCredits, displayScale: 1, type: "starting_credits", effectiveOn: new Date().toISOString().slice(0, 10), source: "character_creation", notes: startingWealthNote(input.startingLevel, input.startingCredits) });
+      if (selectedItems.length) await transaction.insert(characterInventoryEntries).values(selectedItems.map((item, index) => ({
+        id: randomUUID(), characterId: created.id, contentItemId: null, itemNameSnapshot: item.name, itemLinkSnapshot: item.url,
+        bulkSnapshot: item.bulk ?? null, quantity: 1, acquisitionType: "starting_equipment", acquiredOn: new Date().toISOString().slice(0, 10),
+        amountPaidMinor: null, valueMinor: item.priceCredits ?? null, sourceChronicleId: null, sourcePurchaseId: null,
+        notes: `Starting wealth permanent item (level ${requiredLevels[index]}).\n\n${nethysItemNotes(item)}`,
+        lotKey: input.idempotencyKey ? `starting-wealth:${input.idempotencyKey}:${index}` : randomUUID(),
+      })));
       return created;
     });
   } catch (error) {
