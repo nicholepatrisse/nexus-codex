@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 import { createTestIdentity } from "@/auth/test-fixture";
-import { createCharacter, getCharacterDetail, listCharacters, updateCharacter } from "@/character/characters";
+import { createCharacter, getCharacterDetail, listCharacters, StartingLevelLockedError, updateCharacter } from "@/character/characters";
 import { applyManualChronicle, createManualChronicle, deleteManualChronicle, listChronicles, unapplyManualChronicle, updateManualChronicle } from "@/character/chronicles";
 import { createCreditAdjustment, getOwnedCreditLedger } from "@/character/credit-ledger";
 import { createInventoryEntry, deleteInventoryEntry, listOwnedInventory, updateInventoryEntry } from "@/character/inventory";
@@ -45,9 +45,9 @@ describeWithDatabase("characters persistence", () => {
     if (!created) throw new Error("Expected character creation to return a record.");
 
     expect(await updateCharacter(otherActor, created.id, { name: "Stolen" })).toBeNull();
-    const attemptedStartingLevelChange = { name: " Navasi ", startingLevel: 7, className: " Envoy ", ancestry: "Human", background: "  ", backstory: "  Raised aboard a station.  ", notes: "  " } as Parameters<typeof updateCharacter>[2];
+    const attemptedStartingLevelChange = { name: " Navasi ", startingLevel: 7, startingCredits: 7200, startingItems: [], className: " Envoy ", ancestry: "Human", background: "  ", backstory: "  Raised aboard a station.  ", notes: "  " } as Parameters<typeof updateCharacter>[2];
     expect(await updateCharacter(ownerActor, created.id, attemptedStartingLevelChange)).toEqual(expect.objectContaining({ id: created.id }));
-    expect(await getCharacterDetail(ownerActor, created.id)).toEqual(expect.objectContaining({ name: "Navasi", startingLevel: 1, currentLevel: 1, xp: 0, className: "Envoy", ancestry: "Human", background: null, backstory: "Raised aboard a station.", notes: null, isOwner: true }));
+    expect(await getCharacterDetail(ownerActor, created.id)).toEqual(expect.objectContaining({ name: "Navasi", startingLevel: 7, startingCredits: 7200, creditsMinor: 7200, currentLevel: 7, xp: 0, className: "Envoy", ancestry: "Human", background: null, backstory: "Raised aboard a station.", notes: null, isOwner: true }));
   });
 
   it("owner-manages manual Chronicles without changing identity", async () => {
@@ -73,6 +73,7 @@ describeWithDatabase("characters persistence", () => {
     expect(await applyManualChronicle(otherActor, character.id, first.id)).toBeNull();
     const appliedAt = new Date("2026-08-23T10:00:00Z");
     expect(await applyManualChronicle(ownerActor, character.id, first.id, getDb(), appliedAt)).toEqual(expect.objectContaining({ status: "applied", appliedAt, chronicleNumber: "1" }));
+    await expect(updateCharacter(ownerActor, character.id, { name: "Chronicle Hero", startingLevel: 3, startingCredits: 750, startingItems: [] })).rejects.toBeInstanceOf(StartingLevelLockedError);
     expect(await applyManualChronicle(ownerActor, character.id, first.id, getDb(), new Date("2026-08-24T10:00:00Z"))).toEqual(expect.objectContaining({ status: "applied", appliedAt, chronicleNumber: "1" }));
     expect(await getCharacterDetail(ownerActor, character.id)).toEqual(expect.objectContaining({ xp: 12, currentLevel: 2, creditsMinor: 375 }));
     expect(await listCharacters(ownerActor)).toEqual([expect.objectContaining({ id: character.id, totalXp: 12, currentLevel: 2 })]);
@@ -80,6 +81,7 @@ describeWithDatabase("characters persistence", () => {
     expect(await getCharacterDetail(ownerActor, character.id)).toEqual(expect.objectContaining({ creditsMinor: 400 }));
     expect(await deleteManualChronicle(ownerActor, character.id, first.id)).toBe(false);
     expect(await unapplyManualChronicle(ownerActor, character.id, first.id)).toEqual(expect.objectContaining({ status: "pending", appliedAt: null }));
+    await expect(updateCharacter(ownerActor, character.id, { name: "Chronicle Hero", startingLevel: 3, startingCredits: 750, startingItems: [] })).rejects.toBeInstanceOf(StartingLevelLockedError);
     expect(await getCharacterDetail(ownerActor, character.id)).toEqual(expect.objectContaining({ xp: 0, creditsMinor: 150 }));
     expect(await deleteManualChronicle(otherActor, character.id, first.id)).toBe(false);
     expect(await deleteManualChronicle(ownerActor, character.id, first.id)).toBe(false);

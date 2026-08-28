@@ -159,6 +159,7 @@ export async function applyChronicle(actor: AuthenticatedActor, characterId: str
     const chronicleNumber = pending?.chronicleNumber ?? (pending ? await nextChronicleNumber(characterId, transaction as Database) : null);
     const [applied] = chronicleNumber ? await transaction.update(chronicles).set({ status: "applied", appliedAt: now, chronicleNumber, updatedAt: now }).where(and(eq(chronicles.id, chronicleId), eq(chronicles.characterId, characterId), eq(chronicles.status, "pending"), isNull(chronicles.appliedAt))).returning() : [];
     if (applied) {
+      await transaction.update(characters).set({ startingLevelLocked: true, updatedAt: now }).where(eq(characters.id, characterId));
       const existing = await transaction.select({ id: characterCreditLedgerEntries.id, amountMinor: characterCreditLedgerEntries.amountMinor }).from(characterCreditLedgerEntries).where(eq(characterCreditLedgerEntries.sourceChronicleId, chronicleId));
       const net = existing.reduce((sum, entry) => sum + entry.amountMinor, 0);
       const total = totalCredits(applied);
