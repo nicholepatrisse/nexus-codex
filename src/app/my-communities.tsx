@@ -1,5 +1,8 @@
 import Link from "next/link";
 import { SparkAccent } from "@/app/accent-primitives";
+import { CommunityCard } from "@/app/community-card";
+import { EmptyState } from "@/app/empty-state";
+import { StatusBadge } from "@/app/status-badge";
 import { getAuthenticatedActor } from "@/auth/actor";
 import {
   listHomepageAdmissionStatusesForPerson,
@@ -23,25 +26,25 @@ interface AdmissionSummary {
   updatedAt: Date;
 }
 
-const admissionBadges: Record<string, { label: string; className: string; message: string }> = {
+const admissionBadges: Record<string, { label: string; tone: "neutral" | "success" | "warning" | "danger"; message: string }> = {
   pending: {
     label: "Pending",
-    className: "border-warning/30 bg-warning/10 text-warning",
+    tone: "warning",
     message: "An owner is reviewing your membership request.",
   },
   approved: {
     label: "Approved",
-    className: "border-success/30 bg-success/10 text-success",
+    tone: "success",
     message: "Your membership request was approved.",
   },
   rejected: {
     label: "Not approved",
-    className: "border-danger/30 bg-danger/10 text-danger",
+    tone: "danger",
     message: "Your membership request was not approved.",
   },
   cancelled: {
     label: "Cancelled",
-    className: "border-border-strong bg-surface-raised text-text-muted",
+    tone: "neutral",
     message: "You cancelled this membership request.",
   },
 };
@@ -58,16 +61,14 @@ export function AdmissionStatusList({ admissions }: { admissions: AdmissionSumma
         {admissions.slice(0, 2).map((admission) => {
           const badge = admissionBadges[admission.status] ?? {
             label: "Updated",
-            className: "border-border-strong bg-surface-raised text-text-muted",
+            tone: "neutral" as const,
             message: "Your membership request has been updated.",
           };
           const content = (
             <>
               <span className="flex items-start justify-between gap-4">
                 <span className="font-semibold text-text-primary">{admission.communityName}</span>
-                <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${badge.className}`}>
-                  {badge.label}
-                </span>
+                <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
               </span>
               <span className="mt-3 block text-sm text-text-muted">{badge.message}</span>
             </>
@@ -135,27 +136,14 @@ export function CommunityList({
       </div>
 
       {activeCommunities.length === 0 && archivedCommunities.length === 0 ? (
-        <div className="accent-brand-gradient mt-6 rounded-2xl border border-dashed border-border-strong p-6">
-          <p className="flex items-center gap-2 font-semibold"><SparkAccent size={14} />No communities yet</p>
-          <p className="mt-2 text-sm leading-6 text-text-muted">
-            Create a community to start organizing Society games.
-          </p>
-        </div>
+        <EmptyState className="accent-brand-gradient mt-6" icon={<SparkAccent size={14} />} title="No communities yet" description="Create a community to start organizing Society games." />
       ) : null}
 
       {activeCommunities.length > 0 ? (
         <ul className="mt-6 grid gap-4 sm:grid-cols-2">
           {activeCommunities.slice(0, 2).map((community) => (
             <li key={community.id}>
-              <Link
-                href={`/communities/${community.slug}`}
-                className="block rounded-2xl border border-border bg-surface-raised p-5 transition hover:border-brand hover:bg-surface-hover"
-              >
-                <span className="block text-lg font-semibold text-text-primary">{community.name}</span>
-                <span className="mt-2 block text-sm capitalize text-text-muted">
-                  {community.visibility} community
-                </span>
-              </Link>
+              <CommunityCard name={community.name} slug={community.slug} href={`/communities/${community.slug}`} metadata={<span className="capitalize">{community.visibility} community</span>} />
             </li>
           ))}
         </ul>
@@ -172,13 +160,7 @@ export function CommunityList({
           <ul className="mt-4 grid gap-4 sm:grid-cols-2">
             {archivedCommunities.slice(0, 2).map((community) => (
               <li key={community.id}>
-                <Link
-                  href={`/communities/${community.slug}/settings`}
-                  className="block rounded-2xl border border-border bg-surface/70 p-5 text-text-muted transition hover:border-border-strong hover:bg-surface-hover"
-                >
-                  <span className="block text-lg font-semibold text-text-primary">{community.name}</span>
-                  <span className="mt-2 block text-sm text-text-subtle">Archived · Open settings to restore</span>
-                </Link>
+                <CommunityCard name={community.name} slug={community.slug} href={`/communities/${community.slug}/settings`} metadata="Archived · Open settings to restore" muted />
               </li>
             ))}
           </ul>
