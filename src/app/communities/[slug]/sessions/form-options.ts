@@ -43,8 +43,25 @@ export async function loadSessionFormOptions(communityId: string) {
       ))
       .orderBy(asc(people.displayName)),
   ]);
+  const collator = new Intl.Collator("en", { numeric: true, sensitivity: "base" });
+  const groupedScenarios = new Map<string, typeof scenarios>();
+  for (const scenario of scenarios) {
+    const seasonNumber = scenario.code.match(/^(\d+)-/)?.[1];
+    const season = seasonNumber ? `Season ${Number(seasonNumber)}` : "Other scenarios";
+    groupedScenarios.set(season, [...(groupedScenarios.get(season) ?? []), scenario]);
+  }
+
   return {
-    scenarios: scenarios.map(({ id, code, title }) => ({ id, label: `${code} — ${title}` })),
-    gms: gms.map(({ id, displayName, organizedPlayNumber }) => ({ id, label: organizedPlayNumber ? `${displayName} · ${organizedPlayNumber}` : `${displayName} · Organized Play number required`, disabled: !organizedPlayNumber })),
+    scenarioGroups: [...groupedScenarios.entries()]
+      .sort(([left], [right]) => left === "Other scenarios" ? 1 : right === "Other scenarios" ? -1 : collator.compare(left, right))
+      .map(([label, items]) => ({
+        label,
+        options: items
+          .sort((left, right) => collator.compare(left.code, right.code))
+          .map(({ id, code, title }) => ({ id, label: `${code}: ${title}` })),
+      })),
+    gms: gms
+      .filter(({ organizedPlayNumber }) => organizedPlayNumber?.trim())
+      .map(({ id, displayName, organizedPlayNumber }) => ({ id, label: `${displayName} · ${organizedPlayNumber}` })),
   };
 }
