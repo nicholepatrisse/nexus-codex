@@ -242,9 +242,6 @@ export async function createSessionDraft(
       ? eligibleIds[0]
       : requestedGmPersonId;
     if (!gmPersonId) throw new SessionDraftValidationError("Choose an active community GM.");
-    if (currentRole === "owner" && !eligibleIds.includes(gmPersonId)) {
-      throw new SessionDraftValidationError("Choose an active community GM.");
-    }
     if (currentRole === "gm" && gmPersonId !== actor.personId) return { status: "forbidden" };
     const sessionId = await insertDraft(
       transaction,
