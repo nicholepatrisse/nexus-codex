@@ -13,8 +13,10 @@ import {
 import { publishSession } from "@/session/publish-session";
 import { cancelPublishedSession, updatePublishedSession } from "@/session/published-session";
 import { completeSession, markSessionReportedToPaizo, saveSessionCharacterNotes, saveSessionReporting } from "@/session/complete-session";
+import { DuplicateChronicleError } from "@/character/chronicles";
 import { attachChronicleSheet } from "@/session/chronicle-sheets";
 import { addPaizoScenario, previewPaizoScenario } from "@/catalog/add-paizo-scenario";
+import { societyPlayNumberSchema, updateSocietyPlayNumber } from "@/profile/profile";
 
 export type SessionDraftFormState = {
   fieldErrors?: Record<string, string[] | undefined>;
@@ -34,6 +36,16 @@ export type PublishSessionState = { error?: string };
 export type CancelSessionState = { error?: string };
 export type CompleteSessionState = { error?: string; saved?: boolean };
 export type ScenarioLookupState = { error?: string; scenario?: { code: string; title: string; sourceUrl: string; minimumLevel: number; maximumLevel: number; productCode: string | null }; contentItemId?: string; existing?: boolean };
+export type SessionSocietyNumberState = { fieldError?: string; formError?: string };
+
+export async function addSessionSocietyNumberAction(slug: string, _state: SessionSocietyNumberState, formData: FormData): Promise<SessionSocietyNumberState> {
+  const parsed = societyPlayNumberSchema.safeParse(formData.get("societyPlayNumber"));
+  if (!parsed.success) return { fieldError: parsed.error.issues[0]?.message ?? "Enter your numeric society number." };
+  try { await updateSocietyPlayNumber(await requireAuthenticatedActor(), parsed.data); }
+  catch (error) { return { formError: error instanceof AuthenticationRequiredError ? "Your session expired. Sign in and try again." : "We couldn’t save your society number. Please try again." }; }
+  revalidatePath(`/communities/${slug}/sessions/new`);
+  redirect(`/communities/${slug}/sessions/new`);
+}
 
 function scenarioError(error: unknown) {
   if (error instanceof AuthenticationRequiredError) return "Your session expired. Sign in and try again.";
@@ -81,6 +93,7 @@ export async function completeSessionAction(slug: string, sessionId: string, _pr
     revalidatePath(`/communities/${slug}/sessions/${sessionId}`);
   } catch (error) {
     if (error instanceof AuthenticationRequiredError) return { error: "Your session expired. Sign in and try again." };
+    if (error instanceof DuplicateChronicleError) return { error: error.message };
     return { error: "The reporting could not be saved. Please try again." };
   }
   redirect(`/communities/${encodeURIComponent(slug)}/sessions/${sessionId}?reporting=saved`);

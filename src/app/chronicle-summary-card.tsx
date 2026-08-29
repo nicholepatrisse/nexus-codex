@@ -3,21 +3,19 @@ import Link from "next/link";
 import { GmCreditBadge } from "@/app/gm-credit-badge";
 import { StatusBadge } from "@/app/status-badge";
 
-export type ChronicleSummaryStatus = "pending" | "applied";
-
 export function formatChronicleDate(value: string) {
   return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${value}T00:00:00Z`));
 }
 
-export function ChronicleSummaryCard({ href, scenarioNumber, scenarioName, playedOn, characterLevel, xp, status, isGmCredit = false, chronicleNumber, characterName, actions, secondaryActions }: {
+export function ChronicleSummaryCard({ href, scenarioNumber, scenarioName, playedOn, characterLevel, xp, isGmCredit = false, source, chronicleNumber, characterName, actions, secondaryActions }: {
   href: string;
   scenarioNumber: string;
   scenarioName: string;
   playedOn: string;
   characterLevel: number;
   xp: number;
-  status: ChronicleSummaryStatus;
   isGmCredit?: boolean;
+  source?: "nexus" | "external";
   chronicleNumber?: string | null;
   characterName?: string;
   actions?: ReactNode;
@@ -29,11 +27,11 @@ export function ChronicleSummaryCard({ href, scenarioNumber, scenarioName, playe
         {chronicleNumber ? <p className="text-xs font-semibold tracking-wide text-text-muted uppercase">Chronicle {chronicleNumber}</p> : null}
         <div className={`${chronicleNumber ? "mt-1" : ""} flex flex-wrap items-center gap-2`}>
           <h3><Link className="font-semibold text-text-primary hover:text-brand hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand" href={href}>{scenarioNumber} — {scenarioName}</Link></h3>
-          {isGmCredit ? <GmCreditBadge /> : null}
         </div>
       </div>
       <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-        <StatusBadge tone={status === "pending" ? "warning" : "brand"}>{status === "pending" ? "Needs review" : "Applied"}</StatusBadge>
+        {source ? <StatusBadge>{source === "nexus" ? "Nexus" : "External"}</StatusBadge> : null}
+        {isGmCredit ? <GmCreditBadge /> : null}
         {actions}
       </div>
     </div>

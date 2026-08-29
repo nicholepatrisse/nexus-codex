@@ -337,6 +337,27 @@
       "when": 1787943056703,
       "tag": "0047_fixed_apocalypse",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1787944289353,
+      "tag": "0048_wonderful_puma",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1787945380745,
+      "tag": "0049_tricky_pandemic",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1787978650228,
+      "tag": "0050_young_war_machine",
+      "breakpoints": true
     }
   ]
 }
