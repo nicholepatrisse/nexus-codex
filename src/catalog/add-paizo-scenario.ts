@@ -47,6 +47,28 @@ async function findExisting(scenario: PaizoScenarioDetails, database: Database) 
   return existing;
 }
 
+async function importScenario(actor: AuthenticatedActor, url: string, create: boolean, database: Database, fetchPage: typeof fetch): Promise<AddScenarioResult> {
+  const scenario = await fetchPaizoScenarioPage(url, fetchPage);
+  const existing = await findExisting(scenario, database);
+  if (existing) return { status: "existing", scenario, contentItemId: existing.id };
+  if (!create) return { status: "ready", scenario };
+  const prepared = prepareContentItem({ id: randomUUID(), programId: SFS2_PROGRAM_ID, code: scenario.code, title: scenario.title, contentType: "scenario", minimumLevel: scenario.minimumLevel, maximumLevel: scenario.maximumLevel });
+  const [created] = await database.insert(contentItems).values({ ...prepared, source: "paizo", sourceUrl: scenario.sourceUrl, productCode: scenario.productCode, publicationDate: scenario.publicationDate, description: scenario.description, createdByPersonId: actor.personId, lastVerifiedAt: new Date() }).onConflictDoNothing().returning({ id: contentItems.id });
+  if (created) return { status: "created", scenario, contentItemId: created.id };
+  const raced = await findExisting(scenario, database);
+  if (!raced) throw new Error("The scenario could not be added to the catalog.");
+  return { status: "existing", scenario, contentItemId: raced.id };
+}
+
+/** Authenticated players may import an official scenario while recording a manual Chronicle. */
+export async function previewPaizoScenarioForChronicle(actor: AuthenticatedActor, url: string, database = getDb(), fetchPage: typeof fetch = fetch) {
+  return importScenario(actor, url, false, database, fetchPage);
+}
+
+export async function addPaizoScenarioForChronicle(actor: AuthenticatedActor, url: string, database = getDb(), fetchPage: typeof fetch = fetch) {
+  return importScenario(actor, url, true, database, fetchPage);
+}
+
 export async function previewPaizoScenario(actor: AuthenticatedActor, slug: string, url: string, database = getDb(), fetchPage: typeof fetch = fetch): Promise<AddScenarioResult> {
   const access = await authorizedProgram(actor, slug, database);
   if (access.status !== "authorized") return access;
