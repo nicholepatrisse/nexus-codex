@@ -5,10 +5,8 @@ import { getAuthenticatedActor } from "@/auth/actor";
 import { getCharacterDetail, type CharacterSession } from "@/character/characters";
 import { formatCredits, getOwnedCreditLedger } from "@/character/credit-ledger";
 import { CharacterClassIcon } from "@/character/character-class-icon";
-import { listChronicles, type ChronicleWithGmCredit } from "@/character/chronicles";
+import { getNexusChronicleEditTarget, listChronicles, type ChronicleWithGmCredit } from "@/character/chronicles";
 import { CharacterProgress } from "./character-progress";
-import { applyChronicleAction } from "./chronicles/actions";
-import { ChronicleLifecycleButton } from "./chronicles/lifecycle-button";
 import { createCreditAdjustmentAction } from "./credits/actions";
 import { CreditAdjustmentForm } from "./credits/adjustment-form";
 import { listOwnedInventory } from "@/character/inventory";
@@ -16,6 +14,8 @@ import { InventoryCard } from "./inventory/inventory-card";
 import { sellInventoryAction } from "./sales/actions";
 import { GameCard } from "@/app/game-card";
 import { ChronicleSummaryCard } from "@/app/chronicle-summary-card";
+import { applyChronicleAction } from "./chronicles/actions";
+import { ChronicleLifecycleButton } from "./chronicles/lifecycle-button";
 
 function SessionList({ sessions, empty }: { sessions: CharacterSession[]; empty: string }) {
   if (!sessions.length) return <p className="mt-3 text-sm text-text-muted">{empty}</p>;
@@ -40,10 +40,10 @@ const transactionLabels: Record<string, string> = {
   sale: "Sale",
 };
 
-function ChronicleCard({ chronicle, characterId, isOwner }: { chronicle: ChronicleWithGmCredit; characterId: string; isOwner: boolean }) {
-  const applyAction = isOwner && chronicle.status === "pending" ? <ChronicleLifecycleButton status="pending" action={applyChronicleAction.bind(null, characterId, chronicle.id)} /> : null;
-  const editAction = isOwner && chronicle.status === "pending" && chronicle.provenance === "manual" ? <Link href={`/characters/${characterId}/chronicles/${chronicle.id}/edit`} aria-label={`Edit ${chronicle.scenarioNumberSnapshot} Chronicle`} title="Edit Chronicle" className="inline-flex size-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-surface hover:text-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-4"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg></Link> : null;
-  return <li><ChronicleSummaryCard href={`/characters/${characterId}/chronicles/${chronicle.id}`} scenarioNumber={chronicle.scenarioNumberSnapshot} scenarioName={chronicle.scenarioNameSnapshot} playedOn={chronicle.playedOn} characterLevel={chronicle.characterLevel} xp={chronicle.xp} status={chronicle.status === "applied" ? "applied" : "pending"} isGmCredit={chronicle.isGmCredit} chronicleNumber={chronicle.chronicleNumber} actions={applyAction} secondaryActions={editAction} /></li>;
+function ChronicleCard({ chronicle, characterId, editHref, currentLevel, isOwner }: { chronicle: ChronicleWithGmCredit; characterId: string; editHref: string | null; currentLevel: number; isOwner: boolean }) {
+  const editAction = editHref ? <Link href={editHref} aria-label={`Edit ${chronicle.scenarioNumberSnapshot} Chronicle`} title="Edit Chronicle" className="inline-flex size-8 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-surface hover:text-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-4"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg></Link> : null;
+  const canApplyLevelOnePregen = isOwner && chronicle.status === "pending" && chronicle.creditType === "pregen" && chronicle.characterLevel > 1 && currentLevel === 1 && chronicle.eligibilityState === "eligible";
+  return <li><ChronicleSummaryCard href={`/characters/${characterId}/chronicles/${chronicle.id}`} scenarioNumber={chronicle.scenarioNumberSnapshot} scenarioName={chronicle.scenarioNameSnapshot} playedOn={chronicle.playedOn} characterLevel={chronicle.characterLevel} xp={chronicle.xp} isGmCredit={chronicle.isGmCredit} source={chronicle.provenance === "nexus" ? "nexus" : "external"} chronicleNumber={chronicle.chronicleNumber} actions={canApplyLevelOnePregen ? <ChronicleLifecycleButton status="pending" action={applyChronicleAction.bind(null, characterId, chronicle.id)} /> : null} secondaryActions={editAction} /></li>;
 }
 
 const ownerTabs = ["overview", "chronicles", "sessions", "inventory"] as const;
@@ -64,6 +64,8 @@ export default async function CharacterPage({ params, searchParams }: { params: 
   if (!character) notFound();
   const tab = selectedCharacterTab((await searchParams).tab, character.isOwner);
   const chronicles = await listChronicles(characterId);
+  const nexusEditTargets = new Map((await Promise.all(chronicles.filter(({ provenance }) => provenance === "nexus").map(async (chronicle) => [chronicle.id, await getNexusChronicleEditTarget(actor, characterId, chronicle.id)] as const))).filter((entry) => entry[1] !== null));
+  const chronicleEditHref = (chronicle: ChronicleWithGmCredit) => chronicle.provenance === "manual" && character.isOwner ? `/characters/${character.id}/chronicles/${chronicle.id}/edit` : (() => { const target = nexusEditTargets.get(chronicle.id); return target ? `/communities/${encodeURIComponent(target.communitySlug)}/sessions/${encodeURIComponent(target.sessionId)}` : null; })();
   const ledger = character.isOwner ? await getOwnedCreditLedger(actor, characterId) : null;
   const inventory = character.isOwner ? await listOwnedInventory(actor, characterId) : null;
   const appliedChronicles = chronicles.filter(({ status }) => status === "applied").sort(chronicleNumberOrder);
@@ -93,9 +95,9 @@ export default async function CharacterPage({ params, searchParams }: { params: 
       </div> : null}
       </> : null}
       {tab === "chronicles" ? <section className="mt-8">
-        <div className="flex flex-wrap items-center justify-between gap-4"><div><h2 className="text-2xl font-semibold">Chronicles</h2><p className="mt-1 text-sm text-text-muted">Stored reward history; existing values are never recalculated.</p></div>{character.isOwner ? <Link href={`/characters/${character.id}/chronicles/new`} className="rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-on-brand">Add Chronicle</Link> : null}</div>
-        <section className="mt-8"><h3 className="text-lg font-semibold">Unapplied</h3>{unappliedChronicles.length ? <ul className="mt-3 space-y-3">{unappliedChronicles.map((chronicle) => <ChronicleCard key={chronicle.id} chronicle={chronicle} characterId={character.id} isOwner={character.isOwner} />)}</ul> : <p className="mt-3 text-sm text-text-muted">No unapplied Chronicles.</p>}</section>
-        <section className="mt-8 border-t border-border pt-8"><h3 className="text-lg font-semibold">Applied</h3>{appliedChronicles.length ? <ol className="mt-3 space-y-3">{appliedChronicles.map((chronicle) => <ChronicleCard key={chronicle.id} chronicle={chronicle} characterId={character.id} isOwner={character.isOwner} />)}</ol> : <p className="mt-3 text-sm text-text-muted">No applied Chronicles.</p>}</section>
+        <div className="flex flex-wrap items-center justify-between gap-4"><div><h2 className="text-2xl font-semibold">Chronicles</h2><p className="mt-1 text-sm text-text-muted">Ordered by date played; manual entries can be edited to correct the date.</p></div>{character.isOwner ? <Link href={`/characters/${character.id}/chronicles/new`} className="rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-on-brand">Add missing Chronicle</Link> : null}</div>
+        {unappliedChronicles.length ? <section className="mt-8"><h3 className="text-lg font-semibold">Held Chronicles</h3><ul className="mt-3 space-y-3">{unappliedChronicles.map((chronicle) => <ChronicleCard key={chronicle.id} chronicle={chronicle} characterId={character.id} editHref={chronicleEditHref(chronicle)} currentLevel={character.currentLevel} isOwner={character.isOwner} />)}</ul></section> : null}
+        <section className="mt-8 border-t border-border pt-8"><h3 className="text-lg font-semibold">Applied</h3>{appliedChronicles.length ? <ol className="mt-3 space-y-3">{appliedChronicles.map((chronicle) => <ChronicleCard key={chronicle.id} chronicle={chronicle} characterId={character.id} editHref={chronicleEditHref(chronicle)} currentLevel={character.currentLevel} isOwner={character.isOwner} />)}</ol> : <p className="mt-3 text-sm text-text-muted">No applied Chronicles.</p>}</section>
       </section> : null}
       {tab === "sessions" ? <section className="mt-8">{!hasSessions ? <div className="rounded-xl border border-dashed border-border-strong p-6 text-center"><h2 className="text-xl font-semibold">No sessions yet</h2><p className="mt-2 text-text-muted">This character has not been used for a game yet.</p></div> : <div className="space-y-10"><section><h2 className="text-2xl font-semibold">Upcoming sessions</h2><SessionList sessions={character.upcomingSessions} empty="No upcoming sessions." /></section><section className="border-t border-border pt-8"><h2 className="text-2xl font-semibold">Past sessions</h2><SessionList sessions={character.pastSessions} empty="No past sessions." /></section></div>}</section> : null}
       {tab === "inventory" && inventory ? <div className="mt-8 space-y-10"><section>

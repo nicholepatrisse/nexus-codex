@@ -13,20 +13,22 @@ const base = {
 
 describe("ChronicleSummaryCard", () => {
   it("presents pending review with character and GM-credit context", () => {
-    const markup = renderToStaticMarkup(<ChronicleSummaryCard {...base} status="pending" characterName="Veyra Sable" isGmCredit />);
+    const markup = renderToStaticMarkup(<ChronicleSummaryCard {...base} characterName="Veyra Sable" isGmCredit source="external" />);
 
     expect(markup).toContain("1-04 — The Great Absalom Relay");
-    expect(markup).toContain("Needs review");
+    expect(markup).not.toContain("Needs review");
     expect(markup).toContain("Veyra Sable");
     expect(markup).toContain("GM Credit");
+    expect(markup).toContain("External");
     expect(markup).toContain("Sep 2, 2030 · Level 3 · 4 XP");
   });
 
   it("presents applied history and composes owner actions outside the detail link", () => {
-    const markup = renderToStaticMarkup(<ChronicleSummaryCard {...base} status="applied" chronicleNumber="7" actions={<button>Apply</button>} secondaryActions={<a href="/edit">Edit</a>} />);
+    const markup = renderToStaticMarkup(<ChronicleSummaryCard {...base} source="nexus" chronicleNumber="7" actions={<button>Apply</button>} secondaryActions={<a href="/edit">Edit</a>} />);
 
     expect(markup).toContain("Chronicle 7");
-    expect(markup).toContain("Applied");
+    expect(markup).not.toContain(">Applied<");
+    expect(markup).toContain("Nexus");
     expect(markup).toContain("</a></h3>");
     expect(markup).toContain("<button>Apply</button>");
     expect(markup).not.toContain("<a href=\"/characters/character-1/chronicles/chronicle-1\"><button>");

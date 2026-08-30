@@ -6,6 +6,7 @@ import { getCharacterProgressions } from "@/character/characters";
 import { getDb } from "@/db/client";
 import { characterCreditLedgerEntries, characters, chronicleSheetAttachments, chronicles, communities, communityAuditEvents, contentItems, people, sessionGmCredits, sessionSignups, sessions } from "@/db/schema";
 import { calculateEarnIncome, totalChronicleCredits } from "@/character/sfs2-chronicle-rewards";
+import { assertChronicleReplayAllowed, reconcileChronicles, renumberChronicles } from "@/character/chronicles";
 
 export type SessionChronicleInput = { characterId: string; characterLevel: number; advancementSpeed: "standard" | "slow"; xp: number; baseCreditsMinor: number; downtimeDisposition: "earn_income" | "other" | "declined"; downtimeCheckTotal: number | null; downtimeProficiency: "trained" | "expert" | "master" | null; downtimeOverrideCreditsMinor: number | null; downtimeCorrectionNote: string; downtimeActivity: string; partnerCode: string; eventName: string; eventCode: string; gmOrganizedPlayId: string; gmNotes: string };
 type Database = ReturnType<typeof getDb>;
@@ -19,8 +20,8 @@ function rewardValues(note: SessionChronicleInput, characterLevel: number, metad
 }
 
 async function eligibleCharacters(sessionId: string, database: Database) {
-  const players = await database.select({ id: characters.id, startingLevel: characters.startingLevel }).from(sessionSignups).innerJoin(characters, eq(characters.id, sessionSignups.characterId)).where(and(eq(sessionSignups.sessionId, sessionId), eq(sessionSignups.status, "confirmed")));
-  const credits = await database.select({ id: characters.id, startingLevel: characters.startingLevel }).from(sessionGmCredits).innerJoin(characters, eq(characters.id, sessionGmCredits.characterId)).where(eq(sessionGmCredits.sessionId, sessionId));
+  const players = (await database.select({ id: characters.id, startingLevel: characters.startingLevel }).from(sessionSignups).innerJoin(characters, eq(characters.id, sessionSignups.characterId)).where(and(eq(sessionSignups.sessionId, sessionId), eq(sessionSignups.status, "confirmed")))).map((character) => ({ ...character, creditType: "normal" as const }));
+  const credits = (await database.select({ id: characters.id, startingLevel: characters.startingLevel }).from(sessionGmCredits).innerJoin(characters, eq(characters.id, sessionGmCredits.characterId)).where(eq(sessionGmCredits.sessionId, sessionId))).map((character) => ({ ...character, creditType: "gm" as const }));
   return [...new Map([...players, ...credits].map((character) => [character.id, character])).values()];
 }
 
@@ -30,7 +31,7 @@ async function upsertChronicles(session: { id: string; communityId: string; gmPe
   const eligibleIds = new Set(eligible.map(({ id }) => id));
   if (notes.some(({ characterId }) => !eligibleIds.has(characterId))) return false;
   const progression = await getCharacterProgressions(eligible, database);
-  const [content] = await database.select({ code: contentItems.code, title: contentItems.title }).from(contentItems).where(eq(contentItems.id, session.contentItemId)).limit(1);
+  const [content] = await database.select({ code: contentItems.code, title: contentItems.title, minimumLevel: contentItems.minimumLevel, maximumLevel: contentItems.maximumLevel }).from(contentItems).where(eq(contentItems.id, session.contentItemId)).limit(1);
   if (!content) throw new Error("Session content is missing.");
   const [community] = await database.select({ name: communities.name, eventName: communities.eventName, eventCode: communities.eventCode }).from(communities).where(eq(communities.id, session.communityId)).limit(1);
   if (!community) throw new Error("Session community is missing.");
@@ -40,11 +41,18 @@ async function upsertChronicles(session: { id: string; communityId: string; gmPe
   const now = new Date();
   for (const note of notes) {
     const [existing] = await database.select({ id: chronicles.id, characterLevel: chronicles.characterLevel }).from(chronicles).where(and(eq(chronicles.sessionId, session.id), eq(chronicles.characterId, note.characterId))).limit(1);
+    await assertChronicleReplayAllowed(note.characterId, content.code, database, existing?.id);
     const characterLevel = existing?.characterLevel ?? progression.get(note.characterId)?.currentLevel ?? 1;
-    const values = { characterLevel, advancementSpeed: note.advancementSpeed, xp: note.xp, ...rewardValues(note, characterLevel, metadataDefaults), chronicleNumber: null, gmNotes: note.gmNotes || null, status: "pending", appliedAt: null, updatedAt: now };
+    const creditType = eligible.find(({ id }) => id === note.characterId)?.creditType ?? "normal";
+    const inRange = characterLevel >= content.minimumLevel && characterLevel <= content.maximumLevel;
+    const eligibilityState = inRange || (creditType === "gm" && characterLevel === 1) ? "eligible" : creditType === "gm" && characterLevel < content.minimumLevel ? "held" : "ineligible";
+    const values = { characterLevel, creditType, eligibilityState, scenarioMinimumLevelSnapshot: content.minimumLevel, scenarioMaximumLevelSnapshot: content.maximumLevel, advancementSpeed: note.advancementSpeed, xp: note.xp, ...rewardValues(note, characterLevel, metadataDefaults), chronicleNumber: null, gmNotes: note.gmNotes || null, status: "pending", appliedAt: null, updatedAt: now };
     const chronicleId = existing?.id ?? randomUUID();
     if (existing) await database.update(chronicles).set(values).where(eq(chronicles.id, existing.id));
-    else await database.insert(chronicles).values({ id: chronicleId, characterId: note.characterId, sessionId: session.id, contentItemId: session.contentItemId, scenarioNumberSnapshot: content.code, scenarioNameSnapshot: content.title, playedOn: session.startsAt.toISOString().slice(0, 10), provenance: "nexus", playerNotes: null, ...values, createdAt: now });
+    else await database.insert(chronicles).values({ id: chronicleId, characterId: note.characterId, sessionId: session.id, contentItemId: session.contentItemId, scenarioNumberSnapshot: content.code, scenarioNameSnapshot: content.title, playedOn: session.startsAt.toISOString().slice(0, 10), playedAt: session.startsAt, provenance: "nexus", playerNotes: null, ...values, createdAt: now });
+  }
+  for (const character of eligible) {
+    await renumberChronicles(character.id, database);
   }
   return true;
 }
@@ -81,13 +89,15 @@ export async function saveSessionCharacterNotes(actor: AuthenticatedActor, slug:
 }
 
 export async function saveSessionReporting(actor: AuthenticatedActor, slug: string, sessionId: string, notes: SessionChronicleInput[], database: Database = getDb()) {
-  return database.transaction(async (transaction) => {
+  const result = await database.transaction(async (transaction) => {
     const authorization = await authorize(actor, slug, sessionId, transaction as Database);
     if (authorization.status !== "authorized") return authorization;
     if (authorization.session.status !== "published") return { status: authorization.session.status === "completed" ? "completed" as const : "unavailable" as const };
     if (!await upsertChronicles(authorization.session, notes, transaction as Database)) return { status: "invalid-character" as const };
     return { status: "saved" as const };
   });
+  if (result.status === "saved") for (const characterId of new Set(notes.map(({ characterId }) => characterId))) await reconcileChronicles(null, characterId, database);
+  return result;
 }
 
 export async function completeSession(actor: AuthenticatedActor, slug: string, sessionId: string, database: Database = getDb()) {

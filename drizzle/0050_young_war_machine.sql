@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "chronicles_character_scenario_unique" ON "chronicles" USING btree ("character_id",lower(btrim("scenario_number_snapshot")));

@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 import { createTestIdentity } from "@/auth/test-fixture";
 import { createCharacter, getCharacterDetail, listCharacters, StartingLevelLockedError, updateCharacter } from "@/character/characters";
-import { applyManualChronicle, createManualChronicle, deleteManualChronicle, listChronicles, unapplyManualChronicle, updateManualChronicle } from "@/character/chronicles";
+import { applyManualChronicle, createManualChronicle, deleteManualChronicle, listChronicles, updateManualChronicle } from "@/character/chronicles";
 import { createCreditAdjustment, getOwnedCreditLedger } from "@/character/credit-ledger";
 import { createInventoryEntry, deleteInventoryEntry, listOwnedInventory, updateInventoryEntry } from "@/character/inventory";
 import { getDb } from "@/db/client";
@@ -63,39 +63,51 @@ describeWithDatabase("characters persistence", () => {
     const first = await createManualChronicle(ownerActor, character.id, { ...event, scenarioNumber: "1-02", scenarioName: "Second", datePlayed: "2026-08-20", characterLevel: 1, advancementSpeed: "standard", xp: 4, baseCreditsMinor: 100, downtimeDisposition: "declined" });
     const second = await createManualChronicle(ownerActor, character.id, { ...event, scenarioNumber: "1-01", scenarioName: "First", datePlayed: "2026-08-21", characterLevel: 1, advancementSpeed: "slow", xp: 2, baseCreditsMinor: 50, downtimeDisposition: "declined" });
     if (!first || !second) throw new Error("Expected Chronicle creation.");
-    expect(first).toEqual(expect.objectContaining({ status: "pending", appliedAt: null, provenance: "manual", playedOn: "2026-08-20" }));
-    expect(await getCharacterDetail(ownerActor, character.id)).toEqual(expect.objectContaining({ xp: 0, creditsMinor: 150 }));
+    expect(first).toEqual(expect.objectContaining({ status: "applied", appliedAt: new Date("2026-08-20T00:00:00Z"), provenance: "manual", playedOn: "2026-08-20", chronicleNumber: "1" }));
+    await expect(createManualChronicle(ownerActor, character.id, { ...event, scenarioNumber: " 1-02 ", scenarioName: "Replay", datePlayed: "2026-08-21", characterLevel: 1, advancementSpeed: "standard", xp: 4, baseCreditsMinor: 100, downtimeDisposition: "declined" })).rejects.toThrow("already has a Chronicle for 1-02");
+    expect(await getCharacterDetail(ownerActor, character.id)).toEqual(expect.objectContaining({ xp: 6, creditsMinor: 300 }));
     expect(await createManualChronicle(otherActor, character.id, { ...event, scenarioNumber: "x", scenarioName: "Unauthorized", datePlayed: "2026-08-20", characterLevel: 1, advancementSpeed: "standard", xp: 0, baseCreditsMinor: 0, downtimeDisposition: "declined" })).toBeNull();
-    expect((await listChronicles(character.id)).map((entry) => entry.id)).toEqual([second.id, first.id]);
+    expect((await listChronicles(character.id)).map((entry) => entry.id)).toEqual([first.id, second.id]);
     expect(await updateManualChronicle(otherActor, character.id, first.id, { ...event, scenarioNumber: "x", scenarioName: "Stolen", datePlayed: "2026-08-20", characterLevel: 1, advancementSpeed: "standard", xp: 0, baseCreditsMinor: 0, downtimeDisposition: "declined" })).toBeNull();
     const updated = await updateManualChronicle(ownerActor, character.id, first.id, { ...event, scenarioNumber: "1-02", scenarioName: "Updated snapshot", datePlayed: "2026-08-22", characterLevel: 2, advancementSpeed: "standard", xp: 12, baseCreditsMinor: 225, downtimeDisposition: "declined" });
     expect(updated).toEqual(expect.objectContaining({ id: first.id, scenarioNameSnapshot: "Updated snapshot", baseCreditsMinor: 225 }));
+    expect(await listChronicles(character.id)).toEqual([
+      expect.objectContaining({ id: second.id, chronicleNumber: "1" }),
+      expect.objectContaining({ id: first.id, chronicleNumber: "2" }),
+    ]);
     expect(await applyManualChronicle(otherActor, character.id, first.id)).toBeNull();
-    const appliedAt = new Date("2026-08-23T10:00:00Z");
-    expect(await applyManualChronicle(ownerActor, character.id, first.id, getDb(), appliedAt)).toEqual(expect.objectContaining({ status: "applied", appliedAt, chronicleNumber: "1" }));
     await expect(updateCharacter(ownerActor, character.id, { name: "Chronicle Hero", startingLevel: 3, startingCredits: 750, startingItems: [] })).rejects.toBeInstanceOf(StartingLevelLockedError);
-    expect(await applyManualChronicle(ownerActor, character.id, first.id, getDb(), new Date("2026-08-24T10:00:00Z"))).toEqual(expect.objectContaining({ status: "applied", appliedAt, chronicleNumber: "1" }));
-    expect(await getCharacterDetail(ownerActor, character.id)).toEqual(expect.objectContaining({ xp: 12, currentLevel: 2, creditsMinor: 375 }));
-    expect(await listCharacters(ownerActor)).toEqual([expect.objectContaining({ id: character.id, totalXp: 12, currentLevel: 2 })]);
+    expect(await getCharacterDetail(ownerActor, character.id)).toEqual(expect.objectContaining({ xp: 14, currentLevel: 2, creditsMinor: 425 }));
+    expect(await listCharacters(ownerActor)).toEqual([expect.objectContaining({ id: character.id, totalXp: 14, currentLevel: 2 })]);
     expect(await updateManualChronicle(ownerActor, character.id, first.id, { ...event, scenarioNumber: "x", scenarioName: "Applied edit", datePlayed: "2026-08-22", characterLevel: 2, advancementSpeed: "standard", xp: 99, baseCreditsMinor: 250, downtimeDisposition: "declined" })).toEqual(expect.objectContaining({ status: "applied", baseCreditsMinor: 250 }));
-    expect(await getCharacterDetail(ownerActor, character.id)).toEqual(expect.objectContaining({ creditsMinor: 400 }));
-    expect(await deleteManualChronicle(ownerActor, character.id, first.id)).toBe(false);
-    expect(await unapplyManualChronicle(ownerActor, character.id, first.id)).toEqual(expect.objectContaining({ status: "pending", appliedAt: null }));
-    await expect(updateCharacter(ownerActor, character.id, { name: "Chronicle Hero", startingLevel: 3, startingCredits: 750, startingItems: [] })).rejects.toBeInstanceOf(StartingLevelLockedError);
-    expect(await getCharacterDetail(ownerActor, character.id)).toEqual(expect.objectContaining({ xp: 0, creditsMinor: 150 }));
+    expect(await getCharacterDetail(ownerActor, character.id)).toEqual(expect.objectContaining({ creditsMinor: 450 }));
     expect(await deleteManualChronicle(otherActor, character.id, first.id)).toBe(false);
-    expect(await deleteManualChronicle(ownerActor, character.id, first.id)).toBe(false);
-    expect(await deleteManualChronicle(ownerActor, character.id, second.id)).toBe(true);
-    expect((await listChronicles(character.id)).map((entry) => entry.id)).toEqual([first.id]);
+    expect(await deleteManualChronicle(ownerActor, character.id, first.id)).toBe(true);
+    expect(await listChronicles(character.id)).toEqual([expect.objectContaining({ id: second.id, chronicleNumber: "1" })]);
+    expect(await getCharacterDetail(ownerActor, character.id)).toEqual(expect.objectContaining({ xp: 2, creditsMinor: 200 }));
     expect(await getOwnedCreditLedger(otherActor, character.id)).toBeNull();
     expect(await createCreditAdjustment(otherActor, character.id, { amountMinor: -25, effectiveOn: "2026-08-24", notes: "Not mine" })).toBeNull();
     expect(await createCreditAdjustment(ownerActor, character.id, { amountMinor: -25, effectiveOn: "2026-08-24", notes: "Purchase correction" })).toEqual(expect.objectContaining({ amountMinor: -25, type: "adjustment", source: "owner_adjustment" }));
     const adjusted = await getOwnedCreditLedger(ownerActor, character.id);
-    expect(adjusted?.balanceMinor).toBe(125);
-    expect(adjusted?.entries.map(({ amountMinor }) => amountMinor)).toEqual([225, 25, -250, -25, 150]);
-    expect(await applyManualChronicle(ownerActor, character.id, first.id)).toEqual(expect.objectContaining({ status: "applied", chronicleNumber: "1" }));
-    expect((await getOwnedCreditLedger(ownerActor, character.id))?.balanceMinor).toBe(375);
+    expect(adjusted?.balanceMinor).toBe(175);
     expect((await getOwnedCreditLedger(ownerActor, character.id))?.entries.filter(({ type }) => type === "chronicle_reward")).toHaveLength(1);
+  });
+
+  it("derives Chronicle numbers from played date and optional time", async () => {
+    const owner = await createTestIdentity({ name: "Chronicle Time Owner", sessions: 0 });
+    userIds.push(owner.authUser.id);
+    await getDb().insert(gameSystems).values({ id: SUPPORTED_GAME_SYSTEM.id, code: SUPPORTED_GAME_SYSTEM.code, name: SUPPORTED_GAME_SYSTEM.name }).onConflictDoUpdate({ target: gameSystems.id, set: { code: SUPPORTED_GAME_SYSTEM.code, name: SUPPORTED_GAME_SYSTEM.name } });
+    await getDb().update(people).set({ societyPlayNumber: "777779" }).where(eq(people.id, owner.person.id));
+    const actor = { personId: owner.person.id, authUserId: owner.authUser.id, sessionId: "owner" };
+    const character = await createCharacter(actor, { name: "Timed Hero", characterNumber: "01" });
+    if (!character) throw new Error("Expected character creation.");
+    const evening = await createManualChronicle(actor, character.id, { ...event, scenarioNumber: "1-02", scenarioName: "Evening", datePlayed: "2026-08-20", timePlayed: "18:00", characterLevel: 1, advancementSpeed: "standard", xp: 4, baseCreditsMinor: 100, downtimeDisposition: "declined" });
+    const morning = await createManualChronicle(actor, character.id, { ...event, scenarioNumber: "1-01", scenarioName: "Morning", datePlayed: "2026-08-20", timePlayed: "10:00", characterLevel: 1, advancementSpeed: "standard", xp: 4, baseCreditsMinor: 100, downtimeDisposition: "declined" });
+    if (!evening || !morning) throw new Error("Expected Chronicles.");
+    expect(await listChronicles(character.id)).toEqual([
+      expect.objectContaining({ id: morning.id, chronicleNumber: "1", appliedAt: new Date("2026-08-20T10:00:00Z") }),
+      expect.objectContaining({ id: evening.id, chronicleNumber: "2", appliedAt: new Date("2026-08-20T18:00:00Z") }),
+    ]);
   });
 
   it("owner-manages distinct inventory lots without ledger side effects", async () => {
