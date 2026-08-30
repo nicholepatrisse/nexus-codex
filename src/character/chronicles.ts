@@ -8,6 +8,7 @@ import { characterCreditLedgerEntries, characters, chronicles, communities, cont
 import { calculateEarnIncome, totalChronicleCredits } from "@/character/sfs2-chronicle-rewards";
 import { isValidPregenLevel, SFS2_PREGEN_LEVELS } from "@/character/sfs2-pregens";
 import { deriveSfs2Progression } from "@/character/sfs2-progression";
+import { SUPPORTED_GAME_SYSTEM } from "@/game-system/config";
 
 type Database = ReturnType<typeof getDb>;
 const optionalId = z.string().trim().max(100).nullable().optional().transform((value) => value || null);
@@ -126,7 +127,7 @@ export async function listUnappliedChronicles(personId: string, database: Databa
 }
 
 export async function listChronicleContentItems(database: Database = getDb()) {
-  return database.select({ id: contentItems.id, code: contentItems.code, title: contentItems.title, minimumLevel: contentItems.minimumLevel, maximumLevel: contentItems.maximumLevel }).from(contentItems).orderBy(asc(contentItems.normalizedCode));
+  return database.select({ id: contentItems.id, code: contentItems.code, title: contentItems.title, minimumLevel: contentItems.minimumLevel, maximumLevel: contentItems.maximumLevel }).from(contentItems).where(and(eq(contentItems.programId, SUPPORTED_GAME_SYSTEM.organizedPlayProgramId), eq(contentItems.contentType, "scenario"))).orderBy(asc(contentItems.normalizedCode));
 }
 
 export function evaluateChronicleEligibility(minimumLevel: number, maximumLevel: number, earningLevel: number, assignedLevel: number, creditType: "normal" | "pregen" | "gm" | "correction") {

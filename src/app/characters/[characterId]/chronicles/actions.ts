@@ -4,13 +4,29 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { AuthenticationRequiredError, requireAuthenticatedActor } from "@/auth/actor";
 import { applyManualChronicle, ChronicleEligibilityError, ChronicleOrderError, createManualChronicle, deleteManualChronicle, DuplicateChronicleError, manualChronicleInputSchema, reconcileChronicles, unapplyManualChronicle, updateManualChronicle } from "@/character/chronicles";
+import { addPaizoScenarioForChronicle, previewPaizoScenarioForChronicle } from "@/catalog/add-paizo-scenario";
+import type { ScenarioLookupState } from "@/app/scenario-selector";
 
 export interface ChronicleFormState { fieldErrors?: Record<string, string[] | undefined>; formError?: string; values?: Record<string, string> }
 function submittedValues(formData: FormData) { return Object.fromEntries(Array.from(formData.entries(), ([name, value]) => [name, typeof value === "string" ? value : value.name])); }
-function input(formData: FormData) { const nullableNumber = (name: string) => formData.get(name) === "" || formData.get(name) == null ? null : formData.get(name); return { contentItemId: formData.get("contentItemId"), scenarioNumber: formData.get("scenarioNumber"), scenarioName: formData.get("scenarioName"), datePlayed: formData.get("datePlayed"), timePlayed: formData.get("timePlayed") || null, characterLevel: formData.get("characterLevel"), creditType: formData.get("creditType") || "normal", eligibilityNote: formData.get("eligibilityNote"), advancementSpeed: formData.get("advancementSpeed"), xp: formData.get("xp"), baseCreditsMinor: formData.get("baseCreditsMinor"), downtimeDisposition: formData.get("downtimeDisposition"), downtimeEntryMethod: formData.get("downtimeEntryMethod") || "calculated", downtimeCheckTotal: nullableNumber("downtimeCheckTotal"), downtimeProficiency: formData.get("downtimeProficiency") || null, downtimeSheetCreditsMinor: nullableNumber("downtimeSheetCreditsMinor"), downtimeOverrideCreditsMinor: nullableNumber("downtimeOverrideCreditsMinor"), downtimeCorrectionNote: formData.get("downtimeCorrectionNote"), downtimeActivity: formData.get("downtimeActivity"), partnerCode: formData.get("partnerCode"), eventName: formData.get("eventName"), eventCode: formData.get("eventCode"), gmOrganizedPlayId: formData.get("gmOrganizedPlayId"), playerNotes: formData.get("playerNotes") }; }
+function input(formData: FormData) { const nullableNumber = (name: string) => formData.get(name) === "" || formData.get(name) == null ? null : formData.get(name); return { contentItemId: formData.get("contentItemId"), scenarioNumber: formData.get("scenarioNumber"), scenarioName: formData.get("scenarioName"), datePlayed: formData.get("datePlayed"), timePlayed: formData.get("timePlayed") || null, characterLevel: formData.get("characterLevel"), creditType: formData.get("creditType") || "normal", eligibilityNote: formData.get("eligibilityNote"), advancementSpeed: formData.get("advancementSpeed"), xp: formData.get("xp"), baseCreditsMinor: formData.get("baseCreditsMinor"), downtimeDisposition: formData.get("downtimeDisposition"), downtimeEntryMethod: formData.get("downtimeEntryMethod") || "calculated", downtimeCheckTotal: nullableNumber("downtimeCheckTotal"), downtimeProficiency: formData.get("downtimeProficiency") || null, downtimeSheetCreditsMinor: nullableNumber("downtimeSheetCreditsMinor"), downtimeOverrideCreditsMinor: nullableNumber("downtimeOverrideCreditsMinor"), downtimeCorrectionNote: formData.get("downtimeCorrectionNote"), downtimeActivity: formData.get("downtimeActivity"), partnerCode: null, eventName: formData.get("eventName"), eventCode: formData.get("eventCode"), gmOrganizedPlayId: formData.get("gmOrganizedPlayId"), playerNotes: formData.get("playerNotes") }; }
+
+function scenarioLookup(result: Awaited<ReturnType<typeof previewPaizoScenarioForChronicle>>): ScenarioLookupState {
+  if (result.status === "forbidden" || result.status === "not-found") return { error: "The scenario catalog is unavailable." };
+  return { scenario: result.scenario, contentItemId: result.status === "existing" || result.status === "created" ? result.contentItemId : undefined, existing: result.status === "existing" };
+}
+export async function previewChronicleScenarioAction(url: string): Promise<ScenarioLookupState> {
+  try { return scenarioLookup(await previewPaizoScenarioForChronicle(await requireAuthenticatedActor(), url)); }
+  catch (error) { return { error: error instanceof Error ? error.message : "The Paizo scenario could not be fetched." }; }
+}
+export async function addChronicleScenarioAction(url: string): Promise<ScenarioLookupState> {
+  try { const result = await addPaizoScenarioForChronicle(await requireAuthenticatedActor(), url); revalidatePath("/characters"); return scenarioLookup(result); }
+  catch (error) { return { error: error instanceof Error ? error.message : "The Paizo scenario could not be added." }; }
+}
 
 export async function createChronicleAction(characterId: string, _state: ChronicleFormState, formData: FormData): Promise<ChronicleFormState> {
   const values = submittedValues(formData);
+  if (!formData.get("contentItemId")) return { fieldErrors: { contentItemId: ["Choose a scenario."] }, values };
   const parsed = manualChronicleInputSchema.safeParse(input(formData));
   if (!parsed.success) return { fieldErrors: z.flattenError(parsed.error).fieldErrors, values };
   try {
@@ -27,6 +43,7 @@ export async function createChronicleAction(characterId: string, _state: Chronic
 
 export async function updateChronicleAction(characterId: string, chronicleId: string, _state: ChronicleFormState, formData: FormData): Promise<ChronicleFormState> {
   const values = submittedValues(formData);
+  if (!formData.get("contentItemId")) return { fieldErrors: { contentItemId: ["Choose a scenario."] }, values };
   const parsed = manualChronicleInputSchema.safeParse(input(formData));
   if (!parsed.success) return { fieldErrors: z.flattenError(parsed.error).fieldErrors, values };
   try {
