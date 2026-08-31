@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { and, asc, count, desc, eq, gte, inArray, isNotNull, lt, or } from "drizzle-orm";
 import type { AuthenticatedActor } from "@/auth/actor";
+import { defaultPregenLevel, SFS2_PREGENS } from "@/character/sfs2-pregens";
 import { resolveCommunityAccessBySlug } from "@/authorization/community-access";
 import { canPerformCommunityOperation, type CommunityRole } from "@/authorization/policy";
 import { getDb } from "@/db/client";
@@ -30,18 +31,36 @@ export type UpdateSessionSignupResult =
   | { status: "updated"; signupId: string }
   | { status: "not-found" | "unavailable" };
 
+export type SessionSignupChoice =
+  | { kind: "character"; characterId: string }
+  | { kind: "pregen"; pregenName: string; pregenLevel: number; creditRecipientCharacterId: string };
+
+async function validateChoice(choice: SessionSignupChoice, personId: string, gameSystemId: string, minimumLevel: number, maximumLevel: number, database: Database) {
+  const characterId = choice.kind === "character" ? choice.characterId : choice.creditRecipientCharacterId;
+  const [character] = await database.select({ id: characters.id }).from(characters).where(and(eq(characters.id, characterId), eq(characters.personId, personId), eq(characters.gameSystemId, gameSystemId))).limit(1);
+  if (!character) return null;
+  if (choice.kind === "pregen" && !SFS2_PREGENS.includes(choice.pregenName as typeof SFS2_PREGENS[number])) return null;
+  const scenarioPregenLevel = defaultPregenLevel(minimumLevel, maximumLevel);
+  return choice.kind === "character"
+    ? { characterId: character.id, pregenName: null, pregenLevel: null, creditRecipientCharacterId: null }
+    : { characterId: null, pregenName: choice.pregenName, pregenLevel: scenarioPregenLevel, creditRecipientCharacterId: character.id };
+}
+
 export async function updateOwnSessionSignup(
   actor: AuthenticatedActor,
   slug: string,
   sessionId: string,
-  characterId: string,
+  rawChoice: SessionSignupChoice | string,
   database: Database = getDb(),
 ): Promise<UpdateSessionSignupResult> {
+  const choice: SessionSignupChoice = typeof rawChoice === "string" ? { kind: "character", characterId: rawChoice } : rawChoice;
   return database.transaction(async (transaction) => {
     const [session] = await transaction.select({
       id: sessions.id,
       communityId: sessions.communityId,
       gameSystemId: rulesets.gameSystemId,
+      minimumLevel: contentItems.minimumLevel,
+      maximumLevel: contentItems.maximumLevel,
     }).from(sessions)
       .innerJoin(communities, eq(communities.id, sessions.communityId))
       .innerJoin(contentItems, eq(contentItems.id, sessions.contentItemId))
@@ -55,12 +74,8 @@ export async function updateOwnSessionSignup(
       )).limit(1).for("update");
     if (!session) return { status: "unavailable" };
 
-    const [character] = await transaction.select({ id: characters.id }).from(characters).where(and(
-      eq(characters.id, characterId),
-      eq(characters.personId, actor.personId),
-      eq(characters.gameSystemId, session.gameSystemId),
-    )).limit(1);
-    if (!character) return { status: "unavailable" };
+    const values = await validateChoice(choice, actor.personId, session.gameSystemId, session.minimumLevel, session.maximumLevel, transaction as Database);
+    if (!values) return { status: "unavailable" };
 
     const [signup] = await transaction.select({ id: sessionSignups.id }).from(sessionSignups).where(and(
       eq(sessionSignups.sessionId, session.id),
@@ -70,12 +85,12 @@ export async function updateOwnSessionSignup(
     if (!signup) return { status: "not-found" };
 
     const now = new Date();
-    await transaction.update(sessionSignups).set({ characterId: character.id, updatedAt: now })
+    await transaction.update(sessionSignups).set({ ...values, updatedAt: now })
       .where(eq(sessionSignups.id, signup.id));
     await transaction.insert(communityAuditEvents).values({
       id: randomUUID(), communityId: session.communityId, actorPersonId: actor.personId,
       eventType: "session.signup.updated",
-      details: { sessionId: session.id, signupId: signup.id, characterId: character.id }, occurredAt: now,
+      details: { sessionId: session.id, signupId: signup.id, ...values }, occurredAt: now,
     });
     return { status: "updated", signupId: signup.id };
   });
@@ -163,6 +178,7 @@ export async function listUpcomingSignedUpGames(
     signupStatus: sessionSignups.status,
     waitlistPosition: sessionSignups.waitlistPosition,
     characterName: characters.name,
+    pregenName: sessionSignups.pregenName,
     paizoReportedAt: sessions.paizoReportedAt,
   }).from(sessions)
     .leftJoin(sessionSignups, and(
@@ -193,10 +209,11 @@ export async function listUpcomingSignedUpGames(
   return rows.flatMap((row): SignedUpGame[] => {
     if (row.sessionStatus !== "published" && row.sessionStatus !== "cancelled") return [];
     if (row.signupStatus !== null && row.signupStatus !== "confirmed" && row.signupStatus !== "waitlisted") return [];
-    const { gmPersonId, ...game } = row;
+    const { gmPersonId, pregenName, ...game } = row;
     const participationRole = gmPersonId === personId ? "gm" as const : "player" as const;
     return [{
       ...game,
+      characterName: pregenName ? `${pregenName} (pregen)` : game.characterName,
       sessionStatus: row.sessionStatus,
       signupStatus: row.signupStatus,
       participationRole,
@@ -206,15 +223,15 @@ export async function listUpcomingSignedUpGames(
 
 /** All viewable game history for the person, including completed and overdue GM sessions. */
 export async function listAllSignedUpGames(personId: string, database: Database = getDb()): Promise<SignedUpGame[]> {
-  const rows = await database.select({ sessionId: sessions.id, gmPersonId: sessions.gmPersonId, communityName: communities.name, communitySlug: communities.slug, scenarioCode: contentItems.code, scenarioTitle: contentItems.title, startsAt: sessions.startsAt, displayTimeZone: sessions.displayTimeZone, sessionStatus: sessions.status, signupStatus: sessionSignups.status, waitlistPosition: sessionSignups.waitlistPosition, characterName: characters.name, paizoReportedAt: sessions.paizoReportedAt })
+  const rows = await database.select({ sessionId: sessions.id, gmPersonId: sessions.gmPersonId, communityName: communities.name, communitySlug: communities.slug, scenarioCode: contentItems.code, scenarioTitle: contentItems.title, startsAt: sessions.startsAt, displayTimeZone: sessions.displayTimeZone, sessionStatus: sessions.status, signupStatus: sessionSignups.status, waitlistPosition: sessionSignups.waitlistPosition, characterName: characters.name, pregenName: sessionSignups.pregenName, paizoReportedAt: sessions.paizoReportedAt })
     .from(sessions).leftJoin(sessionSignups, and(eq(sessionSignups.sessionId, sessions.id), eq(sessionSignups.personId, personId), inArray(sessionSignups.status, ["confirmed", "waitlisted"]))).leftJoin(characters, eq(characters.id, sessionSignups.characterId)).innerJoin(communities, eq(communities.id, sessions.communityId)).innerJoin(contentItems, eq(contentItems.id, sessions.contentItemId)).leftJoin(communityMemberships, and(eq(communityMemberships.communityId, communities.id), eq(communityMemberships.personId, personId), eq(communityMemberships.status, "active")))
     .where(and(or(eq(sessions.gmPersonId, personId), isNotNull(sessionSignups.id)), inArray(sessions.status, ["published", "completed", "cancelled"]), eq(communities.lifecycleStatus, "active"), or(isNotNull(communityMemberships.id), and(eq(communities.visibility, "public"), eq(communities.scheduleVisibility, "public")))))
     .orderBy(desc(sessions.startsAt), desc(sessions.id));
   return rows.flatMap((row): SignedUpGame[] => {
     if (row.sessionStatus !== "published" && row.sessionStatus !== "completed" && row.sessionStatus !== "cancelled") return [];
     if (row.signupStatus !== null && row.signupStatus !== "confirmed" && row.signupStatus !== "waitlisted") return [];
-    const { gmPersonId, ...game } = row;
-    return [{ ...game, sessionStatus: row.sessionStatus, signupStatus: row.signupStatus, participationRole: gmPersonId === personId ? "gm" : "player" }];
+    const { gmPersonId, pregenName, ...game } = row;
+    return [{ ...game, characterName: pregenName ? `${pregenName} (pregen)` : game.characterName, sessionStatus: row.sessionStatus, signupStatus: row.signupStatus, participationRole: gmPersonId === personId ? "gm" : "player" }];
   });
 }
 
@@ -239,9 +256,10 @@ export async function signupForSession(
   actor: AuthenticatedActor,
   slug: string,
   sessionId: string,
-  characterId: string,
+  rawChoice: SessionSignupChoice | string,
   database: Database = getDb(),
 ): Promise<SessionSignupResult> {
+  const choice: SessionSignupChoice = typeof rawChoice === "string" ? { kind: "character", characterId: rawChoice } : rawChoice;
   return database.transaction(async (transaction) => {
     const access = await resolveCommunityAccessBySlug(slug, actor.personId, transaction);
     if (access.status !== "available" || !canViewSchedule(access)) return { status: "not-found" };
@@ -251,6 +269,8 @@ export async function signupForSession(
       capacity: sessions.playerCapacity,
       gmPersonId: sessions.gmPersonId,
       gameSystemId: rulesets.gameSystemId,
+      minimumLevel: contentItems.minimumLevel,
+      maximumLevel: contentItems.maximumLevel,
     })
       .from(sessions)
       .innerJoin(contentItems, eq(contentItems.id, sessions.contentItemId))
@@ -264,12 +284,8 @@ export async function signupForSession(
     if (!session) return { status: "not-found" };
     if (session.gmPersonId === actor.personId) return { status: "unavailable" };
 
-    const [character] = await transaction.select({ id: characters.id }).from(characters).where(and(
-      eq(characters.id, characterId),
-      eq(characters.personId, actor.personId),
-      eq(characters.gameSystemId, session.gameSystemId),
-    )).limit(1);
-    if (!character) return { status: "unavailable" };
+    const values = await validateChoice(choice, actor.personId, session.gameSystemId, session.minimumLevel, session.maximumLevel, transaction as Database);
+    if (!values) return { status: "unavailable" };
 
     const [existing] = await transaction.select({
       id: sessionSignups.id,
@@ -283,7 +299,7 @@ export async function signupForSession(
     )).limit(1).for("update");
     if (existing && (existing.status === "confirmed" || existing.status === "waitlisted")) {
       if (!existing.characterId) {
-        await transaction.update(sessionSignups).set({ characterId: character.id, updatedAt: new Date() })
+        await transaction.update(sessionSignups).set({ ...values, updatedAt: new Date() })
           .where(eq(sessionSignups.id, existing.id));
       }
       return {
@@ -318,7 +334,7 @@ export async function signupForSession(
       id: signupId,
       sessionId: session.id,
       personId: actor.personId,
-      characterId: character.id,
+      ...values,
       status,
       waitlistPosition,
       createdAt: now,
@@ -327,7 +343,7 @@ export async function signupForSession(
     await transaction.insert(communityAuditEvents).values({
       id: randomUUID(), communityId: access.community.id, actorPersonId: actor.personId,
       eventType: status === "confirmed" ? "session.signup.confirmed" : "session.signup.waitlisted",
-      details: { sessionId: session.id, signupId, characterId: character.id }, occurredAt: now,
+      details: { sessionId: session.id, signupId, ...values }, occurredAt: now,
     });
     return { status, signupId, replayed: false, ...(waitlistPosition ? { waitlistPosition } : {}) };
   });

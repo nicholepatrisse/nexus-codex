@@ -13,7 +13,8 @@ export type CompletionCharacter = {
   societyNumber?: string | null;
   level?: number | null;
   className?: string | null;
-  relationship: "Player" | "GM Credit";
+  relationship: "Player" | "Pregen Credit" | "GM Credit";
+  playedAs?: string;
   gmNotes: string;
   advancementSpeed: "standard" | "slow";
   xp: number;
@@ -63,7 +64,7 @@ export function CompleteSessionForm({ slug, sessionId, characters, participantsW
       {characters.length ? characters.map((character) => { const preview = previews[character.characterId] ?? previewFor(character); const downtimeDays = preview.xp * 2; let earned: ReturnType<typeof calculateEarnIncome> | null = null; if (preview.downtimeDisposition === "earn_income" && preview.downtimeCheckTotal != null && preview.downtimeProficiency) { try { earned = calculateEarnIncome(character.level ?? 1, preview.downtimeCheckTotal, preview.downtimeProficiency, downtimeDays); } catch { earned = null; } } const downtimeCredits = preview.downtimeOverrideCreditsMinor ?? earned?.calculatedCreditsMinor ?? 0; const totalCredits = preview.baseCreditsMinor + downtimeCredits; return <div key={character.characterId} className="rounded-xl border border-border bg-surface p-4">
         <input type="hidden" name="characterId" value={character.characterId} />
         <input type="hidden" name={`partnerCode:${character.characterId}`} value={character.partnerCode} />
-        <div className="flex flex-wrap items-baseline justify-between gap-2"><p className="font-semibold">{character.characterName}</p><span className="text-xs font-semibold text-brand">{character.relationship}</span></div>
+        <div className="flex flex-wrap items-baseline justify-between gap-2"><p className="font-semibold">{character.playedAs ? <><span className="text-text-muted">Playing as:</span> {character.playedAs}<br /><span className="text-text-muted">Credit goes to:</span> {character.characterName}</> : character.characterName}</p><span className="text-xs font-semibold text-brand">{character.relationship}</span></div>
         <p className="mt-1 text-sm text-text-muted">{character.playerName}{character.societyNumber ? ` · ${character.societyNumber}` : ""}{character.level ? ` · Level ${character.level}` : ""}{character.className ? ` ${character.className}` : ""}</p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <div><p className="text-sm font-semibold">Character level</p><p className="mt-1 rounded-lg border border-border bg-surface-raised px-3 py-2 text-sm">{character.level ?? 1}</p><input name={`characterLevel:${character.characterId}`} type="hidden" value={character.level ?? 1} /></div>

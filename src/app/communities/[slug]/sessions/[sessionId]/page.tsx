@@ -21,6 +21,7 @@ import { PlayerCharacterAssignments, type UnassignedParticipant } from "./player
 import { PaizoReportingReminder } from "./paizo-reporting-reminder";
 import { SessionStatusPill } from "@/app/session-status-pill";
 import { DescriptionItem, DescriptionList } from "@/app/description-list";
+import { defaultPregenLevel } from "@/character/sfs2-pregens";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string; sessionId: string }> }): Promise<Metadata> {
   const { slug, sessionId } = await params;
@@ -61,8 +62,9 @@ export default async function SessionPage({ params, searchParams }: { params: Pr
   const actor = await getAuthenticatedActor();
   const access = await resolveCommunityAccessBySlug(slug, actor?.personId ?? null);
   if (access.status !== "available") notFound();
-  const [session] = await getDb().select({ id: sessions.id, status: sessions.status, gameSystemId: sessions.gameSystemId, gmPersonId: sessions.gmPersonId, gmName: people.displayName, gmDiscordHandle: people.discordHandle, gmOrganizedPlayNumber: people.societyPlayNumber, scenarioCode: contentItems.code, scenarioTitle: contentItems.title, startsAt: sessions.startsAt, endsAt: sessions.endsAt, displayTimeZone: sessions.displayTimeZone, playerCapacity: sessions.playerCapacity, notes: sessions.notes, locationType: sessions.locationType, communityEventName: communities.eventName, communityEventCode: communities.eventCode, paizoReportedAt: sessions.paizoReportedAt }).from(sessions).innerJoin(communities, eq(communities.id, sessions.communityId)).innerJoin(contentItems, eq(contentItems.id, sessions.contentItemId)).innerJoin(people, eq(people.id, sessions.gmPersonId)).where(and(eq(sessions.id, sessionId), eq(sessions.communityId, access.community.id))).limit(1);
+  const [session] = await getDb().select({ id: sessions.id, status: sessions.status, gameSystemId: sessions.gameSystemId, gmPersonId: sessions.gmPersonId, gmName: people.displayName, gmDiscordHandle: people.discordHandle, gmOrganizedPlayNumber: people.societyPlayNumber, scenarioCode: contentItems.code, scenarioTitle: contentItems.title, scenarioMinimumLevel: contentItems.minimumLevel, scenarioMaximumLevel: contentItems.maximumLevel, startsAt: sessions.startsAt, endsAt: sessions.endsAt, displayTimeZone: sessions.displayTimeZone, playerCapacity: sessions.playerCapacity, notes: sessions.notes, locationType: sessions.locationType, communityEventName: communities.eventName, communityEventCode: communities.eventCode, paizoReportedAt: sessions.paizoReportedAt }).from(sessions).innerJoin(communities, eq(communities.id, sessions.communityId)).innerJoin(contentItems, eq(contentItems.id, sessions.contentItemId)).innerJoin(people, eq(people.id, sessions.gmPersonId)).where(and(eq(sessions.id, sessionId), eq(sessions.communityId, access.community.id))).limit(1);
   if (!session) notFound();
+  const scenarioPregenLevel = defaultPregenLevel(session.scenarioMinimumLevel, session.scenarioMaximumLevel);
   const isOwner = access.roles.includes("owner");
   const isAssignedGm = Boolean(actor) && session.gmPersonId === actor!.personId;
   const isManager = isOwner || isAssignedGm;
@@ -73,38 +75,46 @@ export default async function SessionPage({ params, searchParams }: { params: Pr
   let confirmedCount = 0;
   let waitlistedCount = 0;
   let roster: SessionRosterEntry[] | undefined;
-  let ownSignup: (OwnSessionSignupDetails & { characterId: string; gameSystemId: string }) | undefined;
+  let ownSignup: OwnSessionSignupDetails | undefined;
   let eligibleCharacters: { id: string; name: string; societyNumber: string; currentLevel: number }[] = [];
   let completionCharacters: CompletionCharacter[] = [];
   let participantsWithoutCharacters: string[] = [];
   let unassignedParticipants: UnassignedParticipant[] = [];
   if (session.status !== "draft") {
-    const rows = await getDb().select({ id: sessionSignups.id, personId: sessionSignups.personId, status: sessionSignups.status, waitlistPosition: sessionSignups.waitlistPosition, personName: people.displayName, discordHandle: people.discordHandle, characterId: characters.id, characterName: characters.name, characterSocietyNumber: characters.societyNumber, characterStartingLevel: characters.startingLevel, characterClassName: characters.className, characterAncestry: characters.ancestry, characterBackground: characters.background, gameSystemId: characters.gameSystemId }).from(sessionSignups).innerJoin(people, eq(people.id, sessionSignups.personId)).leftJoin(characters, eq(characters.id, sessionSignups.characterId)).where(and(eq(sessionSignups.sessionId, session.id), inArray(sessionSignups.status, ["confirmed", "waitlisted"]))).orderBy(asc(sessionSignups.waitlistPosition), asc(sessionSignups.createdAt));
-    const rosterCharacters = rows.flatMap((row) => row.characterId && row.characterStartingLevel ? [{ id: row.characterId, startingLevel: row.characterStartingLevel }] : []);
+    const rows = await getDb().select({ id: sessionSignups.id, personId: sessionSignups.personId, status: sessionSignups.status, waitlistPosition: sessionSignups.waitlistPosition, personName: people.displayName, discordHandle: people.discordHandle, characterId: characters.id, characterName: characters.name, characterSocietyNumber: characters.societyNumber, characterStartingLevel: characters.startingLevel, characterClassName: characters.className, characterAncestry: characters.ancestry, characterBackground: characters.background, gameSystemId: characters.gameSystemId, pregenName: sessionSignups.pregenName, pregenLevel: sessionSignups.pregenLevel, creditRecipientCharacterId: sessionSignups.creditRecipientCharacterId }).from(sessionSignups).innerJoin(people, eq(people.id, sessionSignups.personId)).leftJoin(characters, eq(characters.id, sessionSignups.characterId)).where(and(eq(sessionSignups.sessionId, session.id), inArray(sessionSignups.status, ["confirmed", "waitlisted"]))).orderBy(asc(sessionSignups.waitlistPosition), asc(sessionSignups.createdAt));
+    const creditRecipientIds = rows.flatMap((row) => row.creditRecipientCharacterId ? [row.creditRecipientCharacterId] : []);
+    const creditRecipients = creditRecipientIds.length ? await getDb().select().from(characters).where(inArray(characters.id, creditRecipientIds)) : [];
+    const creditRecipientById = new Map(creditRecipients.map((character) => [character.id, character]));
+    const rosterCharacters = rows.flatMap((row) => { const recipient = row.creditRecipientCharacterId ? creditRecipientById.get(row.creditRecipientCharacterId) : undefined; return row.characterId && row.characterStartingLevel ? [{ id: row.characterId, startingLevel: row.characterStartingLevel }] : recipient ? [{ id: recipient.id, startingLevel: recipient.startingLevel }] : []; });
     const progressionByCharacter = await getCharacterProgressions(rosterCharacters);
     confirmedCount = rows.filter(({ status }) => status === "confirmed").length;
     waitlistedCount = rows.filter(({ status }) => status === "waitlisted").length;
     const persistedOwnSignup = actor ? rows.find(({ personId }) => personId === actor.personId) : undefined;
-    if (persistedOwnSignup?.characterName && persistedOwnSignup.characterId && persistedOwnSignup.gameSystemId) {
+    const ownRecipient = persistedOwnSignup?.creditRecipientCharacterId ? creditRecipientById.get(persistedOwnSignup.creditRecipientCharacterId) : undefined;
+    if (persistedOwnSignup && ((persistedOwnSignup.characterName && persistedOwnSignup.characterId) || (persistedOwnSignup.pregenName && ownRecipient))) {
       ownSignup = {
         status: persistedOwnSignup.status === "confirmed" ? "confirmed" : "waitlisted",
-        characterName: persistedOwnSignup.characterName,
+        characterName: persistedOwnSignup.pregenName ?? persistedOwnSignup.characterName!,
         characterSocietyNumber: persistedOwnSignup.characterSocietyNumber,
-        characterLevel: progressionByCharacter.get(persistedOwnSignup.characterId)?.currentLevel,
+        characterLevel: persistedOwnSignup.pregenLevel ?? (persistedOwnSignup.characterId ? progressionByCharacter.get(persistedOwnSignup.characterId)?.currentLevel : null),
         waitlistPosition: persistedOwnSignup.waitlistPosition,
-        characterId: persistedOwnSignup.characterId,
-        gameSystemId: persistedOwnSignup.gameSystemId,
+        characterId: persistedOwnSignup.characterId ?? undefined,
+        pregenName: persistedOwnSignup.pregenName ?? undefined,
+        pregenLevel: persistedOwnSignup.pregenLevel ?? undefined,
+        creditRecipientCharacterId: ownRecipient?.id,
+        creditRecipientCharacterName: ownRecipient?.name,
+        scenarioPregenLevel,
         slug,
         sessionId: session.id,
         canManage: session.status === "published" && session.startsAt > new Date(),
       };
-      eligibleCharacters = (await listCharacters(actor!)).filter(({ gameSystemId }) => gameSystemId === persistedOwnSignup.gameSystemId).map(({ id, name, societyNumber, currentLevel }) => ({ id, name, societyNumber, currentLevel }));
+      eligibleCharacters = (await listCharacters(actor!)).filter(({ gameSystemId }) => gameSystemId === session.gameSystemId).map(({ id, name, societyNumber, currentLevel }) => ({ id, name, societyNumber, currentLevel }));
       ownSignup.characters = eligibleCharacters;
     }
     const showPrivateRosterDetails = canViewPrivateRosterDetails(isManager);
-    roster = rows.map((row) => ({ id: row.id, personName: row.personName, characterId: row.characterId, discordHandle: showPrivateRosterDetails ? row.discordHandle : null, characterName: row.characterName, characterSocietyNumber: showPrivateRosterDetails ? row.characterSocietyNumber : null, characterLevel: row.characterId ? progressionByCharacter.get(row.characterId)?.currentLevel : null, characterClassName: row.characterClassName, characterAncestry: row.characterAncestry, characterBackground: row.characterBackground, status: row.status === "confirmed" ? "confirmed" : "waitlisted", ...(row.waitlistPosition ? { waitlistPosition: row.waitlistPosition } : {}) }));
-    if (isManager) completionCharacters = rows.flatMap((row) => row.status === "confirmed" && row.characterId && row.characterName ? [{ characterId: row.characterId, characterName: row.characterName, playerName: row.personName, societyNumber: row.characterSocietyNumber, level: progressionByCharacter.get(row.characterId)?.currentLevel, className: row.characterClassName, relationship: "Player" as const, gmNotes: "", advancementSpeed: "standard" as const, xp: 4, baseCreditsMinor: ({1:140,2:220,3:380,4:640,5:1000,6:1500,7:2200,8:3000,9:4400,10:6000} as Record<number,number>)[progressionByCharacter.get(row.characterId)?.currentLevel ?? 1] ?? 0, downtimeDisposition: "declined" as const, downtimeCheckTotal: null, downtimeProficiency: null, downtimeOverrideCreditsMinor: null, downtimeCorrectionNote: "", downtimeActivity: "", chronicleNumber: "", partnerCode: "", eventName: session.communityEventName ?? access.community.name, eventCode: session.communityEventCode ?? "", gmOrganizedPlayId: session.gmOrganizedPlayNumber ?? "" }] : []);
-    if (isManager) participantsWithoutCharacters = rows.filter((row) => row.status === "confirmed" && !row.characterId).map(({ personName }) => personName);
+    roster = rows.map((row) => ({ id: row.id, personName: row.personName, characterId: row.characterId, discordHandle: showPrivateRosterDetails ? row.discordHandle : null, characterName: row.pregenName ?? row.characterName, characterSocietyNumber: showPrivateRosterDetails ? row.characterSocietyNumber : null, characterLevel: row.pregenLevel ?? (row.characterId ? progressionByCharacter.get(row.characterId)?.currentLevel : null), characterClassName: row.characterClassName, characterAncestry: row.characterAncestry, characterBackground: row.characterBackground, pregen: Boolean(row.pregenName), creditRecipientName: showPrivateRosterDetails && row.creditRecipientCharacterId ? creditRecipientById.get(row.creditRecipientCharacterId)?.name : null, status: row.status === "confirmed" ? "confirmed" : "waitlisted", ...(row.waitlistPosition ? { waitlistPosition: row.waitlistPosition } : {}) }));
+    if (isManager) completionCharacters = rows.flatMap((row) => { const recipient = row.creditRecipientCharacterId ? creditRecipientById.get(row.creditRecipientCharacterId) : undefined; const characterId = recipient?.id ?? row.characterId; const characterName = recipient?.name ?? row.characterName; const level = characterId ? progressionByCharacter.get(characterId)?.currentLevel : undefined; return row.status === "confirmed" && characterId && characterName ? [{ characterId, characterName, playerName: row.personName, societyNumber: recipient?.societyNumber ?? row.characterSocietyNumber, level, className: recipient?.className ?? row.characterClassName, relationship: row.pregenName ? "Pregen Credit" as const : "Player" as const, playedAs: row.pregenName ? `${row.pregenName} (level ${row.pregenLevel})` : undefined, gmNotes: "", advancementSpeed: "standard" as const, xp: 4, baseCreditsMinor: ({1:140,2:220,3:380,4:640,5:1000,6:1500,7:2200,8:3000,9:4400,10:6000} as Record<number,number>)[level ?? 1] ?? 0, downtimeDisposition: "declined" as const, downtimeCheckTotal: null, downtimeProficiency: null, downtimeOverrideCreditsMinor: null, downtimeCorrectionNote: "", downtimeActivity: "", chronicleNumber: "", partnerCode: "", eventName: session.communityEventName ?? access.community.name, eventCode: session.communityEventCode ?? "", gmOrganizedPlayId: session.gmOrganizedPlayNumber ?? "" }] : []; });
+    if (isManager) participantsWithoutCharacters = rows.filter((row) => row.status === "confirmed" && !row.characterId && !row.creditRecipientCharacterId).map(({ personName }) => personName);
     if (isManager && participantsWithoutCharacters.length) {
       const missing = rows.filter((row) => row.status === "confirmed" && !row.characterId);
       const options = await getDb().select({ id: characters.id, personId: characters.personId, name: characters.name, societyNumber: characters.societyNumber, startingLevel: characters.startingLevel, className: characters.className }).from(characters).where(and(inArray(characters.personId, missing.map(({ personId }) => personId)), eq(characters.gameSystemId, session.gameSystemId)));
@@ -122,7 +132,7 @@ export default async function SessionPage({ params, searchParams }: { params: Pr
       <Link href={`/communities/${encodeURIComponent(slug)}`} className="text-sm text-brand hover:underline">← {access.community.name}</Link>
       <section className="responsive-card mt-6 rounded-3xl border border-border bg-surface sm:mt-8 sm:p-10">
         <div><p className="text-sm font-semibold tracking-[0.2em] text-brand uppercase">Session</p><h1 className="mt-3 break-words text-2xl font-semibold sm:text-3xl">{session.scenarioCode} — {session.scenarioTitle}</h1></div>
-        <section className="mt-6 rounded-2xl border border-border bg-surface p-4 sm:mt-8 sm:p-5" aria-labelledby="signup-heading"><h2 id="signup-heading" className="text-lg font-semibold">Sign up for this game</h2><SessionSignupControl slug={slug} sessionId={session.id} characters={eligibleCharacters} /></section>
+        <section className="mt-6 rounded-2xl border border-border bg-surface p-4 sm:mt-8 sm:p-5" aria-labelledby="signup-heading"><h2 id="signup-heading" className="text-lg font-semibold">Sign up for this game</h2><SessionSignupControl slug={slug} sessionId={session.id} scenarioPregenLevel={scenarioPregenLevel} characters={eligibleCharacters} /></section>
         <SessionDetails session={session} browserZone={browserZone} />
         {session.notes ? <div className="mt-8 border-t border-border pt-6"><h2 className="text-sm font-semibold text-text-muted">Notes</h2><p className="mt-2 whitespace-pre-wrap">{session.notes}</p></div> : null}
         <SessionRoster capacity={session.playerCapacity} confirmedCount={confirmedCount} waitlistedCount={waitlistedCount} />

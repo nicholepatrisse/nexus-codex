@@ -4,6 +4,19 @@ import { revalidatePath } from "next/cache";
 import { AuthenticationRequiredError, requireAuthenticatedActor } from "@/auth/actor";
 import { cancelOwnSessionSignup, signupForSession, updateOwnSessionSignup } from "@/session/session-signups";
 
+function signupChoice(formData: FormData) {
+  const kind = formData.get("signupKind");
+  if (kind === "pregen") {
+    const pregenName = formData.get("pregenName");
+    const pregenLevel = Number(formData.get("pregenLevel"));
+    const creditRecipientCharacterId = formData.get("creditRecipientCharacterId");
+    if (typeof pregenName !== "string" || !pregenName || !Number.isInteger(pregenLevel) || typeof creditRecipientCharacterId !== "string" || !creditRecipientCharacterId) return null;
+    return { kind, pregenName, pregenLevel, creditRecipientCharacterId } as const;
+  }
+  const characterId = formData.get("characterId");
+  return typeof characterId === "string" && characterId ? { kind: "character" as const, characterId } : null;
+}
+
 export type SessionSignupActionState = {
   status?: "confirmed" | "waitlisted" | "cancelled" | "updated";
   waitlistPosition?: number;
@@ -18,9 +31,9 @@ export async function signupForSessionAction(
 ): Promise<SessionSignupActionState> {
   void _previous;
   try {
-    const characterId = formData.get("characterId");
-    if (typeof characterId !== "string" || !characterId) return { error: "Choose a character to sign up." };
-    const result = await signupForSession(await requireAuthenticatedActor(), slug, sessionId, characterId);
+    const choice = signupChoice(formData);
+    if (!choice) return { error: "Choose who you are playing and, for a pregen, where the credit goes." };
+    const result = await signupForSession(await requireAuthenticatedActor(), slug, sessionId, choice);
     if (result.status !== "confirmed" && result.status !== "waitlisted") {
       return { error: "This session is not available for signup." };
     }
@@ -43,9 +56,9 @@ export async function updateSessionSignupAction(
 ): Promise<SessionSignupActionState> {
   void _previous;
   try {
-    const characterId = formData.get("characterId");
-    if (typeof characterId !== "string" || !characterId) return { error: "Choose a character." };
-    const result = await updateOwnSessionSignup(await requireAuthenticatedActor(), slug, sessionId, characterId);
+    const choice = signupChoice(formData);
+    if (!choice) return { error: "Choose who you are playing and, for a pregen, where the credit goes." };
+    const result = await updateOwnSessionSignup(await requireAuthenticatedActor(), slug, sessionId, choice);
     if (result.status !== "updated") return { error: "This signup can no longer be edited." };
     revalidatePath(`/communities/${slug}`);
     revalidatePath(`/communities/${slug}/sessions/${sessionId}`);
