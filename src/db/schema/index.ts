@@ -178,6 +178,52 @@ export const characters = pgTable(
   ],
 );
 
+/** Paizo rulebooks/products a player owns. Player Core is implicit and is not stored. */
+export const playerMaterials = pgTable(
+  "player_materials",
+  {
+    id: text("id").primaryKey(),
+    personId: text("person_id").notNull().references(() => people.id, { onDelete: "cascade" }),
+    identity: text("identity").notNull(),
+    productCode: text("product_code"),
+    title: text("title").notNull(),
+    sourceUrl: text("source_url").notNull(),
+    aliases: jsonb("aliases").$type<string[]>().notNull().default([]),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("player_materials_person_identity_unique").on(table.personId, table.identity),
+    index("player_materials_person_id_idx").on(table.personId),
+    check("player_materials_identity_not_blank", sql`length(btrim(${table.identity})) > 0`),
+    check("player_materials_title_not_blank", sql`length(btrim(${table.title})) > 0`),
+  ],
+);
+
+/** Reusable, globally deduplicated character options imported from Archives of Nethys. */
+export const characterOptions = pgTable(
+  "character_options",
+  {
+    id: text("id").primaryKey(),
+    gameSystemId: text("game_system_id").notNull().default(SUPPORTED_GAME_SYSTEM.id).references(() => gameSystems.id, { onDelete: "restrict" }),
+    optionType: text("option_type").notNull(),
+    name: text("name").notNull(),
+    normalizedName: text("normalized_name").notNull(),
+    sourceMaterialIdentity: text("source_material_identity"),
+    sourceMaterialTitle: text("source_material_title"),
+    sourceUrl: text("source_url").notNull(),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("character_options_source_url_unique").on(table.sourceUrl),
+    index("character_options_type_name_idx").on(table.optionType, table.normalizedName),
+    check("character_options_type_check", sql`${table.optionType} in ('class', 'ancestry', 'background', 'item')`),
+    check("character_options_name_not_blank", sql`length(btrim(${table.name})) > 0`),
+  ],
+);
+
 export const rulesets = pgTable(
   "rulesets",
   {
