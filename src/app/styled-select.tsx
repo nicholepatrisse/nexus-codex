@@ -1,15 +1,18 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { CharacterIdentity, type CharacterIdentityData } from "@/character/character-identity";
 
 export type StyledSelectOption = {
   value: string;
   label: string;
   description?: string;
   metadata?: string;
+  character?: CharacterIdentityData;
 };
 
 function OptionContent({ option, selected = false }: { option: StyledSelectOption; selected?: boolean }) {
+  if (option.character) return <CharacterIdentity character={option.character} variant="dropdown-option" />;
   return <>
     <span className="min-w-0 flex-1">
       <span className="block truncate font-medium">{option.label}</span>
