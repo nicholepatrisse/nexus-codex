@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { CommunityCard } from "@/app/community-card";
 import { EmptyState } from "@/app/empty-state";
 import { StatusBadge } from "@/app/status-badge";
+import { DescriptionItem, DescriptionList } from "@/app/description-list";
 
 describe("shared UI patterns", () => {
   it("renders an empty state with semantic content and optional composition", () => {
@@ -25,5 +26,29 @@ describe("shared UI patterns", () => {
     expect(markup).toContain("Nexus");
     expect(markup).toContain("Archived");
     expect(markup).toContain("bg-surface/70");
+  });
+
+  it("renders compact multi-column description lists with composable values", () => {
+    const markup = renderToStaticMarkup(<DescriptionList density="compact" columns={2}>
+      <DescriptionItem label="Website"><a href="/rules">Rules</a></DescriptionItem>
+      <DescriptionItem label="Status"><StatusBadge tone="success">Ready</StatusBadge></DescriptionItem>
+    </DescriptionList>);
+    expect(markup).toContain("<dl");
+    expect(markup).toContain("gap-y-2");
+    expect(markup).toContain("sm:grid-cols-2");
+    expect(markup).toContain('<a href="/rules">Rules</a>');
+    expect(markup).toContain("Ready");
+  });
+
+  it("wraps long values and applies the explicit missing-value policy", () => {
+    const markup = renderToStaticMarkup(<DescriptionList>
+      <DescriptionItem label="Notes">A very long value that remains readable without overflowing its container</DescriptionItem>
+      <DescriptionItem label="Omitted">{null}</DescriptionItem>
+      <DescriptionItem label="Unavailable" empty="placeholder" placeholder="Not provided">{null}</DescriptionItem>
+    </DescriptionList>);
+    expect(markup).toContain("break-words");
+    expect(markup).not.toContain("Omitted");
+    expect(markup).toContain("Unavailable");
+    expect(markup).toContain("Not provided");
   });
 });
