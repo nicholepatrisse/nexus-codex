@@ -372,6 +372,13 @@
       "when": 1788201907055,
       "tag": "0052_peaceful_betty_brant",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1788204847920,
+      "tag": "0053_unusual_shaman",
+      "breakpoints": true
     }
   ]
 }

@@ -11,5 +11,11 @@ describe("inventory validation", () => {
     expect(inventoryEntryInputSchema.safeParse({ ...valid, acquisitionType: "sold" }).success).toBe(false);
     expect(inventoryEntryInputSchema.safeParse({ ...valid, amountPaidMinor: -1 }).success).toBe(false);
     expect(inventoryEntryInputSchema.safeParse({ ...valid, itemLink: "javascript:alert(1)" }).success).toBe(false);
+    expect(inventoryEntryInputSchema.safeParse({ ...valid, validationNote: "x".repeat(1001) }).success).toBe(false);
+  });
+
+  it("normalizes blank validation notes", () => {
+    expect(inventoryEntryInputSchema.parse({ ...valid, validationNote: "  access from a boon  " }).validationNote).toBe("access from a boon");
+    expect(inventoryEntryInputSchema.parse({ ...valid, validationNote: "   " }).validationNote).toBeNull();
   });
 });

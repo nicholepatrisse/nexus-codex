@@ -6,7 +6,7 @@ import { nextAvailableCharacterNumber, normalizeCharacterNumber } from "@/app/ch
 import { CharacterProgress } from "@/app/characters/[characterId]/character-progress";
 describe("character creation", () => {
   it("accepts and normalizes required fields", () => {
-    expect(createCharacterInputSchema.parse({ name: "  Navasi  ", characterNumber: " 01 " })).toEqual({ name: "Navasi", characterNumber: "01", startingLevel: 1, startingCredits: 150, startingItems: [], className: null, ancestry: null, background: null, backstory: null, notes: null });
+    expect(createCharacterInputSchema.parse({ name: "  Navasi  ", characterNumber: " 01 " })).toEqual({ name: "Navasi", characterNumber: "01", startingLevel: 1, startingCredits: 150, startingItems: [], className: null, classValidationNote: null, ancestry: null, ancestryValidationNote: null, background: null, backgroundValidationNote: null, backstory: null, notes: null });
   });
   it.each([
     { name: "", characterNumber: "01" },
@@ -17,7 +17,7 @@ describe("character creation", () => {
 
   it("normalizes optional character details", () => {
     expect(createCharacterInputSchema.parse({ name: "Navasi", characterNumber: "01", startingLevel: "7", className: "  Envoy ", ancestry: "  Human  ", background: "   " })).toEqual({
-      name: "Navasi", characterNumber: "01", startingLevel: 7, startingCredits: 7200, startingItems: [], className: "Envoy", ancestry: "Human", background: null, backstory: null, notes: null,
+      name: "Navasi", characterNumber: "01", startingLevel: 7, startingCredits: 7200, startingItems: [], className: "Envoy", classValidationNote: null, ancestry: "Human", ancestryValidationNote: null, background: null, backgroundValidationNote: null, backstory: null, notes: null,
     });
   });
 
@@ -54,12 +54,13 @@ describe("character creation", () => {
   });
 
   it("does not expose starting level through character updates", () => {
-    expect(updateCharacterInputSchema.parse({ name: "Navasi", startingLevel: 7, startingCredits: 7200, startingItems: [] })).toEqual({ name: "Navasi", startingLevel: 7, startingCredits: 7200, startingItems: [], className: null, ancestry: null, background: null, backstory: null, notes: null });
+    expect(updateCharacterInputSchema.parse({ name: "Navasi", startingLevel: 7, startingCredits: 7200, startingItems: [] })).toEqual({ name: "Navasi", startingLevel: 7, startingCredits: 7200, startingItems: [], className: null, classValidationNote: null, ancestry: null, ancestryValidationNote: null, background: null, backgroundValidationNote: null, backstory: null, notes: null });
   });
 
   it("applies reasonable detail length limits", () => {
     expect(updateCharacterInputSchema.safeParse({ name: "Navasi", className: "x".repeat(101) }).success).toBe(false);
     expect(updateCharacterInputSchema.safeParse({ name: "Navasi", backstory: "x".repeat(5001) }).success).toBe(false);
+    expect(updateCharacterInputSchema.safeParse({ name: "Navasi", classValidationNote: "x".repeat(1001) }).success).toBe(false);
   });
 
   it("formats Starfinder 2E character numbers", () => {
