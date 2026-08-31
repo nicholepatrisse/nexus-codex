@@ -3,6 +3,7 @@
 import { useActionState, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { updateCommunitySettingsAction } from "./actions";
+import { StyledSelect } from "@/app/styled-select";
 import type { CommunitySettingsFormState } from "./state";
 
 interface Settings {
@@ -62,5 +63,5 @@ export function CommunitySettingsForm({ settings }: { settings: Settings }) {
 function Select({ label, name, value, options }: { label: string; name: string; value: string; options: [string, string][] }) {
   const [selected, setSelected] = useState(value);
 
-  return <label className="text-sm font-semibold">{label}<select name={name} value={selected} onChange={(event) => setSelected(event.target.value)} className="mt-2 w-full rounded-xl border border-border-strong bg-surface-raised px-4 py-3">{options.map(([key, text]) => <option key={key} value={key}>{text}</option>)}</select></label>;
+  return <div><label htmlFor={name} className="text-sm font-semibold">{label}</label><StyledSelect name={name} label={label} value={selected} options={options.map(([key, text]) => ({ value: key, label: text }))} onValueChange={setSelected} /></div>;
 }
