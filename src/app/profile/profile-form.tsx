@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
+import { FormField } from "@/app/form-field";
 import { updateProfileAction, type ProfileFormState } from "./actions";
 
 type ProfileValues = { displayName: string; discordHandle: string | null; societyPlayNumber: string | null };
@@ -12,8 +13,7 @@ function SaveButton() {
 }
 
 function Field({ name, label, value, maximum, help, state }: { name: keyof ProfileValues; label: string; value: string | null; maximum: number; help: string; state: ProfileFormState }) {
-  const error = state.fieldErrors?.[name]?.[0];
-  return <div><label htmlFor={name} className="block text-sm font-semibold">{label} <span className="font-normal text-text-muted">(optional)</span></label><input id={name} name={name} defaultValue={value ?? ""} maxLength={maximum} aria-describedby={`${name}-help${error ? ` ${name}-error` : ""}`} aria-invalid={Boolean(error)} className="mt-2 w-full rounded-xl border border-border-strong bg-surface-raised px-4 py-3 outline-none focus:border-brand" /><p id={`${name}-help`} className="mt-2 text-sm text-text-muted">{help}</p>{error ? <p id={`${name}-error`} role="alert" className="mt-2 text-sm text-danger">{error}</p> : null}</div>;
+  return <FormField id={name} label={label} optional description={help} errors={state.fieldErrors?.[name]}>{(controlProps) => <input {...controlProps} name={name} defaultValue={value ?? ""} maxLength={maximum} className="w-full rounded-xl border border-border-strong bg-surface-raised px-4 py-3 outline-none focus:border-brand" />}</FormField>;
 }
 
 export function ProfileForm({ profile }: { profile: ProfileValues }) {
