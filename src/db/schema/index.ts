@@ -518,6 +518,10 @@ export const sessionSignups = pgTable(
       .references(() => people.id, { onDelete: "restrict" }),
     characterId: text("character_id")
       .references(() => characters.id, { onDelete: "restrict" }),
+    pregenName: text("pregen_name"),
+    pregenLevel: integer("pregen_level"),
+    creditRecipientCharacterId: text("credit_recipient_character_id")
+      .references(() => characters.id, { onDelete: "restrict" }),
     status: text("status").notNull(),
     waitlistPosition: integer("waitlist_position"),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
@@ -532,6 +536,7 @@ export const sessionSignups = pgTable(
       .on(table.sessionId, table.waitlistPosition)
       .where(sql`${table.status} = 'waitlisted'`),
     index("session_signups_session_status_idx").on(table.sessionId, table.status),
+    index("session_signups_credit_recipient_idx").on(table.creditRecipientCharacterId),
     check(
       "session_signups_status_check",
       sql`${table.status} in ('confirmed', 'waitlisted', 'cancelled')`,
@@ -541,6 +546,12 @@ export const sessionSignups = pgTable(
       sql`coalesce((${table.status} = 'confirmed' and ${table.waitlistPosition} is null and ${table.cancelledAt} is null)
         or (${table.status} = 'waitlisted' and ${table.waitlistPosition} is not null and ${table.waitlistPosition} > 0 and ${table.cancelledAt} is null)
         or (${table.status} = 'cancelled' and ${table.cancelledAt} is not null), false)`,
+    ),
+    check(
+      "session_signups_character_choice_check",
+      sql`coalesce((${table.characterId} is not null and ${table.pregenName} is null and ${table.pregenLevel} is null and ${table.creditRecipientCharacterId} is null)
+        or (${table.characterId} is null and length(btrim(${table.pregenName})) between 1 and 100 and ${table.pregenLevel} in (1, 3, 5, 7) and ${table.creditRecipientCharacterId} is not null)
+        or (${table.characterId} is null and ${table.pregenName} is null and ${table.pregenLevel} is null and ${table.creditRecipientCharacterId} is null), false)`,
     ),
   ],
 );

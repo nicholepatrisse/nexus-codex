@@ -1,0 +1,8 @@
+ALTER TABLE "session_signups" ADD COLUMN "pregen_name" text;--> statement-breakpoint
+ALTER TABLE "session_signups" ADD COLUMN "pregen_level" integer;--> statement-breakpoint
+ALTER TABLE "session_signups" ADD COLUMN "credit_recipient_character_id" text;--> statement-breakpoint
+ALTER TABLE "session_signups" ADD CONSTRAINT "session_signups_credit_recipient_character_id_characters_id_fk" FOREIGN KEY ("credit_recipient_character_id") REFERENCES "public"."characters"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "session_signups_credit_recipient_idx" ON "session_signups" USING btree ("credit_recipient_character_id");--> statement-breakpoint
+ALTER TABLE "session_signups" ADD CONSTRAINT "session_signups_character_choice_check" CHECK (coalesce(("session_signups"."character_id" is not null and "session_signups"."pregen_name" is null and "session_signups"."pregen_level" is null and "session_signups"."credit_recipient_character_id" is null)
+        or ("session_signups"."character_id" is null and length(btrim("session_signups"."pregen_name")) between 1 and 100 and "session_signups"."pregen_level" in (1, 3, 5, 7) and "session_signups"."credit_recipient_character_id" is not null)
+        or ("session_signups"."character_id" is null and "session_signups"."pregen_name" is null and "session_signups"."pregen_level" is null and "session_signups"."credit_recipient_character_id" is null), false));

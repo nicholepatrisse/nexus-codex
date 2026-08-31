@@ -191,6 +191,14 @@ describeWithDatabase("session signups", () => {
       eq(communityAuditEvents.communityId, community.id),
       eq(communityAuditEvents.eventType, "session.signup.updated"),
     ))).resolves.toEqual(expect.arrayContaining([expect.objectContaining({ actorPersonId: actor.personId })]));
+
+    await expect(updateOwnSessionSignup(actor, community.slug, publishedSessionId, {
+      kind: "pregen", pregenName: "Navasi", pregenLevel: 7,
+      creditRecipientCharacterId: alternateCharacterId,
+    })).resolves.toEqual({ status: "updated", signupId: signup!.id });
+    await expect(getDb().select().from(sessionSignups).where(eq(sessionSignups.id, signup!.id)))
+      .resolves.toEqual([expect.objectContaining({ characterId: null, pregenName: "Navasi", pregenLevel: 1, creditRecipientCharacterId: alternateCharacterId })]);
+    await updateOwnSessionSignup(actor, community.slug, publishedSessionId, alternateCharacterId);
   });
 
   it("lists only the person's authorized upcoming games in chronological order", async () => {

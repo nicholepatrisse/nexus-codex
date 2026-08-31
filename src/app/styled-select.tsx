@@ -1,7 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useId, useRef, useState } from "react";
 import { CharacterIdentity, type CharacterIdentityData } from "@/character/character-identity";
+import { getCharacterClassIcon } from "@/character/character-class-icon";
 
 export type StyledSelectOption = {
   value: string;
@@ -9,12 +11,15 @@ export type StyledSelectOption = {
   description?: string;
   metadata?: string;
   character?: CharacterIdentityData;
+  className?: string;
   disabled?: boolean;
 };
 
 function OptionContent({ option, selected = false }: { option: StyledSelectOption; selected?: boolean }) {
   if (option.character) return <span className={`min-w-0 flex-1 ${selected ? "[&_.text-text-muted]:text-on-brand/80 [&_.text-text-primary]:text-on-brand" : ""}`}><CharacterIdentity character={option.character} variant="dropdown-option" /></span>;
+  const classIcon = getCharacterClassIcon(option.className);
   return <>
+    {classIcon ? <Image src={classIcon.src} alt="" aria-hidden="true" width={32} height={32} className="size-8 shrink-0 object-contain" /> : null}
     <span className="min-w-0 flex-1">
       <span className="block truncate font-medium">{option.label}</span>
       {option.description ? <span className={`mt-0.5 block truncate text-sm ${selected ? "text-on-brand/80" : "text-text-muted"}`}>{option.description}</span> : null}

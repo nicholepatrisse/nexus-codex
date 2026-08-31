@@ -20,9 +20,10 @@ function rewardValues(note: SessionChronicleInput, characterLevel: number, metad
 }
 
 async function eligibleCharacters(sessionId: string, database: Database) {
-  const players = (await database.select({ id: characters.id, startingLevel: characters.startingLevel }).from(sessionSignups).innerJoin(characters, eq(characters.id, sessionSignups.characterId)).where(and(eq(sessionSignups.sessionId, sessionId), eq(sessionSignups.status, "confirmed")))).map((character) => ({ ...character, creditType: "normal" as const }));
-  const credits = (await database.select({ id: characters.id, startingLevel: characters.startingLevel }).from(sessionGmCredits).innerJoin(characters, eq(characters.id, sessionGmCredits.characterId)).where(eq(sessionGmCredits.sessionId, sessionId))).map((character) => ({ ...character, creditType: "gm" as const }));
-  return [...new Map([...players, ...credits].map((character) => [character.id, character])).values()];
+  const players = (await database.select({ id: characters.id, startingLevel: characters.startingLevel }).from(sessionSignups).innerJoin(characters, eq(characters.id, sessionSignups.characterId)).where(and(eq(sessionSignups.sessionId, sessionId), eq(sessionSignups.status, "confirmed")))).map((character) => ({ ...character, creditType: "normal" as const, earningLevel: null as number | null }));
+  const pregens = (await database.select({ id: characters.id, startingLevel: characters.startingLevel, earningLevel: sessionSignups.pregenLevel }).from(sessionSignups).innerJoin(characters, eq(characters.id, sessionSignups.creditRecipientCharacterId)).where(and(eq(sessionSignups.sessionId, sessionId), eq(sessionSignups.status, "confirmed")))).map((character) => ({ ...character, creditType: "pregen" as const }));
+  const credits = (await database.select({ id: characters.id, startingLevel: characters.startingLevel }).from(sessionGmCredits).innerJoin(characters, eq(characters.id, sessionGmCredits.characterId)).where(eq(sessionGmCredits.sessionId, sessionId))).map((character) => ({ ...character, creditType: "gm" as const, earningLevel: null as number | null }));
+  return [...new Map([...players, ...pregens, ...credits].map((character) => [character.id, character])).values()];
 }
 
 async function upsertChronicles(session: { id: string; communityId: string; gmPersonId: string; contentItemId: string; startsAt: Date }, notes: SessionChronicleInput[], database: Database) {
@@ -42,10 +43,12 @@ async function upsertChronicles(session: { id: string; communityId: string; gmPe
   for (const note of notes) {
     const [existing] = await database.select({ id: chronicles.id, characterLevel: chronicles.characterLevel }).from(chronicles).where(and(eq(chronicles.sessionId, session.id), eq(chronicles.characterId, note.characterId))).limit(1);
     await assertChronicleReplayAllowed(note.characterId, content.code, database, existing?.id);
-    const characterLevel = existing?.characterLevel ?? progression.get(note.characterId)?.currentLevel ?? 1;
-    const creditType = eligible.find(({ id }) => id === note.characterId)?.creditType ?? "normal";
+    const credit = eligible.find(({ id }) => id === note.characterId);
+    const characterLevel = existing?.characterLevel ?? credit?.earningLevel ?? progression.get(note.characterId)?.currentLevel ?? 1;
+    const creditType = credit?.creditType ?? "normal";
     const inRange = characterLevel >= content.minimumLevel && characterLevel <= content.maximumLevel;
-    const eligibilityState = inRange || (creditType === "gm" && characterLevel === 1) ? "eligible" : creditType === "gm" && characterLevel < content.minimumLevel ? "held" : "ineligible";
+    const recipientLevel = progression.get(note.characterId)?.currentLevel ?? 1;
+    const eligibilityState = creditType === "pregen" ? (recipientLevel <= characterLevel ? (recipientLevel === characterLevel || recipientLevel === 1 ? "eligible" : "held") : "ineligible") : inRange || (creditType === "gm" && characterLevel === 1) ? "eligible" : creditType === "gm" && characterLevel < content.minimumLevel ? "held" : "ineligible";
     const values = { characterLevel, creditType, eligibilityState, scenarioMinimumLevelSnapshot: content.minimumLevel, scenarioMaximumLevelSnapshot: content.maximumLevel, advancementSpeed: note.advancementSpeed, xp: note.xp, ...rewardValues(note, characterLevel, metadataDefaults), chronicleNumber: null, gmNotes: note.gmNotes || null, status: "pending", appliedAt: null, updatedAt: now };
     const chronicleId = existing?.id ?? randomUUID();
     if (existing) await database.update(chronicles).set(values).where(eq(chronicles.id, existing.id));

@@ -15,6 +15,8 @@ export function PlayerSummaryCard({
   characterBackground,
   waitlistPosition,
   expandable = true,
+  pregen = false,
+  creditRecipientName,
 }: {
   personName: string;
   discordHandle?: string | null;
@@ -27,12 +29,14 @@ export function PlayerSummaryCard({
   characterBackground?: string | null;
   waitlistPosition?: number;
   expandable?: boolean;
+  pregen?: boolean;
+  creditRecipientName?: string | null;
 }) {
   const compactCharacterDetails = characterIdentityCompactValues({ name: characterName ?? "", level: characterLevel, className: characterClassName, ancestry: characterAncestry, background: characterBackground });
   const summaryContent = <>
     <span className="min-w-0 flex-1">
       <span className="block font-semibold text-text-primary">{personName}</span>
-      {characterName ? <span className={`mt-1 block break-words text-sm text-text-muted ${expandable ? "group-open:hidden" : ""}`}>{[characterName, ...compactCharacterDetails].join(" · ")}</span> : <span className={`mt-1 block text-sm text-text-muted ${expandable ? "group-open:hidden" : ""}`}>No character assigned</span>}
+      {characterName ? <span className={`mt-1 block break-words text-sm text-text-muted ${expandable ? "group-open:hidden" : ""}`}>{pregen ? "Pregen · " : ""}{[characterName, ...compactCharacterDetails].join(" · ")}</span> : <span className={`mt-1 block text-sm text-text-muted ${expandable ? "group-open:hidden" : ""}`}>No character assigned</span>}
     </span>
     <StatusBadge tone={waitlistPosition ? "warning" : "success"}>{waitlistPosition ? `Waitlist #${waitlistPosition}` : "Confirmed"}</StatusBadge>
   </>;
@@ -45,9 +49,10 @@ export function PlayerSummaryCard({
     </summary>
     <div className="border-t border-border px-4 pb-4 pt-3">
       {characterName ? <div>
-        <p className="text-xs font-semibold tracking-wide text-text-muted uppercase">Character</p>
+        <p className="text-xs font-semibold tracking-wide text-text-muted uppercase">{pregen ? "Playing as · Pregen" : "Character"}</p>
         <div className="mt-1"><CharacterIdentity variant="detail" character={{ name: characterName, societyNumber: characterSocietyNumber, level: characterLevel, className: characterClassName, ancestry: characterAncestry, background: characterBackground }} name={characterId ? <Link className="hover:text-brand hover:underline" href={`/characters/${characterId}`}>{characterName}</Link> : characterName} /></div>
       </div> : null}
+    {pregen && creditRecipientName ? <p className="mt-3 border-t border-border pt-3 text-sm"><span className="font-semibold">Credit goes to:</span> {creditRecipientName}</p> : null}
     {discordHandle ? <DescriptionList density="compact" className={characterName ? "mt-3 border-t border-border pt-3" : ""}>
       <DescriptionItem label="Discord">{discordHandle}</DescriptionItem>
     </DescriptionList> : null}
