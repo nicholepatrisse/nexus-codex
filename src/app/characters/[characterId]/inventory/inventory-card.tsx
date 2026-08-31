@@ -5,6 +5,7 @@ import { useRef } from "react";
 import type { InventoryEntry } from "@/character/inventory";
 import type { SaleState } from "../sales/actions";
 import { SaleForm } from "../sales/sale-form";
+import { DescriptionItem, DescriptionList } from "@/app/description-list";
 
 const formatDate = (value: string) => new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${value}T00:00:00Z`));
 const formatCredits = (value: number) => new Intl.NumberFormat("en-US").format(value);
@@ -20,14 +21,14 @@ export function InventoryCard({ characterId, entry, saleAction }: { characterId:
     <dialog ref={details} aria-labelledby={`inventory-${entry.id}-title`} onClick={(event) => { if (event.target === event.currentTarget) details.current?.close(); }} className="m-auto w-[calc(100%-2rem)] max-w-xl rounded-3xl border border-border-strong bg-surface p-0 text-text-primary shadow-2xl backdrop:bg-black/70 backdrop:backdrop-blur-sm">
       <div className="p-6 sm:p-8">
         <div className="flex items-start justify-between gap-4"><div className="min-w-0"><p className="text-sm font-semibold tracking-[0.16em] text-brand uppercase">Inventory item</p><h2 id={`inventory-${entry.id}-title`} className="mt-2 break-words text-2xl font-semibold">{entry.itemNameSnapshot}</h2></div><button type="button" onClick={() => details.current?.close()} aria-label="Close item details" className="rounded-full px-2 py-1 text-xl leading-none text-text-muted hover:bg-surface-raised hover:text-text-primary">×</button></div>
-        <dl className="mt-6 grid gap-5 sm:grid-cols-2">
-          <div><dt className="text-sm text-text-muted">Quantity</dt><dd className="mt-1 font-semibold">{entry.quantity}</dd></div>
-          <div><dt className="text-sm text-text-muted">Acquisition</dt><dd className="mt-1 font-semibold capitalize">{acquisition}</dd></div>
-          <div><dt className="text-sm text-text-muted">Acquired</dt><dd className="mt-1 font-semibold">{formatDate(entry.acquiredOn)}</dd></div>
-          {entry.bulkSnapshot ? <div><dt className="text-sm text-text-muted">Bulk</dt><dd className="mt-1 font-semibold">{entry.bulkSnapshot} each</dd></div> : null}
-          {entry.amountPaidMinor != null ? <div><dt className="text-sm text-text-muted">Amount paid</dt><dd className="mt-1 font-semibold">{formatCredits(entry.amountPaidMinor)} credits</dd></div> : null}
-          {entry.valueMinor != null ? <div><dt className="text-sm text-text-muted">Value</dt><dd className="mt-1 font-semibold">{formatCredits(entry.valueMinor)} credits each</dd></div> : null}
-        </dl>
+        <DescriptionList columns={2} className="mt-6">
+          <DescriptionItem label="Quantity">{entry.quantity}</DescriptionItem>
+          <DescriptionItem label="Acquisition" valueClassName="capitalize">{acquisition}</DescriptionItem>
+          <DescriptionItem label="Acquired">{formatDate(entry.acquiredOn)}</DescriptionItem>
+          <DescriptionItem label="Bulk">{entry.bulkSnapshot ? `${entry.bulkSnapshot} each` : null}</DescriptionItem>
+          <DescriptionItem label="Amount paid">{entry.amountPaidMinor != null ? `${formatCredits(entry.amountPaidMinor)} credits` : null}</DescriptionItem>
+          <DescriptionItem label="Value">{entry.valueMinor != null ? `${formatCredits(entry.valueMinor)} credits each` : null}</DescriptionItem>
+        </DescriptionList>
         {entry.notes ? <section className="mt-6 border-t border-border pt-6"><h3 className="font-semibold">Notes</h3><p className="mt-2 whitespace-pre-wrap text-sm text-text-muted">{entry.notes}</p></section> : null}
         <div className="mt-7 flex flex-wrap items-center gap-4 border-t border-border pt-6">{entry.itemLinkSnapshot ? <a className="text-sm font-semibold text-brand hover:underline" href={entry.itemLinkSnapshot} target="_blank" rel="noreferrer">View item rules<span className="sr-only"> (opens in a new tab)</span></a> : null}<Link className="text-sm font-semibold text-brand hover:underline" href={`/characters/${characterId}/inventory/${entry.id}/edit`}>Edit item</Link></div>
       </div>

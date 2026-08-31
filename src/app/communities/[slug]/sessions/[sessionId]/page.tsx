@@ -20,6 +20,7 @@ import { CompleteSessionForm, type CompletionCharacter } from "./complete-sessio
 import { PlayerCharacterAssignments, type UnassignedParticipant } from "./player-character-assignment";
 import { PaizoReportingReminder } from "./paizo-reporting-reminder";
 import { SessionStatusPill } from "@/app/session-status-pill";
+import { DescriptionItem, DescriptionList } from "@/app/description-list";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string; sessionId: string }> }): Promise<Metadata> {
   const { slug, sessionId } = await params;
@@ -44,6 +45,15 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 function formatInstant(instant: Date, timeZone: string) {
   return new Intl.DateTimeFormat("en-US", { timeZone, weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(instant);
+}
+
+function SessionDetails({ session, browserZone }: { session: { gmName: string; playerCapacity: number; startsAt: Date; endsAt: Date; locationType: string }; browserZone: string }) {
+  return <DescriptionList columns={2} className="mt-8">
+    <DescriptionItem label="Game Master">{session.gmName}</DescriptionItem>
+    <DescriptionItem label="Player capacity">{session.playerCapacity}</DescriptionItem>
+    <DescriptionItem label="Your local time">{formatInstant(session.startsAt, browserZone)} – {formatInstant(session.endsAt, browserZone)}</DescriptionItem>
+    <DescriptionItem label="Location" valueClassName="capitalize">{session.locationType}</DescriptionItem>
+  </DescriptionList>;
 }
 
 export default async function SessionPage({ params, searchParams }: { params: Promise<{ slug: string; sessionId: string }>; searchParams?: Promise<{ completed?: string }> }) {
@@ -113,7 +123,7 @@ export default async function SessionPage({ params, searchParams }: { params: Pr
       <section className="responsive-card mt-6 rounded-3xl border border-border bg-surface sm:mt-8 sm:p-10">
         <div><p className="text-sm font-semibold tracking-[0.2em] text-brand uppercase">Session</p><h1 className="mt-3 break-words text-2xl font-semibold sm:text-3xl">{session.scenarioCode} — {session.scenarioTitle}</h1></div>
         <section className="mt-6 rounded-2xl border border-border bg-surface p-4 sm:mt-8 sm:p-5" aria-labelledby="signup-heading"><h2 id="signup-heading" className="text-lg font-semibold">Sign up for this game</h2><SessionSignupControl slug={slug} sessionId={session.id} characters={eligibleCharacters} /></section>
-        <dl className="mt-8 grid gap-6 sm:grid-cols-2"><div><dt className="text-sm text-text-muted">Game Master</dt><dd className="mt-1 font-semibold">{session.gmName}</dd></div><div><dt className="text-sm text-text-muted">Player capacity</dt><dd className="mt-1 font-semibold">{session.playerCapacity}</dd></div><div><dt className="text-sm text-text-muted">Your local time</dt><dd className="mt-1">{formatInstant(session.startsAt, browserZone)} – {formatInstant(session.endsAt, browserZone)}</dd></div><div><dt className="text-sm text-text-muted">Location</dt><dd className="mt-1 capitalize">{session.locationType}</dd></div></dl>
+        <SessionDetails session={session} browserZone={browserZone} />
         {session.notes ? <div className="mt-8 border-t border-border pt-6"><h2 className="text-sm font-semibold text-text-muted">Notes</h2><p className="mt-2 whitespace-pre-wrap">{session.notes}</p></div> : null}
         <SessionRoster capacity={session.playerCapacity} confirmedCount={confirmedCount} waitlistedCount={waitlistedCount} />
       </section>
@@ -156,7 +166,7 @@ export default async function SessionPage({ params, searchParams }: { params: Pr
       {isManager && session.status === "published" ? <PlayerCharacterAssignments slug={slug} sessionId={session.id} participants={unassignedParticipants} /> : null}
       {isManager && completed ? <CompleteSessionForm slug={slug} sessionId={session.id} characters={completionCharacters} participantsWithoutCharacters={participantsWithoutCharacters} completed future={false} /> : null}
       {isManager && completed ? <PaizoReportingReminder slug={slug} sessionId={session.id} reportedAt={session.paizoReportedAt} justCompleted={justCompleted} /> : null}
-      <dl className="mt-8 grid gap-6 sm:grid-cols-2"><div><dt className="text-sm text-text-muted">Game Master</dt><dd className="mt-1 font-semibold">{session.gmName}</dd></div><div><dt className="text-sm text-text-muted">Player capacity</dt><dd className="mt-1 font-semibold">{session.playerCapacity}</dd></div><div><dt className="text-sm text-text-muted">Your local time</dt><dd className="mt-1">{formatInstant(session.startsAt, browserZone)} – {formatInstant(session.endsAt, browserZone)}</dd></div><div><dt className="text-sm text-text-muted">Location</dt><dd className="mt-1 capitalize">{session.locationType}</dd></div></dl>
+      <SessionDetails session={session} browserZone={browserZone} />
       {session.notes ? <div className="mt-8 border-t border-border pt-6"><h2 className="text-sm font-semibold text-text-muted">Notes</h2><p className="mt-2 whitespace-pre-wrap">{session.notes}</p></div> : null}
       {session.status === "draft" ? <p className="mt-8 rounded-xl border border-border bg-surface-raised p-4 text-sm text-text-muted">This draft is private and is not part of the public schedule.</p> : <><SessionRoster capacity={session.playerCapacity} confirmedCount={confirmedCount} waitlistedCount={waitlistedCount} entries={roster} expandable={isManager} /><p className="mt-8 text-sm text-text-muted">Share this page’s URL. It remains the session’s permanent address, including after cancellation.</p></>}
     </section>

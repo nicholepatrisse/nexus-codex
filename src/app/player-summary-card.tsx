@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { StatusBadge } from "@/app/status-badge";
 import { CharacterIdentity, characterIdentityCompactValues } from "@/character/character-identity";
+import { DescriptionItem, DescriptionList } from "@/app/description-list";
 
 export function PlayerSummaryCard({
   personName,
@@ -47,9 +48,9 @@ export function PlayerSummaryCard({
         <p className="text-xs font-semibold tracking-wide text-text-muted uppercase">Character</p>
         <div className="mt-1"><CharacterIdentity variant="detail" character={{ name: characterName, societyNumber: characterSocietyNumber, level: characterLevel, className: characterClassName, ancestry: characterAncestry, background: characterBackground }} name={characterId ? <Link className="hover:text-brand hover:underline" href={`/characters/${characterId}`}>{characterName}</Link> : characterName} /></div>
       </div> : null}
-    {discordHandle ? <dl className={`${characterName ? "mt-3 border-t border-border pt-3" : ""} grid gap-1 text-sm text-text-muted`}>
-      {discordHandle ? <div className="flex gap-2"><dt className="font-medium text-text-primary">Discord</dt><dd className="min-w-0 break-words">{discordHandle}</dd></div> : null}
-    </dl> : null}
+    {discordHandle ? <DescriptionList density="compact" className={characterName ? "mt-3 border-t border-border pt-3" : ""}>
+      <DescriptionItem label="Discord">{discordHandle}</DescriptionItem>
+    </DescriptionList> : null}
     </div>
   </details>;
 }
