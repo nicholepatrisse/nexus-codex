@@ -7,13 +7,11 @@ import { canPerformCommunityOperation, type CommunityRole } from "@/authorizatio
 import { getDb } from "@/db/client";
 import { characterCreditLedgerEntries, characterInventoryEntries, characters, chronicles, communities, contentItems, gameSystems, people, sessionGmCredits, sessionSignups, sessions } from "@/db/schema";
 import { SUPPORTED_GAME_SYSTEM } from "@/game-system/config";
-import { CHARACTER_CLASSES } from "@/character/class-options";
 import { deriveSfs2Progression } from "@/character/sfs2-progression";
 import { isValidStartingCredits, SFS2_STARTING_ITEM_LEVELS, SFS2_STARTING_WEALTH, startingWealthNote, usesPermanentStartingItems, type Sfs2StartingLevel } from "@/character/sfs2-starting-wealth";
 import { fetchNethysItems, nethysItemNotes } from "@/nethys/items";
 
-const optionalCharacterClassSchema = z.string().trim()
-  .pipe(z.union([z.literal(""), z.enum(CHARACTER_CLASSES, { error: "Choose a supported class." })]))
+const optionalCharacterClassSchema = z.string().trim().max(100, "Class must be 100 characters or fewer.")
   .nullable().optional().transform((value) => value || null);
 const startingLevelSchema = z.coerce.number().refine((level): level is 1 | 3 | 5 | 7 => [1, 3, 5, 7].includes(level), "Starting level must be 1, 3, 5, or 7.");
 const startingItemSchema = z.object({ url: z.string().url(), name: z.string().trim().min(1).max(200) });
