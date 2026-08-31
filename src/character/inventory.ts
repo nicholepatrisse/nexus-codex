@@ -21,6 +21,7 @@ export const inventoryEntryInputSchema = z.object({
   valueMinor: z.union([z.literal(""), z.null(), z.coerce.number().int("Item value must be a whole number.").nonnegative("Item value cannot be negative.").max(2_000_000_000)]).optional().transform((value) => value === "" || value == null ? null : value),
   sourceChronicleId: optionalText(100),
   notes: optionalText(5000),
+  validationNote: z.string().trim().max(1000, "Validation note must be 1,000 characters or fewer.").nullable().optional().transform((value) => value || null),
 });
 export type InventoryEntryInput = z.input<typeof inventoryEntryInputSchema>;
 export type InventoryEntry = typeof characterInventoryEntries.$inferSelect;
@@ -58,7 +59,7 @@ export async function createInventoryEntry(actor: AuthenticatedActor, characterI
   const input = inventoryEntryInputSchema.parse(raw);
   if (!await ownedCharacter(actor, characterId, database)) return null;
   const item = await snapshots(input, characterId, database);
-  const [created] = await database.insert(characterInventoryEntries).values({ id: randomUUID(), lotKey: randomUUID(), characterId, ...item, quantity: input.quantity, acquisitionType: input.acquisitionType, acquiredOn: input.acquiredOn, amountPaidMinor: input.amountPaidMinor, valueMinor: input.valueMinor, sourceChronicleId: input.sourceChronicleId, notes: input.notes }).returning();
+  const [created] = await database.insert(characterInventoryEntries).values({ id: randomUUID(), lotKey: randomUUID(), characterId, ...item, quantity: input.quantity, acquisitionType: input.acquisitionType, acquiredOn: input.acquiredOn, amountPaidMinor: input.amountPaidMinor, valueMinor: input.valueMinor, sourceChronicleId: input.sourceChronicleId, notes: input.notes, validationNote: input.validationNote }).returning();
   return created ?? null;
 }
 
@@ -66,7 +67,7 @@ export async function updateInventoryEntry(actor: AuthenticatedActor, characterI
   const input = inventoryEntryInputSchema.parse(raw);
   if (!await getOwnedInventoryEntry(actor, characterId, entryId, database)) return null;
   const item = await snapshots(input, characterId, database);
-  const [updated] = await database.update(characterInventoryEntries).set({ ...item, quantity: input.quantity, acquisitionType: input.acquisitionType, acquiredOn: input.acquiredOn, amountPaidMinor: input.amountPaidMinor, valueMinor: input.valueMinor, sourceChronicleId: input.sourceChronicleId, notes: input.notes, updatedAt: new Date() }).where(and(eq(characterInventoryEntries.id, entryId), eq(characterInventoryEntries.characterId, characterId))).returning();
+  const [updated] = await database.update(characterInventoryEntries).set({ ...item, quantity: input.quantity, acquisitionType: input.acquisitionType, acquiredOn: input.acquiredOn, amountPaidMinor: input.amountPaidMinor, valueMinor: input.valueMinor, sourceChronicleId: input.sourceChronicleId, notes: input.notes, validationNote: input.validationNote, updatedAt: new Date() }).where(and(eq(characterInventoryEntries.id, entryId), eq(characterInventoryEntries.characterId, characterId))).returning();
   return updated ?? null;
 }
 

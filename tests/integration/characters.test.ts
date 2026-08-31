@@ -4,7 +4,7 @@ import { createTestIdentity } from "@/auth/test-fixture";
 import { createCharacter, getCharacterDetail, listCharacters, StartingLevelLockedError, updateCharacter } from "@/character/characters";
 import { applyManualChronicle, createManualChronicle, deleteManualChronicle, listChronicles, updateManualChronicle } from "@/character/chronicles";
 import { createCreditAdjustment, getOwnedCreditLedger } from "@/character/credit-ledger";
-import { createInventoryEntry, deleteInventoryEntry, listOwnedInventory, updateInventoryEntry } from "@/character/inventory";
+import { createInventoryEntry, deleteInventoryEntry, getOwnedInventoryEntry, listOwnedInventory, updateInventoryEntry } from "@/character/inventory";
 import { getDb } from "@/db/client";
 import { authUsers, characterCreditLedgerEntries, characters, gameSystems, people } from "@/db/schema";
 import { SUPPORTED_GAME_SYSTEM } from "@/game-system/config";
@@ -45,9 +45,12 @@ describeWithDatabase("characters persistence", () => {
     if (!created) throw new Error("Expected character creation to return a record.");
 
     expect(await updateCharacter(otherActor, created.id, { name: "Stolen" })).toBeNull();
-    const attemptedStartingLevelChange = { name: " Navasi ", startingLevel: 7, startingCredits: 7200, startingItems: [], className: " Envoy ", ancestry: "Human", background: "  ", backstory: "  Raised aboard a station.  ", notes: "  " } as Parameters<typeof updateCharacter>[2];
+    const attemptedStartingLevelChange = { name: " Navasi ", startingLevel: 7, startingCredits: 7200, startingItems: [], className: " Envoy ", classValidationNote: "  Acquired through multiclass training.  ", ancestry: "Human", ancestryValidationNote: "  ", background: "  ", backgroundValidationNote: "  Granted by a boon.  ", backstory: "  Raised aboard a station.  ", notes: "  " } as Parameters<typeof updateCharacter>[2];
     expect(await updateCharacter(ownerActor, created.id, attemptedStartingLevelChange)).toEqual(expect.objectContaining({ id: created.id }));
-    expect(await getCharacterDetail(ownerActor, created.id)).toEqual(expect.objectContaining({ name: "Navasi", startingLevel: 7, startingCredits: 7200, creditsMinor: 7200, currentLevel: 7, xp: 0, className: "Envoy", ancestry: "Human", background: null, backstory: "Raised aboard a station.", notes: null, isOwner: true }));
+    expect(await getCharacterDetail(ownerActor, created.id)).toEqual(expect.objectContaining({ name: "Navasi", startingLevel: 7, startingCredits: 7200, creditsMinor: 7200, currentLevel: 7, xp: 0, className: "Envoy", classValidationNote: "Acquired through multiclass training.", ancestry: "Human", ancestryValidationNote: null, background: null, backgroundValidationNote: "Granted by a boon.", backstory: "Raised aboard a station.", notes: null, isOwner: true }));
+
+    expect(await updateCharacter(ownerActor, created.id, { name: "Navasi", classValidationNote: "", ancestryValidationNote: null, backgroundValidationNote: "   " })).toEqual(expect.objectContaining({ id: created.id }));
+    expect(await getCharacterDetail(ownerActor, created.id)).toEqual(expect.objectContaining({ classValidationNote: null, ancestryValidationNote: null, backgroundValidationNote: null }));
   });
 
   it("owner-manages manual Chronicles without changing identity", async () => {
@@ -126,16 +129,22 @@ describeWithDatabase("characters persistence", () => {
     const wrongSource = await createManualChronicle(otherActor, otherCharacter.id, { ...event, scenarioNumber: "1-02", scenarioName: "Wrong source", datePlayed: "2026-08-20", characterLevel: 1, advancementSpeed: "standard", xp: 0, baseCreditsMinor: 0, downtimeDisposition: "declined" });
     if (!source || !wrongSource) throw new Error("Expected Chronicles.");
     const ledgerBefore = await getDb().select().from(characterCreditLedgerEntries).where(eq(characterCreditLedgerEntries.characterId, character.id));
-    const first = await createInventoryEntry(ownerActor, character.id, { itemName: "Laser rifle", quantity: 1, acquisitionType: "purchased", acquiredOn: "2026-08-21", amountPaidMinor: 100, sourceChronicleId: source.id });
-    const second = await createInventoryEntry(ownerActor, character.id, { itemName: "Laser rifle", quantity: 2, acquisitionType: "purchased", acquiredOn: "2026-08-21", amountPaidMinor: 125, sourceChronicleId: source.id });
-    if (!first || !second) throw new Error("Expected inventory entries.");
+    const first = await createInventoryEntry(ownerActor, character.id, { itemName: "Laser rifle", quantity: 1, acquisitionType: "purchased", acquiredOn: "2026-08-21", amountPaidMinor: 100, sourceChronicleId: source.id, validationNote: "  Access from Chronicle 1.  " });
+    const second = await createInventoryEntry(ownerActor, character.id, { itemName: "Laser rifle", quantity: 2, acquisitionType: "purchased", acquiredOn: "2026-08-21", amountPaidMinor: 125, sourceChronicleId: source.id, validationNote: "Different lot access" });
+    const otherCharacterLot = await createInventoryEntry(otherActor, otherCharacter.id, { itemName: "Laser rifle", quantity: 1, acquisitionType: "other", acquiredOn: "2026-08-21", validationNote: "Other character access" });
+    if (!first || !second || !otherCharacterLot) throw new Error("Expected inventory entries.");
     expect(first.lotKey).not.toBe(second.lotKey);
-    expect((await listOwnedInventory(ownerActor, character.id))?.map(({ amountPaidMinor }) => amountPaidMinor)).toEqual([100, 125]);
+    expect((await listOwnedInventory(ownerActor, character.id))?.map(({ amountPaidMinor, validationNote }) => ({ amountPaidMinor, validationNote }))).toEqual([
+      { amountPaidMinor: 100, validationNote: "Access from Chronicle 1." },
+      { amountPaidMinor: 125, validationNote: "Different lot access" },
+    ]);
     expect(await listOwnedInventory(otherActor, character.id)).toBeNull();
     expect(await createInventoryEntry(otherActor, character.id, { itemName: "Stolen", quantity: 1, acquisitionType: "other", acquiredOn: "2026-08-21" })).toBeNull();
     await expect(createInventoryEntry(ownerActor, character.id, { itemName: "Bad source", quantity: 1, acquisitionType: "boon_reward", acquiredOn: "2026-08-21", sourceChronicleId: wrongSource.id })).rejects.toThrow("must belong to this character");
-    expect(await updateInventoryEntry(otherActor, character.id, first.id, { itemName: "Stolen", quantity: 9, acquisitionType: "other", acquiredOn: "2026-08-22" })).toBeNull();
-    expect(await updateInventoryEntry(ownerActor, character.id, first.id, { itemName: "Laser rifle snapshot", quantity: 3, acquisitionType: "purchased", acquiredOn: "2026-08-22", amountPaidMinor: 100 })).toEqual(expect.objectContaining({ quantity: 3, lotKey: first.lotKey }));
+    expect(await updateInventoryEntry(otherActor, character.id, first.id, { itemName: "Stolen", quantity: 9, acquisitionType: "other", acquiredOn: "2026-08-22", validationNote: "Unauthorized note" })).toBeNull();
+    expect(await getOwnedInventoryEntry(otherActor, otherCharacter.id, otherCharacterLot.id)).toEqual(expect.objectContaining({ validationNote: "Other character access" }));
+    expect(await getOwnedInventoryEntry(ownerActor, character.id, first.id)).toEqual(expect.objectContaining({ validationNote: "Access from Chronicle 1." }));
+    expect(await updateInventoryEntry(ownerActor, character.id, first.id, { itemName: "Laser rifle snapshot", quantity: 3, acquisitionType: "purchased", acquiredOn: "2026-08-22", amountPaidMinor: 100, validationNote: "   " })).toEqual(expect.objectContaining({ quantity: 3, lotKey: first.lotKey, validationNote: null }));
     expect(await deleteInventoryEntry(otherActor, character.id, second.id)).toBe(false);
     expect(await deleteInventoryEntry(ownerActor, character.id, second.id)).toBe(true);
     const ledgerAfter = await getDb().select().from(characterCreditLedgerEntries).where(eq(characterCreditLedgerEntries.characterId, character.id));
