@@ -4,11 +4,11 @@ import { load } from "cheerio";
 import type { AuthenticatedActor } from "@/auth/actor";
 import { getDb } from "@/db/client";
 import { playerMaterials } from "@/db/schema";
-import { normalizeMaterialIdentity } from "@/materials/material-identity";
+import { materialTitleWithoutCitation, normalizeMaterialIdentity } from "@/materials/material-identity";
 export { isFreeAccessMaterial, materialTitleWithoutCitation, normalizeMaterialIdentity } from "@/materials/material-identity";
 
 type Database = ReturnType<typeof getDb>;
-export const PLAYER_CORE = { id: "default-player-core", identity: "starfinder-player-core", productCode: "PZO22001", title: "Starfinder Player Core", sourceUrl: "https://store.paizo.com/starfinder-2e-player-core/", aliases: ["Player Core", "SF2 Player Core", "PZO22001"], isDefault: true } as const;
+export const PLAYER_CORE = { id: "default-player-core", identity: "starfinder-player-core", isbn: null, productCode: "PZO22001", title: "Starfinder Player Core", sourceUrl: "https://store.paizo.com/starfinder-2e-player-core/", aliases: ["Player Core", "SF2 Player Core", "PZO22001"], isDefault: true } as const;
 export class MaterialLookupError extends Error {}
 
 function isPaizoProductUrl(url: URL) {
@@ -16,6 +16,22 @@ function isPaizoProductUrl(url: URL) {
   if (url.protocol !== "https:") return false;
   if (hostname === "store.paizo.com") return /^\/[a-z0-9][a-z0-9-]*\/?$/i.test(url.pathname);
   return (hostname === "paizo.com" || hostname.endsWith(".paizo.com")) && url.pathname.startsWith("/products/");
+}
+
+function isNethysSourceUrl(url: URL) {
+  return url.protocol === "https:" && url.hostname.toLowerCase() === "2e.aonsrd.com" && /^\/sources\/[^/]+\/?$/i.test(url.pathname);
+}
+
+export function parseNethysProductUrl(html: string, sourceUrl: string) {
+  const source = new URL(sourceUrl);
+  if (!isNethysSourceUrl(source)) throw new MaterialLookupError("Use an Archives of Nethys source link or a Paizo product link.");
+  const $ = load(html);
+  const href = $("a").filter((_index, element) => /product\s*page|paizo\s*store/i.test($(element).parent().text())).first().attr("href")
+    ?? $("a[href*='store.paizo.com'], a[href*='paizo.com/products/']").first().attr("href");
+  if (!href) throw new MaterialLookupError("Archives of Nethys does not list a Paizo product link for this source.");
+  const productUrl = new URL(href, source);
+  if (!isPaizoProductUrl(productUrl)) throw new MaterialLookupError("Archives of Nethys returned an unsupported product link.");
+  return productUrl;
 }
 
 export function parsePaizoMaterialHtml(html: string, sourceUrl: string) {
@@ -28,18 +44,27 @@ export function parsePaizoMaterialHtml(html: string, sourceUrl: string) {
   if (!title) throw new MaterialLookupError("Paizo returned the page, but its product title could not be read.");
   const text = $("body").text();
   const productCode = text.match(/\bPZO\d{5,}\b/i)?.[0]?.toUpperCase() ?? null;
-  const identity = productCode?.toLowerCase() ?? normalizeMaterialIdentity(title);
-  return { identity, productCode, title, sourceUrl: url.href, aliases: [...new Set([title.replace(/^Starfinder\s+/i, ""), productCode].filter((value): value is string => Boolean(value)))] };
+  const isbn = text.match(/\bISBN(?:-13)?\s*:\s*((?:97[89][\s-]*)?\d(?:[\s-]*\d){9,12})\b/i)?.[1]?.replace(/[^0-9]/g, "") ?? null;
+  const validIsbn = isbn?.length === 13 ? isbn : null;
+  const identity = validIsbn ? `isbn-${validIsbn}` : productCode?.toLowerCase() ?? normalizeMaterialIdentity(title);
+  const shortTitle = title.replace(/^Starfinder(?:\s+2e)?\s+(?:Adventure(?:\s+Path)?\s*:\s*)?/i, "");
+  return { identity, isbn: validIsbn, productCode, title, sourceUrl: url.href, aliases: [...new Set([title.replace(/^Starfinder\s+/i, ""), shortTitle, productCode, validIsbn].filter((value): value is string => Boolean(value)))] };
 }
 
 export async function fetchPaizoMaterial(value: string, fetcher: typeof fetch = fetch) {
   let url: URL;
   try { url = new URL(value); } catch { throw new MaterialLookupError("Enter a complete Paizo product link."); }
-  if (!isPaizoProductUrl(url)) throw new MaterialLookupError("Use a Paizo product link from paizo.com or store.paizo.com.");
+  if (!isPaizoProductUrl(url) && !isNethysSourceUrl(url)) throw new MaterialLookupError("Use an Archives of Nethys source link or a Paizo product link.");
   let response: Response;
   try { response = await fetcher(url, { headers: { Accept: "text/html", "User-Agent": "NexusCodex/1.0 material importer" }, signal: AbortSignal.timeout(10_000) }); }
-  catch { throw new MaterialLookupError("Paizo is unavailable right now. Try again later."); }
-  if (!response.ok) throw new MaterialLookupError("Paizo is unavailable right now. Try again later.");
+  catch { throw new MaterialLookupError(`${isNethysSourceUrl(url) ? "Archives of Nethys" : "Paizo"} is unavailable right now. Try again later.`); }
+  if (!response.ok) throw new MaterialLookupError(`${isNethysSourceUrl(url) ? "Archives of Nethys" : "Paizo"} is unavailable right now. Try again later.`);
+  if (isNethysSourceUrl(url)) {
+    url = parseNethysProductUrl(await response.text(), response.url || url.href);
+    try { response = await fetcher(url, { headers: { Accept: "text/html", "User-Agent": "NexusCodex/1.0 material importer" }, signal: AbortSignal.timeout(10_000) }); }
+    catch { throw new MaterialLookupError("Paizo is unavailable right now. Try again later."); }
+    if (!response.ok) throw new MaterialLookupError("Paizo is unavailable right now. Try again later.");
+  }
   return parsePaizoMaterialHtml(await response.text(), response.url || url.href);
 }
 
@@ -48,11 +73,44 @@ export async function listOwnedMaterials(actor: AuthenticatedActor, database: Da
   return [PLAYER_CORE, ...rows.map((row) => ({ ...row, isDefault: false as const }))];
 }
 
+export function materialValidationIdentities(material: { identity: string; title: string; aliases: readonly string[]; isbn?: string | null }) {
+  return [...new Set([material.identity, material.isbn ? `isbn-${material.isbn}` : null, material.title, ...material.aliases].filter((value): value is string => Boolean(value)).map(normalizeMaterialIdentity).filter(Boolean))];
+}
+
+export function materialMatchesReference(material: { identity: string; title: string; aliases: readonly string[]; isbn?: string | null }, expectedIdentity: string, expectedTitle: string) {
+  const expected = [expectedIdentity, materialTitleWithoutCitation(expectedTitle)].map(normalizeMaterialIdentity);
+  const known = materialValidationIdentities(material);
+  return expected.some((identity) => known.includes(identity));
+}
+
+export async function listOwnedMaterialIdentities(actor: AuthenticatedActor, database: Database = getDb()) {
+  return (await listOwnedMaterials(actor, database)).flatMap(materialValidationIdentities);
+}
+
 export async function addOwnedMaterial(actor: AuthenticatedActor, url: string, database: Database = getDb(), fetcher: typeof fetch = fetch) {
   const material = await fetchPaizoMaterial(url, fetcher);
   if (material.identity === PLAYER_CORE.identity || material.productCode === PLAYER_CORE.productCode) return PLAYER_CORE;
-  const [row] = await database.insert(playerMaterials).values({ id: randomUUID(), personId: actor.personId, ...material }).onConflictDoUpdate({ target: [playerMaterials.personId, playerMaterials.identity], set: { productCode: material.productCode, title: material.title, sourceUrl: material.sourceUrl, aliases: material.aliases, updatedAt: new Date() } }).returning();
+  const [row] = await database.insert(playerMaterials).values({ id: randomUUID(), personId: actor.personId, ...material }).onConflictDoUpdate({ target: [playerMaterials.personId, playerMaterials.identity], set: { isbn: material.isbn, productCode: material.productCode, title: material.title, sourceUrl: material.sourceUrl, aliases: material.aliases, updatedAt: new Date() } }).returning();
   return row;
+}
+
+export async function addReferencedOwnedMaterial(actor: AuthenticatedActor, url: string, expectedIdentity: string, expectedTitle = expectedIdentity, database: Database = getDb(), fetcher: typeof fetch = fetch) {
+  const material = await fetchPaizoMaterial(url, fetcher);
+  const identities = materialValidationIdentities(material);
+  if (!materialMatchesReference(material, expectedIdentity, expectedTitle)) throw new MaterialLookupError("That Paizo product does not match the material for this option.");
+  if (material.identity === PLAYER_CORE.identity || material.productCode === PLAYER_CORE.productCode) return { material: PLAYER_CORE, identities: materialValidationIdentities(PLAYER_CORE), duplicate: true };
+  const existing = await database.select({ id: playerMaterials.id }).from(playerMaterials).where(and(eq(playerMaterials.personId, actor.personId), eq(playerMaterials.identity, material.identity))).limit(1);
+  const [row] = await database.insert(playerMaterials).values({ id: randomUUID(), personId: actor.personId, ...material }).onConflictDoUpdate({ target: [playerMaterials.personId, playerMaterials.identity], set: { isbn: material.isbn, productCode: material.productCode, title: material.title, sourceUrl: material.sourceUrl, aliases: material.aliases, updatedAt: new Date() } }).returning();
+  return { material: row!, identities, duplicate: existing.length > 0 };
+}
+
+export async function addKnownOwnedMaterial(actor: AuthenticatedActor, expectedIdentity: string, expectedTitle: string, database: Database = getDb()) {
+  const materials = await database.select().from(playerMaterials);
+  const material = materials.find((candidate) => materialMatchesReference(candidate, expectedIdentity, expectedTitle));
+  if (!material) return null;
+  const duplicate = material.personId === actor.personId;
+  if (!duplicate) await database.insert(playerMaterials).values({ id: randomUUID(), personId: actor.personId, identity: material.identity, isbn: material.isbn, productCode: material.productCode, title: material.title, sourceUrl: material.sourceUrl, aliases: material.aliases }).onConflictDoUpdate({ target: [playerMaterials.personId, playerMaterials.identity], set: { isbn: material.isbn, productCode: material.productCode, title: material.title, sourceUrl: material.sourceUrl, aliases: material.aliases, updatedAt: new Date() } });
+  return { identities: materialValidationIdentities(material), duplicate };
 }
 
 export async function removeOwnedMaterial(actor: AuthenticatedActor, id: string, database: Database = getDb()) {

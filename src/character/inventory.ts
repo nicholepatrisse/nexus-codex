@@ -3,9 +3,9 @@ import { and, asc, eq, gt } from "drizzle-orm";
 import { z } from "zod";
 import type { AuthenticatedActor } from "@/auth/actor";
 import { getDb } from "@/db/client";
-import { characterInventoryEntries, characters, chronicles, contentItems, playerMaterials } from "@/db/schema";
-import { PLAYER_CORE } from "@/materials/materials";
-import { normalizeMaterialIdentity } from "@/materials/material-identity";
+import { characterInventoryEntries, characters, chronicles, contentItems } from "@/db/schema";
+import { listOwnedMaterialIdentities } from "@/materials/materials";
+import { materialTitleWithoutCitation, normalizeMaterialIdentity } from "@/materials/material-identity";
 import { validateInventoryEntry } from "@/character/inventory-validation";
 
 type Database = ReturnType<typeof getDb>;
@@ -35,6 +35,12 @@ export type InventoryEntryInput = z.input<typeof inventoryEntryInputSchema>;
 export type InventoryEntry = typeof characterInventoryEntries.$inferSelect;
 export type ValidatedInventoryEntry = InventoryEntry & { validation: ReturnType<typeof validateInventoryEntry> };
 
+export function withLegacyInventorySource(entry: InventoryEntry): InventoryEntry {
+  if (entry.sourceMaterialTitle || !entry.notes) return entry;
+  const title = entry.notes.match(/^Source:\s*(.+)$/m)?.[1]?.trim();
+  return title ? { ...entry, sourceMaterialTitle: title, sourceMaterialIdentity: normalizeMaterialIdentity(materialTitleWithoutCitation(title)) } : entry;
+}
+
 async function ownedCharacter(actor: AuthenticatedActor, characterId: string, database: Database) {
   const [row] = await database.select({ id: characters.id }).from(characters).where(and(eq(characters.id, characterId), eq(characters.personId, actor.personId))).limit(1);
   return row ?? null;
@@ -56,17 +62,16 @@ async function snapshots(input: z.output<typeof inventoryEntryInputSchema>, char
 
 export async function listOwnedInventory(actor: AuthenticatedActor, characterId: string, database: Database = getDb()) {
   if (!await ownedCharacter(actor, characterId, database)) return null;
-  const [entries, materials] = await Promise.all([
+  const [entries, owned] = await Promise.all([
     database.select().from(characterInventoryEntries).where(and(eq(characterInventoryEntries.characterId, characterId), gt(characterInventoryEntries.quantity, 0))).orderBy(asc(characterInventoryEntries.itemNameSnapshot), asc(characterInventoryEntries.createdAt)),
-    database.select({ identity: playerMaterials.identity }).from(playerMaterials).where(eq(playerMaterials.personId, actor.personId)),
+    listOwnedMaterialIdentities(actor, database),
   ]);
-  const owned = [PLAYER_CORE.identity, ...materials.map(({ identity }) => identity)];
-  return entries.map((entry): ValidatedInventoryEntry => ({ ...entry, validation: validateInventoryEntry(entry, owned) }));
+  return entries.map((rawEntry): ValidatedInventoryEntry => { const entry = withLegacyInventorySource(rawEntry); return { ...entry, validation: validateInventoryEntry(entry, owned) }; });
 }
 
 export async function getOwnedInventoryEntry(actor: AuthenticatedActor, characterId: string, entryId: string, database: Database = getDb()) {
   const [entry] = await database.select({ entry: characterInventoryEntries }).from(characterInventoryEntries).innerJoin(characters, eq(characters.id, characterInventoryEntries.characterId)).where(and(eq(characterInventoryEntries.id, entryId), eq(characterInventoryEntries.characterId, characterId), eq(characters.personId, actor.personId))).limit(1);
-  return entry?.entry ?? null;
+  return entry?.entry ? withLegacyInventorySource(entry.entry) : null;
 }
 
 export async function createInventoryEntry(actor: AuthenticatedActor, characterId: string, raw: InventoryEntryInput, database: Database = getDb()) {

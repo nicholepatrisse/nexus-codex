@@ -10,6 +10,12 @@ import { SUPPORTED_GAME_SYSTEM } from "@/game-system/config";
 import { deriveSfs2Progression } from "@/character/sfs2-progression";
 import { isValidStartingCredits, SFS2_STARTING_ITEM_LEVELS, SFS2_STARTING_WEALTH, startingWealthNote, usesPermanentStartingItems, type Sfs2StartingLevel } from "@/character/sfs2-starting-wealth";
 import { fetchNethysItems, nethysItemNotes } from "@/nethys/items";
+import { materialTitleWithoutCitation, normalizeMaterialIdentity } from "@/materials/material-identity";
+
+function importedItemSource(item: { source?: string; societyLegal?: boolean; societyStatus?: string; rarity?: string }) {
+  const title = item.source ?? null;
+  return { sourceMaterialTitle: title, sourceMaterialIdentity: title ? normalizeMaterialIdentity(materialTitleWithoutCitation(title)) : null, societyLegal: item.societyLegal ?? null, societyStatus: item.societyStatus ?? null, rarity: item.rarity ?? null };
+}
 
 const optionalCharacterClassSchema = z.string().trim().max(100, "Class must be 100 characters or fewer.")
   .nullable().optional().transform((value) => value || null);
@@ -180,6 +186,7 @@ export async function createCharacter(actor: AuthenticatedActor, rawInput: Creat
         id: randomUUID(), characterId: created.id, contentItemId: null, itemNameSnapshot: item.name, itemLinkSnapshot: item.url,
         bulkSnapshot: item.bulk ?? null, quantity: 1, acquisitionType: "starting_equipment", acquiredOn: new Date().toISOString().slice(0, 10),
         amountPaidMinor: null, valueMinor: item.priceCredits ?? null, sourceChronicleId: null, sourcePurchaseId: null,
+        ...importedItemSource(item),
         notes: `Starting wealth permanent item (level ${requiredLevels[index]}).\n\n${nethysItemNotes(item)}`,
         lotKey: input.idempotencyKey ? `starting-wealth:${input.idempotencyKey}:${index}` : randomUUID(),
       })));
@@ -217,7 +224,7 @@ export async function updateCharacter(actor: AuthenticatedActor, characterId: st
       const now = new Date();
       await transaction.update(characterCreditLedgerEntries).set({ amountMinor: startingCredits, notes: startingWealthNote(startingLevel, startingCredits) }).where(and(eq(characterCreditLedgerEntries.characterId, characterId), eq(characterCreditLedgerEntries.type, "starting_credits")));
       await transaction.delete(characterInventoryEntries).where(and(eq(characterInventoryEntries.characterId, characterId), eq(characterInventoryEntries.acquisitionType, "starting_equipment"), sql`${characterInventoryEntries.notes} like 'Starting wealth permanent item (%)%'`));
-      if (selectedItems.length) await transaction.insert(characterInventoryEntries).values(selectedItems.map((item, index) => ({ id: randomUUID(), characterId, contentItemId: null, itemNameSnapshot: item.name, itemLinkSnapshot: item.url, bulkSnapshot: item.bulk ?? null, quantity: 1, acquisitionType: "starting_equipment", acquiredOn: now.toISOString().slice(0, 10), amountPaidMinor: null, valueMinor: item.priceCredits ?? null, sourceChronicleId: null, sourcePurchaseId: null, notes: `Starting wealth permanent item (level ${requiredLevels[index]}).\n\n${nethysItemNotes(item)}`, lotKey: randomUUID() })));
+      if (selectedItems.length) await transaction.insert(characterInventoryEntries).values(selectedItems.map((item, index) => ({ id: randomUUID(), characterId, contentItemId: null, itemNameSnapshot: item.name, itemLinkSnapshot: item.url, bulkSnapshot: item.bulk ?? null, quantity: 1, acquisitionType: "starting_equipment", acquiredOn: now.toISOString().slice(0, 10), amountPaidMinor: null, valueMinor: item.priceCredits ?? null, sourceChronicleId: null, sourcePurchaseId: null, ...importedItemSource(item), notes: `Starting wealth permanent item (level ${requiredLevels[index]}).\n\n${nethysItemNotes(item)}`, lotKey: randomUUID() })));
     }
     return updated;
   });

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { validateInventoryEntry } from "@/character/inventory-validation";
+import { withLegacyInventorySource } from "@/character/inventory";
 
 const item = { itemNameSnapshot: "Laser rifle", itemLinkSnapshot: "https://2e.aonsrd.com/equipment/weapons/laser-rifle", sourceMaterialIdentity: "galaxy-guide", sourceMaterialTitle: "Galaxy Guide", societyLegal: null, societyStatus: null, rarity: "Common" };
 
@@ -25,5 +26,11 @@ describe("inventory advisory validation", () => {
     const result = validateInventoryEntry({ ...item, sourceMaterialTitle: "Starfinder Society Scenario #1-12: Take the Bait pg. 14", sourceMaterialIdentity: "starfinder-society-scenario-1-12-take-the-bait" }, []);
     expect(result).toMatchObject({ status: "unvalidated", issues: [{ message: expect.stringContaining("link that Chronicle") }] });
     expect(result.issues[0]?.message).not.toContain("owned materials");
+  });
+
+  it("recovers structured source metadata from legacy imported-item notes", () => {
+    const entry = withLegacyInventorySource({ sourceMaterialTitle: null, sourceMaterialIdentity: null, notes: "Item level: 0\nPrice: 10 credits\nSource: Starfinder Absalom Station pg. 140\nCategory: Treasure" } as never);
+    expect(entry).toMatchObject({ sourceMaterialTitle: "Starfinder Absalom Station pg. 140", sourceMaterialIdentity: "starfinder-absalom-station" });
+    expect(validateInventoryEntry({ ...item, sourceMaterialTitle: entry.sourceMaterialTitle, sourceMaterialIdentity: entry.sourceMaterialIdentity }, []).issues[0]?.type).toBe("missing_material_ownership");
   });
 });

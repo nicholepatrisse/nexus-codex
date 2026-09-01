@@ -191,6 +191,7 @@ export const playerMaterials = pgTable(
     id: text("id").primaryKey(),
     personId: text("person_id").notNull().references(() => people.id, { onDelete: "cascade" }),
     identity: text("identity").notNull(),
+    isbn: text("isbn"),
     productCode: text("product_code"),
     title: text("title").notNull(),
     sourceUrl: text("source_url").notNull(),
@@ -200,8 +201,10 @@ export const playerMaterials = pgTable(
   },
   (table) => [
     uniqueIndex("player_materials_person_identity_unique").on(table.personId, table.identity),
+    uniqueIndex("player_materials_person_isbn_unique").on(table.personId, table.isbn).where(sql`${table.isbn} is not null`),
     index("player_materials_person_id_idx").on(table.personId),
     check("player_materials_identity_not_blank", sql`length(btrim(${table.identity})) > 0`),
+    check("player_materials_isbn_format", sql`${table.isbn} is null or ${table.isbn} ~ '^[0-9]{13}$'`),
     check("player_materials_title_not_blank", sql`length(btrim(${table.title})) > 0`),
   ],
 );
