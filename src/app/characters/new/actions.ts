@@ -9,7 +9,7 @@ export interface CreateCharacterFormState { fieldErrors?: Record<string, string[
 export async function createCharacterAction(_state: CreateCharacterFormState, formData: FormData): Promise<CreateCharacterFormState> {
   let startingItems: unknown = [];
   try { startingItems = JSON.parse(String(formData.get("startingItems") ?? "[]")); } catch { /* schema reports the error */ }
-  const parsed = createCharacterInputSchema.safeParse({ name: formData.get("name"), characterNumber: formData.get("characterNumber"), startingLevel: formData.get("startingLevel"), startingCredits: formData.get("startingCredits"), startingItems, idempotencyKey: formData.get("idempotencyKey"), className: formData.get("className"), ancestry: formData.get("ancestry"), background: formData.get("background"), backstory: formData.get("backstory"), notes: formData.get("notes") });
+  const parsed = createCharacterInputSchema.safeParse({ name: formData.get("name"), characterNumber: formData.get("characterNumber"), startingLevel: formData.get("startingLevel"), startingCredits: formData.get("startingCredits"), startingItems, idempotencyKey: formData.get("idempotencyKey"), className: formData.get("className"), classValidationNote: formData.get("classValidationNote"), ancestry: formData.get("ancestry"), ancestryValidationNote: formData.get("ancestryValidationNote"), background: formData.get("background"), backgroundValidationNote: formData.get("backgroundValidationNote"), backstory: formData.get("backstory"), notes: formData.get("notes") });
   if (!parsed.success) return { fieldErrors: z.flattenError(parsed.error).fieldErrors };
   let destination: string | null = null;
   try {

@@ -23,4 +23,8 @@ describe("CharacterIdentity", () => {
   it("omits absent optional fields without empty separators", () => {
     expect(formatCharacterIdentityText({ name: "Navasi", level: 1 })).toBe("Navasi · Level 1");
   });
+
+  it("keeps classless compact cards vertically aligned", () => {
+    expect(renderToStaticMarkup(<CharacterIdentity character={{ name: "Lilli", level: 1 }} />)).toContain("h-full");
+  });
 });
