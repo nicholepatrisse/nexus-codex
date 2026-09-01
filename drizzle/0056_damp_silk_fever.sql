@@ -1,0 +1,3 @@
+ALTER TABLE "player_materials" ADD COLUMN "isbn" text;--> statement-breakpoint
+CREATE UNIQUE INDEX "player_materials_person_isbn_unique" ON "player_materials" USING btree ("person_id","isbn") WHERE "player_materials"."isbn" is not null;--> statement-breakpoint
+ALTER TABLE "player_materials" ADD CONSTRAINT "player_materials_isbn_format" CHECK ("player_materials"."isbn" is null or "player_materials"."isbn" ~ '^[0-9]{13}$');
