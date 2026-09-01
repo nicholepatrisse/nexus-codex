@@ -39,4 +39,14 @@ describe("Archives of Nethys item import", () => {
     expect(sparse).toMatchObject({ name: "Tool", level: 1, traits: [] });
     await expect(fetchNethysItem("https://2e.aonsrd.com/treasure/1-tool", vi.fn().mockRejectedValue(new Error("offline")))).rejects.toThrow("unavailable");
   });
+
+  it("preserves a positive Society restriction for advisory validation", () => {
+    const restricted = parseNethysItemHtml(`<div class="treasure"><h1 class="title"><span class="sfs"><img alt="SFS Restricted"></span> Contraband <span class="feature-level">Item 2</span></h1></div>`, "https://2e.aonsrd.com/treasure/2-contraband");
+    expect(restricted.societyLegal).toBe(false);
+  });
+
+  it("inherits an SFS Limited marker from a multi-item parent", () => {
+    const limited = `<div class="treasure"><h1 class="title"><span class="sfs"><img alt="SFS Limited"></span> Degradation Grenade <span class="feature-level">Item 0+</span></h1><div class="treasure"><h2 class="title">Degradation Grenade (Commercial) <span class="feature-level">Item 0</span></h2><div class="sources">Source Starfinder Society Scenario #1-12: Take the Bait pg. 14</div></div></div>`;
+    expect(parseNethysItemsHtml(limited, "https://2e.aonsrd.com/treasure/178-degradation-grenade")[0]).toMatchObject({ name: "Degradation Grenade (Commercial)", societyStatus: "limited", societyLegal: undefined });
+  });
 });

@@ -1,0 +1,2 @@
+ALTER TABLE "character_inventory_entries" ADD COLUMN "society_status" text;--> statement-breakpoint
+ALTER TABLE "character_inventory_entries" ADD CONSTRAINT "character_inventory_society_status_check" CHECK ("character_inventory_entries"."society_status" is null or "character_inventory_entries"."society_status" in ('standard', 'limited', 'restricted'));

@@ -32,12 +32,13 @@ describeWithDatabase("character purchases", () => {
 
   it("atomically creates durable history, a distinct lot, and one linked debit", async () => {
     const { ownerActor, otherActor, character } = await fixture();
-    const input = { itemName: "Laser rifle", itemLink: "https://example.com/laser", quantity: 2, acquiredOn: "2026-08-26", unitPriceMinor: 50, totalPriceMinor: 100, idempotencyKey: "purchase-1" };
+    const input = { itemName: "Laser rifle", itemLink: "https://example.com/laser", sourceMaterialTitle: "Galaxy Guide", rarity: "Uncommon", validationNote: "Chronicle access", notes: "Imported rules", quantity: 2, acquiredOn: "2026-08-26", unitPriceMinor: 50, totalPriceMinor: 100, idempotencyKey: "purchase-1" };
     expect(await purchaseItem(otherActor, character.id, input)).toBeNull();
     const result = await purchaseItem(ownerActor, character.id, input);
     if (!result) throw new Error("Expected purchase.");
     expect(result.purchase).toEqual(expect.objectContaining({ itemNameSnapshot: "Laser rifle", unitPriceMinor: 50, totalPriceMinor: 100 }));
-    expect(result.inventory).toEqual(expect.objectContaining({ quantity: 2, amountPaidMinor: 100, lotKey: result.purchase.id, sourcePurchaseId: result.purchase.id }));
+    expect(result.inventory).toEqual(expect.objectContaining({ quantity: 2, amountPaidMinor: 100, lotKey: result.purchase.id, sourcePurchaseId: result.purchase.id, sourceMaterialTitle: "Galaxy Guide", rarity: "Uncommon", validationNote: "Chronicle access", notes: "Imported rules" }));
+    expect((await listOwnedInventory(ownerActor, character.id))?.[0]?.validation.status).toBe("unvalidated");
     expect(result.ledgerEntry).toEqual(expect.objectContaining({ amountMinor: -100, type: "purchase", source: "purchase", sourcePurchaseId: result.purchase.id }));
     expect((await getOwnedCreditLedger(ownerActor, character.id))?.balanceMinor).toBe(50);
 

@@ -379,6 +379,20 @@
       "when": 1788204847920,
       "tag": "0053_unusual_shaman",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1788290980814,
+      "tag": "0054_warm_scarecrow",
+      "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1788292787596,
+      "tag": "0055_mysterious_piledriver",
+      "breakpoints": true
     }
   ]
 }
