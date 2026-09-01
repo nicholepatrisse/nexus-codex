@@ -1,0 +1,7 @@
+ALTER TABLE "character_inventory_entries" ADD COLUMN "source_material_identity" text;--> statement-breakpoint
+ALTER TABLE "character_inventory_entries" ADD COLUMN "source_material_title" text;--> statement-breakpoint
+ALTER TABLE "character_inventory_entries" ADD COLUMN "society_legal" boolean;--> statement-breakpoint
+ALTER TABLE "character_inventory_entries" ADD COLUMN "rarity" text;--> statement-breakpoint
+ALTER TABLE "character_inventory_entries" ADD CONSTRAINT "character_inventory_source_material_identity_length_check" CHECK ("character_inventory_entries"."source_material_identity" is null or length(btrim("character_inventory_entries"."source_material_identity")) between 1 and 200);--> statement-breakpoint
+ALTER TABLE "character_inventory_entries" ADD CONSTRAINT "character_inventory_source_material_title_length_check" CHECK ("character_inventory_entries"."source_material_title" is null or length(btrim("character_inventory_entries"."source_material_title")) between 1 and 300);--> statement-breakpoint
+ALTER TABLE "character_inventory_entries" ADD CONSTRAINT "character_inventory_rarity_length_check" CHECK ("character_inventory_entries"."rarity" is null or length(btrim("character_inventory_entries"."rarity")) between 1 and 30);

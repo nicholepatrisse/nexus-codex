@@ -3,7 +3,10 @@ import { and, asc, eq, gt } from "drizzle-orm";
 import { z } from "zod";
 import type { AuthenticatedActor } from "@/auth/actor";
 import { getDb } from "@/db/client";
-import { characterInventoryEntries, characters, chronicles, contentItems } from "@/db/schema";
+import { characterInventoryEntries, characters, chronicles, contentItems, playerMaterials } from "@/db/schema";
+import { PLAYER_CORE } from "@/materials/materials";
+import { normalizeMaterialIdentity } from "@/materials/material-identity";
+import { validateInventoryEntry } from "@/character/inventory-validation";
 
 type Database = ReturnType<typeof getDb>;
 const optionalText = (maximum: number) => z.string().trim().max(maximum).nullable().optional().transform((value) => value || null);
@@ -14,6 +17,11 @@ export const inventoryEntryInputSchema = z.object({
   itemName: z.string().trim().min(1, "Enter an item name.").max(200, "Item name must be 200 characters or fewer."),
   itemLink: optionalLink,
   bulk: optionalText(20),
+  sourceMaterialTitle: optionalText(300),
+  sourceMaterialIdentity: optionalText(200),
+  societyLegal: z.union([z.boolean(), z.literal("true"), z.literal("false"), z.literal(""), z.null()]).optional().transform((value) => value === true || value === "true" ? true : value === false || value === "false" ? false : null),
+  societyStatus: z.enum(["standard", "limited", "restricted"]).or(z.literal("")).nullable().optional().transform((value) => value || null),
+  rarity: optionalText(30),
   quantity: z.coerce.number().int("Quantity must be a whole number.").positive("Quantity must be at least 1.").max(2_000_000_000),
   acquisitionType: z.enum(["starting_equipment", "purchased", "crafted", "boon_reward", "other"], { error: "Choose an acquisition type." }),
   acquiredOn: z.string().date("Enter a valid acquisition date."),
@@ -25,6 +33,7 @@ export const inventoryEntryInputSchema = z.object({
 });
 export type InventoryEntryInput = z.input<typeof inventoryEntryInputSchema>;
 export type InventoryEntry = typeof characterInventoryEntries.$inferSelect;
+export type ValidatedInventoryEntry = InventoryEntry & { validation: ReturnType<typeof validateInventoryEntry> };
 
 async function ownedCharacter(actor: AuthenticatedActor, characterId: string, database: Database) {
   const [row] = await database.select({ id: characters.id }).from(characters).where(and(eq(characters.id, characterId), eq(characters.personId, actor.personId))).limit(1);
@@ -47,7 +56,12 @@ async function snapshots(input: z.output<typeof inventoryEntryInputSchema>, char
 
 export async function listOwnedInventory(actor: AuthenticatedActor, characterId: string, database: Database = getDb()) {
   if (!await ownedCharacter(actor, characterId, database)) return null;
-  return database.select().from(characterInventoryEntries).where(and(eq(characterInventoryEntries.characterId, characterId), gt(characterInventoryEntries.quantity, 0))).orderBy(asc(characterInventoryEntries.itemNameSnapshot), asc(characterInventoryEntries.createdAt));
+  const [entries, materials] = await Promise.all([
+    database.select().from(characterInventoryEntries).where(and(eq(characterInventoryEntries.characterId, characterId), gt(characterInventoryEntries.quantity, 0))).orderBy(asc(characterInventoryEntries.itemNameSnapshot), asc(characterInventoryEntries.createdAt)),
+    database.select({ identity: playerMaterials.identity }).from(playerMaterials).where(eq(playerMaterials.personId, actor.personId)),
+  ]);
+  const owned = [PLAYER_CORE.identity, ...materials.map(({ identity }) => identity)];
+  return entries.map((entry): ValidatedInventoryEntry => ({ ...entry, validation: validateInventoryEntry(entry, owned) }));
 }
 
 export async function getOwnedInventoryEntry(actor: AuthenticatedActor, characterId: string, entryId: string, database: Database = getDb()) {
@@ -59,7 +73,8 @@ export async function createInventoryEntry(actor: AuthenticatedActor, characterI
   const input = inventoryEntryInputSchema.parse(raw);
   if (!await ownedCharacter(actor, characterId, database)) return null;
   const item = await snapshots(input, characterId, database);
-  const [created] = await database.insert(characterInventoryEntries).values({ id: randomUUID(), lotKey: randomUUID(), characterId, ...item, quantity: input.quantity, acquisitionType: input.acquisitionType, acquiredOn: input.acquiredOn, amountPaidMinor: input.amountPaidMinor, valueMinor: input.valueMinor, sourceChronicleId: input.sourceChronicleId, notes: input.notes, validationNote: input.validationNote }).returning();
+  const sourceMaterialIdentity = input.sourceMaterialIdentity ?? (input.sourceMaterialTitle ? normalizeMaterialIdentity(input.sourceMaterialTitle) : null);
+  const [created] = await database.insert(characterInventoryEntries).values({ id: randomUUID(), lotKey: randomUUID(), characterId, ...item, sourceMaterialIdentity, sourceMaterialTitle: input.sourceMaterialTitle, societyLegal: input.societyLegal, societyStatus: input.societyStatus, rarity: input.rarity, quantity: input.quantity, acquisitionType: input.acquisitionType, acquiredOn: input.acquiredOn, amountPaidMinor: input.amountPaidMinor, valueMinor: input.valueMinor, sourceChronicleId: input.sourceChronicleId, notes: input.notes, validationNote: input.validationNote }).returning();
   return created ?? null;
 }
 
@@ -67,7 +82,8 @@ export async function updateInventoryEntry(actor: AuthenticatedActor, characterI
   const input = inventoryEntryInputSchema.parse(raw);
   if (!await getOwnedInventoryEntry(actor, characterId, entryId, database)) return null;
   const item = await snapshots(input, characterId, database);
-  const [updated] = await database.update(characterInventoryEntries).set({ ...item, quantity: input.quantity, acquisitionType: input.acquisitionType, acquiredOn: input.acquiredOn, amountPaidMinor: input.amountPaidMinor, valueMinor: input.valueMinor, sourceChronicleId: input.sourceChronicleId, notes: input.notes, validationNote: input.validationNote, updatedAt: new Date() }).where(and(eq(characterInventoryEntries.id, entryId), eq(characterInventoryEntries.characterId, characterId))).returning();
+  const sourceMaterialIdentity = input.sourceMaterialIdentity ?? (input.sourceMaterialTitle ? normalizeMaterialIdentity(input.sourceMaterialTitle) : null);
+  const [updated] = await database.update(characterInventoryEntries).set({ ...item, sourceMaterialIdentity, sourceMaterialTitle: input.sourceMaterialTitle, societyLegal: input.societyLegal, societyStatus: input.societyStatus, rarity: input.rarity, quantity: input.quantity, acquisitionType: input.acquisitionType, acquiredOn: input.acquiredOn, amountPaidMinor: input.amountPaidMinor, valueMinor: input.valueMinor, sourceChronicleId: input.sourceChronicleId, notes: input.notes, validationNote: input.validationNote, updatedAt: new Date() }).where(and(eq(characterInventoryEntries.id, entryId), eq(characterInventoryEntries.characterId, characterId))).returning();
   return updated ?? null;
 }
 

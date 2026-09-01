@@ -15,6 +15,8 @@ export type NethysItem = {
   description?: string;
   traits: string[];
   rarity?: string;
+  societyLegal?: boolean;
+  societyStatus?: "standard" | "limited" | "restricted";
   usage?: string;
   category?: string;
 };
@@ -43,7 +45,7 @@ export function validateNethysItemUrl(value: string) {
 
 const clean = (value?: string | null) => value?.replace(/\s+/g, " ").trim() || undefined;
 
-function parseItemRoot($: ReturnType<typeof load>, root: ReturnType<ReturnType<typeof load>>, sourceUrl: string): NethysItem {
+function parseItemRoot($: ReturnType<typeof load>, root: ReturnType<ReturnType<typeof load>>, sourceUrl: string, inheritedSocietyStatus?: NethysItem["societyStatus"]): NethysItem {
   const rootElement = root.get(0);
 
   const title = root.children("h1.title, h2.title").first().clone();
@@ -65,6 +67,10 @@ function parseItemRoot($: ReturnType<typeof load>, root: ReturnType<ReturnType<t
   const creditMatch = price?.match(/^([\d,]+(?:\.\d+)?)\s+credits?$/i);
   const traits = root.find(".trait, .traits a, a.link-trait").filter((_index, element) => $(element).closest(".treasure, .armor, .shield, .weapon").get(0) === rootElement).map((_index, element) => clean($(element).text())).get().filter((value): value is string => Boolean(value));
   const rarity = traits.find((trait) => /^(common|uncommon|rare|unique)$/i.test(trait));
+  const societyMarker = root.find(".sfs img").first();
+  const societyMarkerText = [societyMarker.attr("alt"), societyMarker.attr("title"), societyMarker.attr("src")].filter(Boolean).join(" ");
+  const societyStatus = /\brestricted\b/i.test(societyMarkerText) ? "restricted" : /\blimited\b/i.test(societyMarkerText) ? "limited" : /\bstandard\b/i.test(societyMarkerText) ? "standard" : inheritedSocietyStatus;
+  const societyLegal = societyStatus === "restricted" ? false : undefined;
   const pathCategory = new URL(sourceUrl).pathname.split("/")[1];
 
   return {
@@ -79,6 +85,8 @@ function parseItemRoot($: ReturnType<typeof load>, root: ReturnType<ReturnType<t
     description: clean(root.children(".treasure-description, .description").first().text()),
     traits: [...new Set(traits)],
     rarity,
+    societyLegal,
+    societyStatus,
     usage: values.get("usage"),
     category: pathCategory === "treasure" ? "Treasure" : clean(pathCategory)?.replace(/^./, (letter) => letter.toUpperCase()),
   };
@@ -89,6 +97,9 @@ export function parseNethysItemsHtml(html: string, sourceUrl: string): NethysIte
   const root = $(".treasure, .armor, .shield, .weapon").first();
   if (!root.length) throw new NethysItemError("not_item", "The referenced page does not appear to contain a supported item.");
   const variants = root.children(".treasure, .armor, .shield, .weapon");
+  const parentMarker = root.children("h1.title, h2.title").first().find(".sfs img").first();
+  const parentMarkerText = [parentMarker.attr("alt"), parentMarker.attr("title"), parentMarker.attr("src")].filter(Boolean).join(" ");
+  const parentSocietyStatus: NethysItem["societyStatus"] = /\brestricted\b/i.test(parentMarkerText) ? "restricted" : /\blimited\b/i.test(parentMarkerText) ? "limited" : /\bstandard\b/i.test(parentMarkerText) ? "standard" : undefined;
   if (root.hasClass("weapon")) {
     const gradeTable = root.find("table").filter((_index, table) => {
       const headings = $(table).find("thead th").map((_headingIndex, heading) => clean($(heading).text())?.toLowerCase()).get();
@@ -107,14 +118,14 @@ export function parseNethysItemsHtml(html: string, sourceUrl: string): NethysIte
         if (!name || !Number.isInteger(level) || level < 0) return [];
         const variant = root.clone();
         variant.children("h1.title, h2.title").first().html(`${name}<span class="feature-level">Item ${level}</span>`);
-        const parsed = parseItemRoot($, variant, sourceUrl);
+        const parsed = parseItemRoot($, variant, sourceUrl, parentSocietyStatus);
         const creditMatch = price?.match(/^([\d,]+(?:\.\d+)?)\s+credits?$/i);
         return [{ ...parsed, name, level, price, priceCredits: creditMatch?.[1] ? Number(creditMatch[1].replaceAll(",", "")) : undefined }];
       });
       if (weaponVariants.length) return weaponVariants;
     }
   }
-  return (variants.length ? variants.toArray().map((element) => $(element)) : [root]).map((itemRoot) => parseItemRoot($, itemRoot, sourceUrl));
+  return (variants.length ? variants.toArray().map((element) => $(element)) : [root]).map((itemRoot) => parseItemRoot($, itemRoot, sourceUrl, parentSocietyStatus));
 }
 
 export function parseNethysItemHtml(html: string, sourceUrl: string): NethysItem {
