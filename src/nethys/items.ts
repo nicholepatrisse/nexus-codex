@@ -6,7 +6,7 @@ const ITEM_PATH = /^\/(?:treasure\/[^/]+|equipment\/(?:armor|shields|weapons)\/[
 export type NethysItem = {
   url: string;
   name: string;
-  level: number;
+  level?: number;
   price?: string;
   priceCredits?: number;
   bulk?: string;
@@ -51,7 +51,7 @@ function parseItemRoot($: ReturnType<typeof load>, root: ReturnType<ReturnType<t
   title.find(".feature-level, .sfs, img").remove();
   const name = clean(title.text());
   const levelMatch = levelText?.match(/Item\s+(\d+)/i);
-  if (!name || !levelMatch) throw new NethysItemError("parse_failed", "Nethys returned the page, but its required item details could not be read.");
+  if (!name) throw new NethysItemError("parse_failed", "Nethys returned the page, but its required item details could not be read.");
 
   const values = new Map<string, string>();
   root.find("b, strong").filter((_index, element) => $(element).closest(".treasure, .armor, .shield, .weapon").get(0) === rootElement).each((_index, element) => {
@@ -70,7 +70,7 @@ function parseItemRoot($: ReturnType<typeof load>, root: ReturnType<ReturnType<t
   return {
     url: sourceUrl,
     name,
-    level: Number(levelMatch[1]),
+    level: levelMatch ? Number(levelMatch[1]) : undefined,
     price,
     priceCredits: creditMatch?.[1] ? Number(creditMatch[1].replaceAll(",", "")) : undefined,
     hands: values.get("hands"),
@@ -139,7 +139,7 @@ export async function fetchNethysItems(value: string, fetcher: typeof fetch = fe
 
 export function nethysItemNotes(item: NethysItem) {
   const metadata = [
-    `Item level: ${item.level}`,
+    item.level != null && `Item level: ${item.level}`,
     item.price && `Price: ${item.price}`,
     item.hands && `Hands: ${item.hands}`,
     item.source && `Source: ${item.source}`,

@@ -3,6 +3,7 @@ import { fetchNethysItem, NethysItemError, nethysItemNotes, parseNethysItemHtml,
 
 const hygieneKit = `<div class="treasure"><h1 class="title"><span class="sfs">icon</span> Hygiene Kit <span class="feature-level">Item 0</span></h1><div class="sources"><strong>Source</strong> <a>Player Core pg. 241</a></div><div><b>Price</b> 2 credits</div><div><div><b>Hands</b> 2</div><div><b>Bulk</b> L</div></div><hr><div class="treasure-description">Everything needed for good grooming.</div></div>`;
 const sunshades = `<div class="treasure"><h1 class="title">Sunshades <span class="feature-level">Item 0+</span></h1><div class="treasure-description">Sunshades make everyone look cooler.</div><div class="treasure"><h2 class="title">Sunshades (Commercial) <span class="feature-level">Item 0</span></h2><div class="sources"><strong>Source</strong> Player Core pg. 241</div><div><b>Price</b> 2 credits</div><div><b>Bulk</b> —</div></div><div class="treasure"><h2 class="title">Sunshades (Tactical) <span class="feature-level">Item 3</span></h2><div class="sources"><strong>Source</strong> Player Core pg. 241</div><div><b>Price</b> 450 credits</div><div><b>Bulk</b> —</div><div class="treasure-description">Protects against blinded and dazzled.</div></div></div>`;
+const shieldBash = `<div class="weapon"><h1 class="title">Shield Bash</h1><div class="sources"><strong>Source</strong> Player Core pg. 264</div><div><b>Price</b> —</div><div><b>Damage</b> 1d4 B</div><div><b>Bulk</b> —</div><div><b>Hands</b> 1</div><div><b>Type</b> Melee</div><div><b>Category</b> Martial</div><div><b>Group</b> Shield</div><div><b>Upgrades</b> —</div><div class="description">Nethys Note: No description was provided for this weapon</div></div>`;
 
 describe("Archives of Nethys item import", () => {
   it("parses the Hygiene Kit fields", () => {
@@ -25,6 +26,13 @@ describe("Archives of Nethys item import", () => {
       expect.objectContaining({ name: "Commercial Arc Pistol", level: 0, price: "25 credits", priceCredits: 25, bulk: "1", hands: "1" }),
       expect.objectContaining({ name: "Tactical Arc Pistol", level: 2, price: "375 credits", priceCredits: 375, bulk: "1", hands: "1" }),
     ]);
+  });
+
+  it("parses an unlevelled weapon such as Shield Bash", () => {
+    const item = parseNethysItemHtml(shieldBash, "https://2e.aonsrd.com/equipment/weapons/26-shield-bash");
+    expect(item).toMatchObject({ name: "Shield Bash", price: "—", bulk: "—", hands: "1", source: "Player Core pg. 264", category: "Equipment" });
+    expect(item.level).toBeUndefined();
+    expect(nethysItemNotes(item)).not.toContain("Item level:");
   });
 
   it("only accepts recognized HTTPS item URLs", () => {
