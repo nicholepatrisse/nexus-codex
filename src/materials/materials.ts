@@ -4,6 +4,8 @@ import { load } from "cheerio";
 import type { AuthenticatedActor } from "@/auth/actor";
 import { getDb } from "@/db/client";
 import { playerMaterials } from "@/db/schema";
+import { normalizeMaterialIdentity } from "@/materials/material-identity";
+export { isFreeAccessMaterial, materialTitleWithoutCitation, normalizeMaterialIdentity } from "@/materials/material-identity";
 
 type Database = ReturnType<typeof getDb>;
 export const PLAYER_CORE = { id: "default-player-core", identity: "starfinder-player-core", productCode: "PZO22001", title: "Starfinder Player Core", sourceUrl: "https://store.paizo.com/starfinder-2e-player-core/", aliases: ["Player Core", "SF2 Player Core", "PZO22001"], isDefault: true } as const;
@@ -14,10 +16,6 @@ function isPaizoProductUrl(url: URL) {
   if (url.protocol !== "https:") return false;
   if (hostname === "store.paizo.com") return /^\/[a-z0-9][a-z0-9-]*\/?$/i.test(url.pathname);
   return (hostname === "paizo.com" || hostname.endsWith(".paizo.com")) && url.pathname.startsWith("/products/");
-}
-
-export function normalizeMaterialIdentity(value: string) {
-  return value.normalize("NFKD").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
 export function parsePaizoMaterialHtml(html: string, sourceUrl: string) {

@@ -11,6 +11,10 @@ describe("Archives of Nethys character options", () => {
     expect(parseNethysOptionHtml(`<main><h1>${name}</h1><div class="sources">Source Starfinder Player Core</div><a class="trait">Common</a></main>`, url)).toEqual({ name, optionType, sourceMaterialTitle: "Starfinder Player Core", sourceMaterialIdentity: "starfinder-player-core", sourceUrl: url, metadata: { traits: ["Common"] } });
   });
   it("allows missing optional fields", () => expect(parseNethysOptionHtml("<h1>Witchwarper</h1>", "https://2e.aonsrd.com/classes/witchwarper").sourceMaterialTitle).toBeUndefined());
+
+  it("removes page citations from material identity", () => expect(parseNethysOptionHtml('<h1>Astrozoan</h1><div class="sources">Source Galaxy Guide pg. 128</div>', "https://2e.aonsrd.com/ancestries/astrozoan")).toMatchObject({ sourceMaterialTitle: "Galaxy Guide", sourceMaterialIdentity: "galaxy-guide" }));
+
+  it("preserves the Society restricted marker", () => expect(parseNethysOptionHtml('<h1 class="title"><span class="sfs"><img src="/images/icons/sfs-restricted.png" alt="SFS Restricted" title="SFS Restricted"></span> Escaped Experiment</h1><div class="sources">Source Galaxy Guide pg. 99</div>', "https://2e.aonsrd.com/backgrounds/73-escaped-experiment")).toMatchObject({ name: "Escaped Experiment", metadata: { traits: [], societyStatus: "restricted", societyLegal: false } }));
   it("rejects malformed and unsupported pages", () => {
     expect(() => parseNethysOptionHtml("<p>missing</p>", "https://2e.aonsrd.com/classes/envoy")).toThrow(NethysOptionError);
     expect(() => parseNethysOptionHtml("<h1>Feat</h1>", "https://2e.aonsrd.com/feats/example")).toThrow(/not supported/);

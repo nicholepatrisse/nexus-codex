@@ -11,7 +11,7 @@ export async function updateCharacterAction(characterId: string, _state: EditCha
   const startingItems = formData.get("startingItems");
   let parsedStartingItems: unknown;
   try { parsedStartingItems = typeof startingItems === "string" ? JSON.parse(startingItems) : undefined; } catch { parsedStartingItems = "invalid"; }
-  const parsed = updateCharacterInputSchema.safeParse({ name: formData.get("name"), startingLevel: startingLevel ?? undefined, startingCredits: formData.get("startingCredits") ?? undefined, startingItems: parsedStartingItems, className: formData.get("className"), ancestry: formData.get("ancestry"), background: formData.get("background"), backstory: formData.get("backstory"), notes: formData.get("notes") });
+  const parsed = updateCharacterInputSchema.safeParse({ name: formData.get("name"), startingLevel: startingLevel ?? undefined, startingCredits: formData.get("startingCredits") ?? undefined, startingItems: parsedStartingItems, className: formData.get("className"), classValidationNote: formData.get("classValidationNote"), ancestry: formData.get("ancestry"), ancestryValidationNote: formData.get("ancestryValidationNote"), background: formData.get("background"), backgroundValidationNote: formData.get("backgroundValidationNote"), backstory: formData.get("backstory"), notes: formData.get("notes") });
   if (!parsed.success) return { fieldErrors: z.flattenError(parsed.error).fieldErrors };
   try {
     const updated = await updateCharacter(await requireAuthenticatedActor(), characterId, parsed.data);

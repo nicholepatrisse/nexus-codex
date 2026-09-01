@@ -10,6 +10,8 @@ export type StyledSelectOption = {
   label: string;
   description?: string;
   metadata?: string;
+  metadataLabel?: string;
+  metadataTone?: "success" | "neutral" | "danger";
   character?: CharacterIdentityData;
   className?: string;
   disabled?: boolean;
@@ -24,7 +26,7 @@ function OptionContent({ option, selected = false }: { option: StyledSelectOptio
       <span className="block truncate font-medium">{option.label}</span>
       {option.description ? <span className={`mt-0.5 block truncate text-sm ${selected ? "text-on-brand/80" : "text-text-muted"}`}>{option.description}</span> : null}
     </span>
-    {option.metadata ? <span className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${selected ? "border-on-brand/40 bg-on-brand/10 text-on-brand" : "border-border bg-surface text-text-muted"}`}>{option.metadata}</span> : null}
+    {option.metadata ? <span aria-label={option.metadataLabel} title={option.metadataLabel} className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${option.metadataTone === "success" ? "border-success/40 bg-success/10 text-success" : option.metadataTone === "danger" ? "border-danger/40 bg-danger/10 text-danger" : option.metadataTone === "neutral" ? "border-border-strong bg-surface text-text-muted" : selected ? "border-on-brand/40 bg-on-brand/10 text-on-brand" : "border-border bg-surface text-text-muted"}`}>{option.metadata}</span> : null}
   </>;
 }
 

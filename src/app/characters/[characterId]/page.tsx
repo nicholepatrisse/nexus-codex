@@ -85,9 +85,9 @@ export default async function CharacterPage({ params, searchParams }: { params: 
       {tab === "overview" ? <>
       <dl className="mt-6 grid gap-4 sm:mt-8 sm:grid-cols-2 sm:gap-5"><div><dt className="text-sm text-text-muted">Society number</dt><dd className="mt-1 font-semibold">{character.societyNumber}</dd></div><CharacterProgress startingLevel={character.startingLevel} currentLevel={character.currentLevel} xp={character.xp} />
         {character.isOwner ? <div><dt className="text-sm text-text-muted">Credit balance</dt><dd className="mt-1 font-semibold">{formatCredits(character.creditsMinor ?? 0)} credits</dd></div> : null}
-        {character.className ? <div><dt className="text-sm text-text-muted">Class</dt><dd className="mt-1 font-semibold">{character.className}</dd></div> : null}
-        {character.ancestry ? <div><dt className="text-sm text-text-muted">Ancestry</dt><dd className="mt-1 font-semibold">{character.ancestry}</dd></div> : null}
-        {character.background ? <div><dt className="text-sm text-text-muted">Background</dt><dd className="mt-1 font-semibold">{character.background}</dd></div> : null}
+        {character.className ? <div><dt className="text-sm text-text-muted">Class</dt><dd className="mt-1 font-semibold">{character.className}</dd>{character.classValidationNote ? <dd className="mt-1 whitespace-pre-wrap text-sm text-text-muted"><span className="font-semibold">Validation note:</span> {character.classValidationNote}</dd> : null}</div> : null}
+        {character.ancestry ? <div><dt className="text-sm text-text-muted">Ancestry</dt><dd className="mt-1 font-semibold">{character.ancestry}</dd>{character.ancestryValidationNote ? <dd className="mt-1 whitespace-pre-wrap text-sm text-text-muted"><span className="font-semibold">Validation note:</span> {character.ancestryValidationNote}</dd> : null}</div> : null}
+        {character.background ? <div><dt className="text-sm text-text-muted">Background</dt><dd className="mt-1 font-semibold">{character.background}</dd>{character.backgroundValidationNote ? <dd className="mt-1 whitespace-pre-wrap text-sm text-text-muted"><span className="font-semibold">Validation note:</span> {character.backgroundValidationNote}</dd> : null}</div> : null}
       </dl>
       {character.backstory || character.notes ? <div className="mt-8 space-y-6 border-t border-border pt-8">
         {character.backstory ? <section><h2 className="text-lg font-semibold">Backstory</h2><p className="mt-2 whitespace-pre-wrap text-text-muted">{character.backstory}</p></section> : null}
