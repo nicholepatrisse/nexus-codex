@@ -4,7 +4,7 @@ import { createTestIdentity } from "@/auth/test-fixture";
 import { createCharacter } from "@/character/characters";
 import { getOwnedCreditLedger } from "@/character/credit-ledger";
 import { purchaseItem } from "@/character/purchases";
-import { InsufficientInventoryError, listOwnedSales, sellInventory, UnsellableInventoryError } from "@/character/sales";
+import { InsufficientInventoryError, listOwnedSales, PurchaseCannotBeReturnedError, returnPurchase, sellInventory, UnsellableInventoryError } from "@/character/sales";
 import { getDb } from "@/db/client";
 import { authUsers, characterCreditLedgerEntries, characterInventoryEntries, characterSales, gameSystems, people } from "@/db/schema";
 import { SUPPORTED_GAME_SYSTEM } from "@/game-system/config";
@@ -54,6 +54,20 @@ describeWithDatabase("character sales", () => {
     const result = await sellInventory(ownerActor, character.id, { inventoryEntryId: startingItem.id, quantity: 1, soldOn: "2026-08-27", idempotencyKey: "sell-starting" });
     expect(result?.sale).toEqual(expect.objectContaining({ unitValueMinor: 100, totalValueMinor: 100, saleAmountMinor: 50 }));
     expect(result?.inventory).toEqual(expect.objectContaining({ quantity: 0, amountPaidMinor: null }));
+  });
+
+  it("returns a purchase for its full recorded cost and removes the inventory lot", async () => {
+    const { ownerActor, character } = await fixture();
+    const purchase = await purchaseItem(ownerActor, character.id, { itemName: "Illegal gear", quantity: 2, acquiredOn: "2026-09-01", unitPriceMinor: 10, totalPriceMinor: 20, idempotencyKey: "buy-return" });
+    if (!purchase) throw new Error("Expected purchase.");
+    const input = { inventoryEntryId: purchase.inventory.id, returnedOn: "2026-09-02", idempotencyKey: "return-1" };
+    const returned = await returnPurchase(ownerActor, character.id, input);
+    expect(returned?.sale).toEqual(expect.objectContaining({ quantity: 2, saleAmountMinor: 20, saleKind: "refund", pricingPolicy: "purchase-return-full-refund-v1" }));
+    expect(returned?.inventory).toEqual(expect.objectContaining({ quantity: 0, amountPaidMinor: 0 }));
+    expect((await returnPurchase(ownerActor, character.id, input))?.sale.id).toBe(returned?.sale.id);
+    expect((await getOwnedCreditLedger(ownerActor, character.id))?.balanceMinor).toBe(150);
+    const [manual] = await getDb().insert(characterInventoryEntries).values({ id: crypto.randomUUID(), characterId: character.id, itemNameSnapshot: "Manual item", quantity: 1, acquisitionType: "other", acquiredOn: "2026-09-01", amountPaidMinor: 10, valueMinor: 10, lotKey: crypto.randomUUID() }).returning();
+    await expect(returnPurchase(ownerActor, character.id, { ...input, inventoryEntryId: manual!.id, idempotencyKey: "return-manual" })).rejects.toBeInstanceOf(PurchaseCannotBeReturnedError);
   });
 
   it("rejects over-sale, concurrent double-sale, and zero-cost lots", async () => {
