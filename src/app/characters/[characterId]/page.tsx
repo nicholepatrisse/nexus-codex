@@ -11,12 +11,15 @@ import { createCreditAdjustmentAction } from "./credits/actions";
 import { CreditAdjustmentForm } from "./credits/adjustment-form";
 import { listOwnedInventory } from "@/character/inventory";
 import { InventoryCard } from "./inventory/inventory-card";
-import { sellInventoryAction } from "./sales/actions";
+import { returnPurchaseAction, sellInventoryAction } from "./sales/actions";
 import { updateInventorySourceChronicleAction } from "./inventory/actions";
 import { GameCard } from "@/app/game-card";
 import { ChronicleSummaryCard } from "@/app/chronicle-summary-card";
 import { applyChronicleAction } from "./chronicles/actions";
 import { ChronicleLifecycleButton } from "./chronicles/lifecycle-button";
+import { getIdentityValidationContext } from "@/character/identity-validation-context";
+import { deriveCharacterValidationSummary } from "@/character/character-validation-summary";
+import { CharacterValidationSummary } from "./character-validation-summary";
 
 function SessionList({ sessions, empty }: { sessions: CharacterSession[]; empty: string }) {
   if (!sessions.length) return <p className="mt-3 text-sm text-text-muted">{empty}</p>;
@@ -69,6 +72,8 @@ export default async function CharacterPage({ params, searchParams }: { params: 
   const chronicleEditHref = (chronicle: ChronicleWithGmCredit) => chronicle.provenance === "manual" && character.isOwner ? `/characters/${character.id}/chronicles/${chronicle.id}/edit` : (() => { const target = nexusEditTargets.get(chronicle.id); return target ? `/communities/${encodeURIComponent(target.communitySlug)}/sessions/${encodeURIComponent(target.sessionId)}` : null; })();
   const ledger = character.isOwner ? await getOwnedCreditLedger(actor, characterId) : null;
   const inventory = character.isOwner ? await listOwnedInventory(actor, characterId) : null;
+  const validationContext = character.isOwner ? await getIdentityValidationContext(actor) : null;
+  const validationSummary = inventory && validationContext ? deriveCharacterValidationSummary(character, validationContext, inventory) : null;
   const appliedChronicles = chronicles.filter(({ status }) => status === "applied").sort(chronicleNumberOrder);
   const unappliedChronicles = chronicles.filter(({ status }) => status === "pending");
   const hasSessions = character.upcomingSessions.length > 0 || character.pastSessions.length > 0;
@@ -78,6 +83,7 @@ export default async function CharacterPage({ params, searchParams }: { params: 
       <h1 className="responsive-title mt-2 break-words font-semibold sm:mt-3">{character.name}</h1>
       {character.isOwner ? <Link href={`/characters/${character.id}/edit`} className="mt-3 inline-block text-sm font-semibold text-brand hover:underline sm:mt-4">Edit character</Link> : null}</div>
       <div className="shrink-0"><CharacterClassIcon className={character.className} /></div></div>
+      {validationSummary ? <CharacterValidationSummary summary={validationSummary} /> : null}
       <nav aria-label="Character sections">
         <TabRow className="-mx-1 mt-5 px-1 sm:-mx-2 sm:mt-8 sm:px-2">
           {(character.isOwner ? ownerTabs : ownerTabs.filter((item) => item !== "inventory")).map((item) => <Link key={item} href={item === "overview" ? `/characters/${character.id}` : `/characters/${character.id}?tab=${item}`} aria-current={tab === item ? "page" : undefined} className={tabClassName(tab === item, "capitalize")}>{item}</Link>)}
@@ -103,12 +109,12 @@ export default async function CharacterPage({ params, searchParams }: { params: 
       {tab === "sessions" ? <section className="mt-8">{!hasSessions ? <div className="rounded-xl border border-dashed border-border-strong p-6 text-center"><h2 className="text-xl font-semibold">No sessions yet</h2><p className="mt-2 text-text-muted">This character has not been used for a game yet.</p></div> : <div className="space-y-10"><section><h2 className="text-2xl font-semibold">Upcoming sessions</h2><SessionList sessions={character.upcomingSessions} empty="No upcoming sessions." /></section><section className="border-t border-border pt-8"><h2 className="text-2xl font-semibold">Past sessions</h2><SessionList sessions={character.pastSessions} empty="No past sessions." /></section></div>}</section> : null}
       {tab === "inventory" && inventory ? <div className="mt-8 space-y-10"><section>
         <div className="flex flex-wrap items-center justify-between gap-4"><div><h2 className="text-2xl font-semibold">Inventory</h2><p className="mt-1 text-sm text-text-muted">Items currently owned by this character.</p>{ledger ? <p className="mt-2 text-sm font-semibold tabular-nums text-text-primary">Available credits: {formatCredits(ledger.balanceMinor, ledger.displayScale)} credits</p> : null}</div><Link className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white" href={`/characters/${character.id}/inventory/new`}>Add item</Link></div>
-        {!inventory.length ? <div className="mt-5 rounded-xl border border-dashed border-border-strong p-6 text-center"><h3 className="font-semibold">No inventory yet</h3><p className="mt-1 text-sm text-text-muted">Add this character’s current equipment when you’re ready.</p></div> : <ul className="mt-5 space-y-4">{inventory.map((entry) => <InventoryCard key={entry.id} characterId={character.id} entry={entry} chronicles={chronicles} sourceChronicle={chronicles.find(({ id }) => id === entry.sourceChronicleId)} chronicleAction={updateInventorySourceChronicleAction.bind(null, character.id, entry.id)} saleAction={sellInventoryAction.bind(null, character.id, entry.id)} />)}</ul>}
+        {!inventory.length ? <div className="mt-5 rounded-xl border border-dashed border-border-strong p-6 text-center"><h3 className="font-semibold">No inventory yet</h3><p className="mt-1 text-sm text-text-muted">Add this character’s current equipment when you’re ready.</p></div> : <ul className="mt-5 space-y-4">{inventory.map((entry) => <InventoryCard key={entry.id} characterId={character.id} entry={entry} chronicles={chronicles} sourceChronicle={chronicles.find(({ id }) => id === entry.sourceChronicleId)} chronicleAction={updateInventorySourceChronicleAction.bind(null, character.id, entry.id)} saleAction={sellInventoryAction.bind(null, character.id, entry.id)} returnAction={returnPurchaseAction.bind(null, character.id, entry.id)} />)}</ul>}
       </section>
       {ledger ? <section className="border-t border-border pt-8">
         <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-2xl font-semibold">Transaction history</h2><p className="mt-1 text-sm text-text-muted">Chronicles, purchases, sales, and adjustments by date · balance {formatCredits(ledger.balanceMinor, ledger.displayScale)} credits</p></div><CreditAdjustmentForm action={createCreditAdjustmentAction.bind(null, character.id)} /></div>
         {ledger.entries.length ? <ol className="mt-5 space-y-3">{ledger.entries.toReversed().map((entry) => <li key={entry.id} className="grid gap-2 rounded-xl border border-border bg-surface-raised p-4 text-sm sm:grid-cols-[8rem_1fr_auto]">
-          <time className="text-text-muted">{new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${entry.effectiveOn}T00:00:00Z`))}</time><div><p className="font-semibold">{transactionLabels[entry.type] ?? entry.type.replaceAll("_", " ")}</p>{entry.notes ? <p className="text-text-muted">{entry.notes}</p> : null}</div><span className={`font-semibold tabular-nums ${entry.amountMinor > 0 ? "text-success" : entry.amountMinor < 0 ? "text-danger" : "text-text-muted"}`}>{entry.amountMinor > 0 ? "+" : ""}{formatCredits(entry.amountMinor, entry.displayScale)} credits</span>
+          <time className="text-text-muted">{new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${entry.effectiveOn}T00:00:00Z`))}</time><div><p className="font-semibold">{entry.type === "sale" && entry.notes?.startsWith("Returned purchase:") ? "Purchase return" : transactionLabels[entry.type] ?? entry.type.replaceAll("_", " ")}</p>{entry.notes ? <p className="text-text-muted">{entry.notes}</p> : null}</div><span className={`font-semibold tabular-nums ${entry.amountMinor > 0 ? "text-success" : entry.amountMinor < 0 ? "text-danger" : "text-text-muted"}`}>{entry.amountMinor > 0 ? "+" : ""}{formatCredits(entry.amountMinor, entry.displayScale)} credits</span>
         </li>)}</ol> : <p className="mt-5 text-sm text-text-muted">No transactions recorded yet.</p>}
       </section> : null}</div> : null}
     </section>

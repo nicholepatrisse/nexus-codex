@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { saleInputSchema, sfs2OrdinarySaleProceeds } from "@/character/sales";
+import { returnPurchaseInputSchema, saleInputSchema, sfs2OrdinarySaleProceeds } from "@/character/sales";
 
 describe("SFS2 ordinary sale pricing", () => {
   it.each([[10, 1, 5], [5, 1, 2], [5, 3, 7], [0, 4, 0]])("returns half item value and floors to whole credits", (unit, quantity, expected) => {
@@ -12,5 +12,11 @@ describe("SFS2 ordinary sale pricing", () => {
     expect(saleInputSchema.safeParse({ ...valid, quantity: 0 }).success).toBe(false);
     expect(saleInputSchema.safeParse({ ...valid, quantity: 1.5 }).success).toBe(false);
     expect(saleInputSchema.safeParse({ ...valid, idempotencyKey: "" }).success).toBe(false);
+  });
+
+  it("validates a purchase return date and submission key", () => {
+    const valid = { inventoryEntryId: "lot-1", returnedOn: "2026-09-02", idempotencyKey: "return-1" };
+    expect(returnPurchaseInputSchema.parse(valid)).toEqual(valid);
+    expect(returnPurchaseInputSchema.safeParse({ ...valid, returnedOn: "today" }).success).toBe(false);
   });
 });
