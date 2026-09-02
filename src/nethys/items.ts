@@ -12,6 +12,7 @@ export type NethysItem = {
   bulk?: string;
   hands?: string;
   source?: string;
+  sourceUrl?: string;
   description?: string;
   traits: string[];
   rarity?: string;
@@ -82,6 +83,7 @@ function parseItemRoot($: ReturnType<typeof load>, root: ReturnType<ReturnType<t
     hands: values.get("hands"),
     bulk: values.get("bulk"),
     source: clean(root.children(".sources").first().text())?.replace(/^Source\s*/i, ""),
+    sourceUrl: (() => { const href = root.children(".sources").first().find("a[href]").first().attr("href"); if (!href) return undefined; try { const resolved = new URL(href, sourceUrl); return resolved.hostname === HOST && /^\/sources\//i.test(resolved.pathname) ? resolved.href : undefined; } catch { return undefined; } })(),
     description: clean(root.children(".treasure-description, .description").first().text()),
     traits: [...new Set(traits)],
     rarity,

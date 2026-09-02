@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { getAuthenticatedActor } from "@/auth/actor";
-import { addKnownOwnedMaterial, addOwnedMaterial, addReferencedOwnedMaterial, removeOwnedMaterial } from "@/materials/materials";
+import { addCatalogOwnedMaterial, addKnownOwnedMaterial, addOwnedMaterial, addReferencedOwnedMaterial, removeOwnedMaterial } from "@/materials/materials";
 
 export type MaterialActionState = { error?: string; added?: boolean };
 export async function addMaterialAction(_state: MaterialActionState, formData: FormData): Promise<MaterialActionState> {
@@ -10,6 +10,12 @@ export async function addMaterialAction(_state: MaterialActionState, formData: F
   catch (error) { return { error: error instanceof Error ? error.message : "The material could not be added." }; }
 }
 export async function removeMaterialAction(id: string) { const actor = await getAuthenticatedActor(); if (actor) { await removeOwnedMaterial(actor, id); revalidatePath("/profile"); } }
+
+export async function addCatalogMaterialAction(_state: MaterialActionState, formData: FormData): Promise<MaterialActionState> {
+  const actor = await getAuthenticatedActor(); if (!actor) return { error: "Sign in to manage materials." };
+  try { const material = await addCatalogOwnedMaterial(actor, String(formData.get("sourceMaterialId") ?? "")); if (!material) return { error: "Choose a source material from the catalog." }; revalidatePath("/profile"); return { added: true }; }
+  catch { return { error: "The catalog material could not be added." }; }
+}
 
 export type ResolveMaterialState = { ok: true; identities: string[]; duplicate: boolean } | { ok: false; error: string };
 export async function resolveMaterialAction(sourceUrl: string, expectedIdentity: string, expectedTitle: string): Promise<ResolveMaterialState> {

@@ -18,6 +18,7 @@ export const inventoryEntryInputSchema = z.object({
   itemLink: optionalLink,
   bulk: optionalText(20),
   sourceMaterialTitle: optionalText(300),
+  sourceMaterialId: optionalText(100),
   sourceMaterialIdentity: optionalText(200),
   societyLegal: z.union([z.boolean(), z.literal("true"), z.literal("false"), z.literal(""), z.null()]).optional().transform((value) => value === true || value === "true" ? true : value === false || value === "false" ? false : null),
   societyStatus: z.enum(["standard", "limited", "restricted"]).or(z.literal("")).nullable().optional().transform((value) => value || null),
@@ -79,7 +80,7 @@ export async function createInventoryEntry(actor: AuthenticatedActor, characterI
   if (!await ownedCharacter(actor, characterId, database)) return null;
   const item = await snapshots(input, characterId, database);
   const sourceMaterialIdentity = input.sourceMaterialIdentity ?? (input.sourceMaterialTitle ? normalizeMaterialIdentity(input.sourceMaterialTitle) : null);
-  const [created] = await database.insert(characterInventoryEntries).values({ id: randomUUID(), lotKey: randomUUID(), characterId, ...item, sourceMaterialIdentity, sourceMaterialTitle: input.sourceMaterialTitle, societyLegal: input.societyLegal, societyStatus: input.societyStatus, rarity: input.rarity, quantity: input.quantity, acquisitionType: input.acquisitionType, acquiredOn: input.acquiredOn, amountPaidMinor: input.amountPaidMinor, valueMinor: input.valueMinor, sourceChronicleId: input.sourceChronicleId, notes: input.notes, validationNote: input.validationNote }).returning();
+  const [created] = await database.insert(characterInventoryEntries).values({ id: randomUUID(), lotKey: randomUUID(), characterId, ...item, sourceMaterialId: input.sourceMaterialId, sourceMaterialIdentity, sourceMaterialTitle: input.sourceMaterialTitle, societyLegal: input.societyLegal, societyStatus: input.societyStatus, rarity: input.rarity, quantity: input.quantity, acquisitionType: input.acquisitionType, acquiredOn: input.acquiredOn, amountPaidMinor: input.amountPaidMinor, valueMinor: input.valueMinor, sourceChronicleId: input.sourceChronicleId, notes: input.notes, validationNote: input.validationNote }).returning();
   return created ?? null;
 }
 
@@ -88,7 +89,7 @@ export async function updateInventoryEntry(actor: AuthenticatedActor, characterI
   if (!await getOwnedInventoryEntry(actor, characterId, entryId, database)) return null;
   const item = await snapshots(input, characterId, database);
   const sourceMaterialIdentity = input.sourceMaterialIdentity ?? (input.sourceMaterialTitle ? normalizeMaterialIdentity(input.sourceMaterialTitle) : null);
-  const [updated] = await database.update(characterInventoryEntries).set({ ...item, sourceMaterialIdentity, sourceMaterialTitle: input.sourceMaterialTitle, societyLegal: input.societyLegal, societyStatus: input.societyStatus, rarity: input.rarity, quantity: input.quantity, acquisitionType: input.acquisitionType, acquiredOn: input.acquiredOn, amountPaidMinor: input.amountPaidMinor, valueMinor: input.valueMinor, sourceChronicleId: input.sourceChronicleId, notes: input.notes, validationNote: input.validationNote, updatedAt: new Date() }).where(and(eq(characterInventoryEntries.id, entryId), eq(characterInventoryEntries.characterId, characterId))).returning();
+  const [updated] = await database.update(characterInventoryEntries).set({ ...item, sourceMaterialId: input.sourceMaterialId, sourceMaterialIdentity, sourceMaterialTitle: input.sourceMaterialTitle, societyLegal: input.societyLegal, societyStatus: input.societyStatus, rarity: input.rarity, quantity: input.quantity, acquisitionType: input.acquisitionType, acquiredOn: input.acquiredOn, amountPaidMinor: input.amountPaidMinor, valueMinor: input.valueMinor, sourceChronicleId: input.sourceChronicleId, notes: input.notes, validationNote: input.validationNote, updatedAt: new Date() }).where(and(eq(characterInventoryEntries.id, entryId), eq(characterInventoryEntries.characterId, characterId))).returning();
   return updated ?? null;
 }
 

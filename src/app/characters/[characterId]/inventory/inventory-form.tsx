@@ -24,6 +24,7 @@ export function InventoryForm({ characterId, entry, chronicles, ownedMaterialIde
   const [validationNote, setValidationNote] = useState(entry?.validationNote ?? "");
   const [sourceMaterialTitle, setSourceMaterialTitle] = useState(entry?.sourceMaterialTitle ?? "");
   const [sourceMaterialIdentity, setSourceMaterialIdentity] = useState(entry?.sourceMaterialIdentity ?? "");
+  const [sourceMaterialId, setSourceMaterialId] = useState(entry?.sourceMaterialId ?? "");
   const [addedMaterialIdentities, setAddedMaterialIdentities] = useState<string[]>([]);
   const [societyLegal, setSocietyLegal] = useState(entry?.societyLegal == null ? "" : String(entry.societyLegal));
   const [societyStatus, setSocietyStatus] = useState(entry?.societyStatus ?? "");
@@ -38,7 +39,7 @@ export function InventoryForm({ characterId, entry, chronicles, ownedMaterialIde
   const [amountPaidAdjusted, setAmountPaidAdjusted] = useState(Boolean(entry));
   const [lookupError, setLookupError] = useState<string>();
   const [lookupMessage, setLookupMessage] = useState<string>();
-  const [importChoices, setImportChoices] = useState<{ item: NethysItem; notes: string }[]>([]);
+  const [importChoices, setImportChoices] = useState<{ item: NethysItem; notes: string; sourceMaterialId: string | null; sourceMaterialIdentity: string | null }[]>([]);
   const importChoiceName = useId();
   const [lookingUp, startLookup] = useTransition();
   function defaultAmountPaid(value = itemValue, count = quantity, acquisition = acquisitionType) {
@@ -53,9 +54,9 @@ export function InventoryForm({ characterId, entry, chronicles, ownedMaterialIde
       applyImport(result.items[0]!);
     });
   }
-  function applyImport(choice: { item: NethysItem; notes: string }) {
+  function applyImport(choice: { item: NethysItem; notes: string; sourceMaterialId: string | null; sourceMaterialIdentity: string | null }) {
     const { item, notes: importedNotes } = choice;
-    setItemName(item.name); setItemLink(item.url); setNotes(importedNotes); setBulk(item.bulk ?? ""); setSourceMaterialTitle(item.source ?? ""); setSourceMaterialIdentity(item.source ? normalizeMaterialIdentity(materialTitleWithoutCitation(item.source)) : ""); setSocietyLegal(item.societyLegal == null ? "" : String(item.societyLegal)); setSocietyStatus(item.societyStatus ?? ""); setRarity(item.rarity ?? ""); setImportChoices([]);
+    setItemName(item.name); setItemLink(item.url); setNotes(importedNotes); setBulk(item.bulk ?? ""); setSourceMaterialTitle(item.source ?? ""); setSourceMaterialId(choice.sourceMaterialId ?? ""); setSourceMaterialIdentity(choice.sourceMaterialIdentity ?? (item.source ? normalizeMaterialIdentity(materialTitleWithoutCitation(item.source)) : "")); setSocietyLegal(item.societyLegal == null ? "" : String(item.societyLegal)); setSocietyStatus(item.societyStatus ?? ""); setRarity(item.rarity ?? ""); setImportChoices([]);
     if (item.priceCredits != null) { const price = String(item.priceCredits); const total = String(item.priceCredits * (Number(quantity) || 1)); setItemValue(price); setUnitPrice(price); setTotalPrice(total); if (!amountPaidAdjusted) setAmountPaid(defaultAmountPaid(price)); }
     setLookupMessage(`${item.name} imported. Review and edit the details before saving.`);
   }
@@ -67,6 +68,7 @@ export function InventoryForm({ characterId, entry, chronicles, ownedMaterialIde
   return <form action={formAction} className="mt-8 space-y-5">
     <input type="hidden" name="contentItemId" value={entry?.contentItemId ?? ""} />
     <input type="hidden" name="sourceMaterialIdentity" value={sourceMaterialIdentity} />
+    <input type="hidden" name="sourceMaterialId" value={sourceMaterialId} />
     <input type="hidden" name="societyLegal" value={societyLegal} />
     <input type="hidden" name="societyStatus" value={societyStatus} />
     <input type="hidden" name="rarity" value={rarity} />
