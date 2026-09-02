@@ -30,10 +30,10 @@ export function characterIdentityCompactValues(character: CharacterIdentityData)
 }
 
 /** Class artwork is reserved for compact index summaries; denser variants retain class text. */
-export function CharacterIdentity({ character, variant = "compact", name, supplementary }: { character: CharacterIdentityData; variant?: CharacterIdentityVariant; name?: ReactNode; supplementary?: ReactNode }) {
+export function CharacterIdentity({ character, variant = "compact", name, supplementary, detailFieldsClassName = "" }: { character: CharacterIdentityData; variant?: CharacterIdentityVariant; name?: ReactNode; supplementary?: ReactNode; detailFieldsClassName?: string }) {
   const fields = characterIdentityFields(character);
   const renderedName = name ?? character.name;
-  if (variant === "detail") return <div className="min-w-0"><p className="break-words font-semibold">{renderedName}</p>{fields.length ? <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-sm">{fields.map(({ label, value }) => <div className="contents" key={label}><dt className="text-text-muted">{label}</dt><dd className="min-w-0 break-words">{value}</dd></div>)}</dl> : null}</div>;
+  if (variant === "detail") return <div className="min-w-0"><p className="break-words font-semibold">{renderedName}</p>{fields.length ? <dl className={`mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-sm ${detailFieldsClassName}`}>{fields.map(({ label, value }) => <div className="contents" key={label}><dt className="text-text-muted">{label}</dt><dd className="min-w-0 break-words">{value}</dd></div>)}</dl> : null}</div>;
   const metadata = [...fields.map(({ label, value }) => `${label} ${value}`), ...(supplementary != null ? [supplementary] : [])];
   return <span className={`flex min-w-0 items-center ${variant === "compact" ? "h-full gap-3" : "gap-0"}`}><span className="min-w-0 flex-1"><span className="block break-words font-semibold text-text-primary">{renderedName}</span>{metadata.length ? <span className={`mt-1 block text-sm leading-5 text-text-muted ${variant === "dropdown-option" ? "truncate" : "break-words"}`}>{metadata.map((item, index) => <span key={index}>{index ? " · " : null}{item}</span>)}</span> : null}</span>{variant === "compact" ? <CharacterClassIcon className={character.className} /> : null}</span>;
 }

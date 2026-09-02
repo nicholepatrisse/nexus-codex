@@ -11,7 +11,7 @@ import { invalid, unvalidated, validated } from "@/validation/advisory-validatio
 const character = (fields: Partial<CharacterDetail> = {}): CharacterDetail => ({ id: "char-1", name: "Nova", societyNumber: "123-2001", gameSystemName: "Starfinder 2E", startingLevel: 1, startingLevelLocked: false, startingCredits: 1000, startingItems: [], currentLevel: 1, xp: 0, creditsMinor: 1000, className: null, classValidationNote: null, ancestry: null, ancestryValidationNote: null, ancestrySourceChronicleId: null, ancestrySourceChronicleCharacterId: null, background: null, backgroundValidationNote: null, backgroundSourceChronicleId: null, backgroundSourceChronicleCharacterId: null, backstory: null, notes: null, isOwner: true, upcomingSessions: [], pastSessions: [], ...fields });
 const context: IdentityValidationContext = { ownedMaterialIdentities: ["player-core"], options: [
   { optionType: "ancestry", name: "Human", sourceMaterialIdentity: "player-core", sourceMaterialTitle: "Starfinder Player Core", metadata: {} },
-  { optionType: "background", name: "Outlaw", sourceMaterialIdentity: "restricted-book", sourceMaterialTitle: "Restricted Book", metadata: { societyLegal: false } },
+  { optionType: "background", name: "Outlaw", sourceMaterialIdentity: "restricted-book", sourceMaterialTitle: "Restricted Book", sourceUrl: "https://2e.aonsrd.com/backgrounds/outlaw", metadata: { societyLegal: false } },
 ] };
 const item = (id: string, status: "validated" | "unvalidated" | "invalid"): ValidatedInventoryEntry => ({ id, itemNameSnapshot: `Item ${id}`, sourceMaterialTitle: "Galaxy Guide", validationNote: status === "validated" ? null : "Access from a boon", validation: status === "validated" ? validated() : status === "unvalidated" ? unvalidated("unsupported_access_rule", "Nexus cannot confirm this access.") : invalid("society_restriction", "This item is SFS Restricted."), } as ValidatedInventoryEntry);
 
@@ -42,6 +42,19 @@ describe("character validation summary", () => {
     const summary = deriveCharacterValidationSummary(character({ ancestry: "Uncatalogued", ancestryValidationNote: "Home campaign option", background: "Outlaw" }), context, [item("1", "validated")]);
     expect(summary).toMatchObject({ presentation: "Rules Issue Found", validatedCount: 1, unvalidatedCount: 1, invalidCount: 1 });
     expect(summary.details.map(({ status }) => status)).toEqual(["unvalidated", "invalid"]);
-    expect(summary.details[0]).toMatchObject({ category: "Ancestry", source: null, playerNote: "Home campaign option", href: "/characters/char-1/edit#ancestry" });
+    expect(summary.details[0]).toMatchObject({ category: "Ancestry", source: null, sourceHref: null, playerNote: "Home campaign option", editHref: "/characters/char-1/edit#ancestry" });
+    expect(summary.details[1]).toMatchObject({ source: "Restricted Book", sourceHref: "https://2e.aonsrd.com/backgrounds/outlaw" });
+  });
+
+  it("renders GM validation details and notes without edit controls", () => {
+    const summary = deriveCharacterValidationSummary(character({ ancestry: "Uncatalogued", ancestryValidationNote: "Ask about my boon", background: "Outlaw" }), context, [item("1", "invalid")]);
+    const html = renderToStaticMarkup(createElement(SummaryView, { summary, readOnly: true }));
+    expect(html).toContain("Unvalidated");
+    expect(html).toContain("Invalid");
+    expect(html).toContain("Ask about my boon");
+    expect(html).toContain("read-only");
+    expect(html).toContain('href="https://2e.aonsrd.com/backgrounds/outlaw"');
+    expect(html).not.toContain("Review option");
+    expect(html).not.toContain("/edit");
   });
 });
