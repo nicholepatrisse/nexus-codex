@@ -1,6 +1,7 @@
 import { and, count, desc, eq, inArray, isNull, max, ne, sql } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import {
+  characters,
   communities,
   communityAuditEvents,
   communityMembershipRequests,
@@ -8,6 +9,7 @@ import {
   communityRoleGrants,
   contentItems,
   notificationReads,
+  people,
   sessionSignups,
   sessions,
 } from "@/db/schema";
@@ -20,7 +22,7 @@ const applicantMessages: Record<string, string> = {
 
 /** Produces only notifications the person is currently authorized to know about. */
 export async function listNotificationsForPerson(personId: string, database = getDb()) {
-  const [ownerRows, applicantRows, sessionRows] = await Promise.all([
+  const [ownerRows, applicantRows, sessionRows, signupRows] = await Promise.all([
     database.select({
       communityId: communities.id,
       communityName: communities.name,
@@ -70,6 +72,35 @@ export async function listNotificationsForPerson(personId: string, database = ge
       ))
       .orderBy(desc(communityAuditEvents.occurredAt))
       .limit(50),
+    database.select({
+      eventId: communityAuditEvents.id,
+      occurredAt: communityAuditEvents.occurredAt,
+      communityName: communities.name,
+      communitySlug: communities.slug,
+      sessionId: sessions.id,
+      scenarioCode: contentItems.code,
+      scenarioTitle: contentItems.title,
+      playerName: people.displayName,
+      characterName: characters.name,
+      pregenName: sql<string | null>`${communityAuditEvents.details}->>'pregenName'`,
+    }).from(communityAuditEvents)
+      .innerJoin(communities, and(
+        eq(communities.id, communityAuditEvents.communityId),
+        eq(communities.lifecycleStatus, "active"),
+      ))
+      .innerJoin(sessions, and(
+        eq(sessions.communityId, communities.id),
+        eq(sessions.id, sql<string>`${communityAuditEvents.details}->>'sessionId'`),
+      ))
+      .innerJoin(contentItems, eq(contentItems.id, sessions.contentItemId))
+      .innerJoin(people, eq(people.id, communityAuditEvents.actorPersonId))
+      .leftJoin(characters, eq(characters.id, sql<string>`${communityAuditEvents.details}->>'characterId'`))
+      .where(and(
+        inArray(communityAuditEvents.eventType, ["session.signup.confirmed", "session.signup.waitlisted"]),
+        eq(sql<string>`${communityAuditEvents.details}->>'gmPersonId'`, personId),
+      ))
+      .orderBy(desc(communityAuditEvents.occurredAt))
+      .limit(50),
   ]);
 
   const ownerNotifications: AppNotification[] = ownerRows.map((row) => ({
@@ -95,7 +126,20 @@ export async function listNotificationsForPerson(personId: string, database = ge
       actionable: false, isRead: false,
     };
   });
-  const notifications = [...ownerNotifications, ...applicantNotifications, ...sessionNotifications];
+  const signupNotifications: AppNotification[] = signupRows.map((row) => {
+    const characterName = row.pregenName ? `${row.pregenName} (pregen)` : row.characterName ?? "an unspecified character";
+    return {
+      id: `gm-session-signup:${row.eventId}`,
+      kind: "gm.session.signup",
+      title: `${row.scenarioCode} — ${row.scenarioTitle}`,
+      message: `${row.playerName} signed up with ${characterName}.`,
+      href: `/communities/${encodeURIComponent(row.communitySlug)}/sessions/${row.sessionId}`,
+      occurredAt: row.occurredAt,
+      actionable: false,
+      isRead: false,
+    };
+  });
+  const notifications = [...ownerNotifications, ...applicantNotifications, ...sessionNotifications, ...signupNotifications];
   const readRows = notifications.length === 0 ? [] : await database
     .select({ notificationId: notificationReads.notificationId, clearedAt: notificationReads.clearedAt })
     .from(notificationReads)

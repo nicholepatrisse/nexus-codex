@@ -160,6 +160,23 @@ describeWithDatabase("session signups", () => {
     expect(rows).toHaveLength(1);
   });
 
+  it("notifies only the assigned GM once for each successful signup", async () => {
+    const gmSignupNotifications = (await listNotificationsForPerson(gm.personId))
+      .filter(({ kind }) => kind === "gm.session.signup");
+    expect(gmSignupNotifications).toHaveLength(7);
+    expect(gmSignupNotifications).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        title: "1-01 — Signup scenario",
+        message: expect.stringMatching(/^.+ signed up with Signup character \d+\.$/),
+        href: `/communities/${community.slug}/sessions/${publishedSessionId}`,
+        isRead: false,
+      }),
+    ]));
+    await expect(listNotificationsForPerson(owner.personId)).resolves.not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ kind: "gm.session.signup" })]),
+    );
+  });
+
   it("lets the assigned GM select a missing character only from that player's eligible characters", async () => {
     const [signup] = await getDb().select().from(sessionSignups).where(and(eq(sessionSignups.sessionId, publishedSessionId), eq(sessionSignups.status, "confirmed"))).limit(1);
     const player = actors.find(({ personId }) => personId === signup?.personId)!;
