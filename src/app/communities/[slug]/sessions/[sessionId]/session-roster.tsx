@@ -1,6 +1,7 @@
 import { PlayerSummaryCard } from "@/app/player-summary-card";
+import type { CharacterValidationSummary } from "@/character/character-validation-summary";
 
-export type SessionRosterEntry = { id: string; personName: string; discordHandle?: string | null; characterId?: string | null; characterName?: string | null; characterSocietyNumber?: string | null; characterLevel?: number | null; characterClassName?: string | null; characterAncestry?: string | null; characterBackground?: string | null; pregen?: boolean; creditRecipientName?: string | null; status: "confirmed" | "waitlisted"; waitlistPosition?: number };
+export type SessionRosterEntry = { id: string; personName: string; discordHandle?: string | null; characterId?: string | null; characterName?: string | null; characterSocietyNumber?: string | null; characterLevel?: number | null; characterClassName?: string | null; characterAncestry?: string | null; characterBackground?: string | null; validationSummary?: CharacterValidationSummary | null; pregen?: boolean; creditRecipientName?: string | null; status: "confirmed" | "waitlisted"; waitlistPosition?: number };
 
 export function canViewPrivateRosterDetails(isManager: boolean) {
   return isManager;

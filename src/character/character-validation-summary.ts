@@ -4,7 +4,7 @@ import type { ValidatedInventoryEntry } from "@/character/inventory";
 import type { ValidationIssue, ValidationStatus } from "@/validation/advisory-validation";
 
 export type CharacterValidationPresentation = "Validated" | "Needs Review" | "Rules Issue Found";
-export type CharacterValidationDetail = Readonly<{ key: string; category: "Class" | "Ancestry" | "Background" | "Inventory"; selection: string; source: string | null; playerNote: string | null; href: string; status: Exclude<ValidationStatus, "validated">; issues: readonly ValidationIssue[] }>;
+export type CharacterValidationDetail = Readonly<{ key: string; category: "Class" | "Ancestry" | "Background" | "Inventory"; selection: string; source: string | null; sourceHref: string | null; playerNote: string | null; editHref: string; status: Exclude<ValidationStatus, "validated">; issues: readonly ValidationIssue[] }>;
 export type CharacterValidationSummary = Readonly<{ validatedCount: number; unvalidatedCount: number; invalidCount: number; presentation: CharacterValidationPresentation; details: readonly CharacterValidationDetail[] }>;
 
 const identityFields: ReadonlyArray<{ type: IdentitySelectionType; category: "Class" | "Ancestry" | "Background"; value: keyof Pick<CharacterDetail, "className" | "ancestry" | "background">; note: keyof Pick<CharacterDetail, "classValidationNote" | "ancestryValidationNote" | "backgroundValidationNote">; chronicle: keyof Pick<CharacterDetail, "ancestrySourceChronicleId" | "backgroundSourceChronicleId"> | null; anchor: string }> = [
@@ -21,9 +21,9 @@ export function deriveCharacterValidationSummary(character: CharacterDetail, con
     const validation = validateIdentitySelection(field.type, value, context, field.chronicle ? Boolean(character[field.chronicle]) : false);
     if (!validation) continue;
     const option = context.options.find((candidate) => candidate.optionType === field.type && candidate.name.localeCompare(value, undefined, { sensitivity: "accent" }) === 0);
-    selections.push({ status: validation.status, detail: validation.status === "validated" ? undefined : { key: `identity-${field.type}`, category: field.category, selection: value, source: option?.sourceMaterialTitle ?? null, playerNote: character[field.note], href: `/characters/${character.id}/edit#${field.anchor}`, status: validation.status, issues: validation.issues } });
+    selections.push({ status: validation.status, detail: validation.status === "validated" ? undefined : { key: `identity-${field.type}`, category: field.category, selection: value, source: option?.sourceMaterialTitle ?? null, sourceHref: option?.sourceUrl ?? null, playerNote: character[field.note], editHref: `/characters/${character.id}/edit#${field.anchor}`, status: validation.status, issues: validation.issues } });
   }
-  for (const entry of inventory) selections.push({ status: entry.validation.status, detail: entry.validation.status === "validated" ? undefined : { key: `inventory-${entry.id}`, category: "Inventory", selection: entry.itemNameSnapshot, source: entry.sourceMaterialTitle, playerNote: entry.validationNote, href: `/characters/${character.id}/inventory/${entry.id}/edit`, status: entry.validation.status, issues: entry.validation.issues } });
+  for (const entry of inventory) selections.push({ status: entry.validation.status, detail: entry.validation.status === "validated" ? undefined : { key: `inventory-${entry.id}`, category: "Inventory", selection: entry.itemNameSnapshot, source: entry.sourceMaterialTitle, sourceHref: entry.itemLinkSnapshot, playerNote: entry.validationNote, editHref: `/characters/${character.id}/inventory/${entry.id}/edit`, status: entry.validation.status, issues: entry.validation.issues } });
   const validatedCount = selections.filter(({ status }) => status === "validated").length;
   const unvalidatedCount = selections.filter(({ status }) => status === "unvalidated").length;
   const invalidCount = selections.filter(({ status }) => status === "invalid").length;

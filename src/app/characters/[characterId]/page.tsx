@@ -17,8 +17,7 @@ import { GameCard } from "@/app/game-card";
 import { ChronicleSummaryCard } from "@/app/chronicle-summary-card";
 import { applyChronicleAction } from "./chronicles/actions";
 import { ChronicleLifecycleButton } from "./chronicles/lifecycle-button";
-import { getIdentityValidationContext } from "@/character/identity-validation-context";
-import { deriveCharacterValidationSummary } from "@/character/character-validation-summary";
+import { getCharacterValidationReview } from "@/character/character-validation-review";
 import { CharacterValidationSummary } from "./character-validation-summary";
 
 function SessionList({ sessions, empty }: { sessions: CharacterSession[]; empty: string }) {
@@ -72,8 +71,7 @@ export default async function CharacterPage({ params, searchParams }: { params: 
   const chronicleEditHref = (chronicle: ChronicleWithGmCredit) => chronicle.provenance === "manual" && character.isOwner ? `/characters/${character.id}/chronicles/${chronicle.id}/edit` : (() => { const target = nexusEditTargets.get(chronicle.id); return target ? `/communities/${encodeURIComponent(target.communitySlug)}/sessions/${encodeURIComponent(target.sessionId)}` : null; })();
   const ledger = character.isOwner ? await getOwnedCreditLedger(actor, characterId) : null;
   const inventory = character.isOwner ? await listOwnedInventory(actor, characterId) : null;
-  const validationContext = character.isOwner ? await getIdentityValidationContext(actor) : null;
-  const validationSummary = inventory && validationContext ? deriveCharacterValidationSummary(character, validationContext, inventory) : null;
+  const validationReview = await getCharacterValidationReview(actor, characterId);
   const appliedChronicles = chronicles.filter(({ status }) => status === "applied").sort(chronicleNumberOrder);
   const unappliedChronicles = chronicles.filter(({ status }) => status === "pending");
   const hasSessions = character.upcomingSessions.length > 0 || character.pastSessions.length > 0;
@@ -83,7 +81,7 @@ export default async function CharacterPage({ params, searchParams }: { params: 
       <h1 className="responsive-title mt-2 break-words font-semibold sm:mt-3">{character.name}</h1>
       {character.isOwner ? <Link href={`/characters/${character.id}/edit`} className="mt-3 inline-block text-sm font-semibold text-brand hover:underline sm:mt-4">Edit character</Link> : null}</div>
       <div className="shrink-0"><CharacterClassIcon className={character.className} /></div></div>
-      {validationSummary ? <CharacterValidationSummary summary={validationSummary} /> : null}
+      {validationReview ? <CharacterValidationSummary summary={validationReview.summary} readOnly={!validationReview.isOwner} /> : null}
       <nav aria-label="Character sections">
         <TabRow className="-mx-1 mt-5 px-1 sm:-mx-2 sm:mt-8 sm:px-2">
           {(character.isOwner ? ownerTabs : ownerTabs.filter((item) => item !== "inventory")).map((item) => <Link key={item} href={item === "overview" ? `/characters/${character.id}` : `/characters/${character.id}?tab=${item}`} aria-current={tab === item ? "page" : undefined} className={tabClassName(tab === item, "capitalize")}>{item}</Link>)}

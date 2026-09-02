@@ -8,11 +8,11 @@ import type { IdentityValidationContext } from "@/character/identity-validation"
 
 export async function getIdentityValidationContext(actor: AuthenticatedActor, database = getDb()): Promise<IdentityValidationContext> {
   const [options, ownedMaterialIdentities] = await Promise.all([
-    database.select({ optionType: characterOptions.optionType, name: characterOptions.name, sourceMaterialIdentity: characterOptions.sourceMaterialIdentity, sourceMaterialTitle: characterOptions.sourceMaterialTitle, metadata: characterOptions.metadata }).from(characterOptions).where(eq(characterOptions.gameSystemId, SUPPORTED_GAME_SYSTEM.id)),
+    database.select({ optionType: characterOptions.optionType, name: characterOptions.name, sourceMaterialIdentity: characterOptions.sourceMaterialIdentity, sourceMaterialTitle: characterOptions.sourceMaterialTitle, sourceUrl: characterOptions.sourceUrl, metadata: characterOptions.metadata }).from(characterOptions).where(eq(characterOptions.gameSystemId, SUPPORTED_GAME_SYSTEM.id)),
     listOwnedMaterialIdentities(actor, database),
   ]);
   return {
-    options: options.filter((option): option is IdentityValidationContext["options"][number] => option.optionType === "class" || option.optionType === "ancestry" || option.optionType === "background"),
+    options: options.filter((option) => option.optionType === "class" || option.optionType === "ancestry" || option.optionType === "background").map((option) => ({ ...option, optionType: option.optionType as IdentityValidationContext["options"][number]["optionType"] })),
     ownedMaterialIdentities,
   };
 }
