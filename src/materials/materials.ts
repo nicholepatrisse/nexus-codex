@@ -1,15 +1,19 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { load } from "cheerio";
 import type { AuthenticatedActor } from "@/auth/actor";
 import { getDb } from "@/db/client";
-import { playerMaterials } from "@/db/schema";
+import { playerMaterials, sourceMaterials } from "@/db/schema";
 import { materialTitleWithoutCitation, normalizeMaterialIdentity } from "@/materials/material-identity";
 export { isFreeAccessMaterial, materialTitleWithoutCitation, normalizeMaterialIdentity } from "@/materials/material-identity";
 
 type Database = ReturnType<typeof getDb>;
-export const PLAYER_CORE = { id: "default-player-core", identity: "starfinder-player-core", isbn: null, productCode: "PZO22001", title: "Starfinder Player Core", sourceUrl: "https://store.paizo.com/starfinder-2e-player-core/", aliases: ["Player Core", "SF2 Player Core", "PZO22001"], isDefault: true } as const;
+export const PLAYER_CORE = { id: "default-player-core", identity: "pzo22001", isbn: null, productCode: "PZO22001", title: "Starfinder Player Core", sourceUrl: "https://store.paizo.com/starfinder-2e-player-core/", aliases: ["Player Core", "SF2 Player Core", "Starfinder Player Core", "PZO22001"], isDefault: true } as const;
 export class MaterialLookupError extends Error {}
+
+function catalogMaterialIdentity(material: { isbn: string | null; productCode: string | null; title: string }) {
+  return material.productCode?.toLowerCase() ?? (material.isbn ? `isbn-${material.isbn}` : normalizeMaterialIdentity(material.title));
+}
 
 function isPaizoProductUrl(url: URL) {
   const hostname = url.hostname.toLowerCase();
@@ -46,7 +50,7 @@ export function parsePaizoMaterialHtml(html: string, sourceUrl: string) {
   const productCode = text.match(/\bPZO\d{5,}\b/i)?.[0]?.toUpperCase() ?? null;
   const isbn = text.match(/\bISBN(?:-13)?\s*:\s*((?:97[89][\s-]*)?\d(?:[\s-]*\d){9,12})\b/i)?.[1]?.replace(/[^0-9]/g, "") ?? null;
   const validIsbn = isbn?.length === 13 ? isbn : null;
-  const identity = validIsbn ? `isbn-${validIsbn}` : productCode?.toLowerCase() ?? normalizeMaterialIdentity(title);
+  const identity = productCode?.toLowerCase() ?? (validIsbn ? `isbn-${validIsbn}` : normalizeMaterialIdentity(title));
   const shortTitle = title.replace(/^Starfinder(?:\s+2e)?\s+(?:Adventure(?:\s+Path)?\s*:\s*)?/i, "");
   return { identity, isbn: validIsbn, productCode, title, sourceUrl: url.href, aliases: [...new Set([title.replace(/^Starfinder\s+/i, ""), shortTitle, productCode, validIsbn].filter((value): value is string => Boolean(value)))] };
 }
@@ -68,9 +72,33 @@ export async function fetchPaizoMaterial(value: string, fetcher: typeof fetch = 
   return parsePaizoMaterialHtml(await response.text(), response.url || url.href);
 }
 
+export async function catalogSourceMaterial(nethysSourceUrl: string, database: Database = getDb(), fetcher: typeof fetch = fetch) {
+  const [known] = await database.select().from(sourceMaterials).where(eq(sourceMaterials.nethysSourceUrl, nethysSourceUrl)).limit(1);
+  if (known) return known;
+  const material = await fetchPaizoMaterial(nethysSourceUrl, fetcher);
+  if (!material.isbn && !material.productCode) return null;
+  const conflict = material.isbn
+    ? { target: sourceMaterials.isbn, targetWhere: sql`${sourceMaterials.isbn} is not null` }
+    : { target: sourceMaterials.productCode, targetWhere: sql`${sourceMaterials.productCode} is not null` };
+  const [row] = await database.insert(sourceMaterials).values({ id: randomUUID(), isbn: material.isbn, title: material.title, productCode: material.productCode, nethysSourceUrl, paizoProductUrl: material.sourceUrl, aliases: material.aliases }).onConflictDoUpdate({ ...conflict, set: { title: material.title, productCode: material.productCode, nethysSourceUrl, paizoProductUrl: material.sourceUrl, aliases: material.aliases, updatedAt: new Date() } }).returning();
+  return row ?? null;
+}
+
 export async function listOwnedMaterials(actor: AuthenticatedActor, database: Database = getDb()) {
   const rows = await database.select().from(playerMaterials).where(eq(playerMaterials.personId, actor.personId)).orderBy(asc(playerMaterials.title));
   return [PLAYER_CORE, ...rows.map((row) => ({ ...row, isDefault: false as const }))];
+}
+
+export async function listCatalogMaterials(database: Database = getDb()) {
+  return database.select().from(sourceMaterials).orderBy(asc(sourceMaterials.title));
+}
+
+export async function addCatalogOwnedMaterial(actor: AuthenticatedActor, sourceMaterialId: string, database: Database = getDb()) {
+  const [source] = await database.select().from(sourceMaterials).where(eq(sourceMaterials.id, sourceMaterialId)).limit(1);
+  if (!source) return null;
+  const material = { identity: catalogMaterialIdentity(source), isbn: source.isbn, productCode: source.productCode, title: source.title, sourceUrl: source.paizoProductUrl, aliases: source.aliases };
+  const [row] = await database.insert(playerMaterials).values({ id: randomUUID(), personId: actor.personId, ...material }).onConflictDoUpdate({ target: [playerMaterials.personId, playerMaterials.identity], set: { isbn: material.isbn, productCode: material.productCode, title: material.title, sourceUrl: material.sourceUrl, aliases: material.aliases, updatedAt: new Date() } }).returning();
+  return row ?? null;
 }
 
 export function materialValidationIdentities(material: { identity: string; title: string; aliases: readonly string[]; isbn?: string | null }) {
@@ -90,6 +118,10 @@ export async function listOwnedMaterialIdentities(actor: AuthenticatedActor, dat
 export async function addOwnedMaterial(actor: AuthenticatedActor, url: string, database: Database = getDb(), fetcher: typeof fetch = fetch) {
   const material = await fetchPaizoMaterial(url, fetcher);
   if (material.identity === PLAYER_CORE.identity || material.productCode === PLAYER_CORE.productCode) return PLAYER_CORE;
+  if (material.isbn || material.productCode) {
+    const conflict = material.isbn ? { target: sourceMaterials.isbn, targetWhere: sql`${sourceMaterials.isbn} is not null` } : { target: sourceMaterials.productCode, targetWhere: sql`${sourceMaterials.productCode} is not null` };
+    await database.insert(sourceMaterials).values({ id: randomUUID(), isbn: material.isbn, title: material.title, productCode: material.productCode, paizoProductUrl: material.sourceUrl, aliases: material.aliases }).onConflictDoUpdate({ ...conflict, set: { title: material.title, productCode: material.productCode, paizoProductUrl: material.sourceUrl, aliases: material.aliases, updatedAt: new Date() } });
+  }
   const [row] = await database.insert(playerMaterials).values({ id: randomUUID(), personId: actor.personId, ...material }).onConflictDoUpdate({ target: [playerMaterials.personId, playerMaterials.identity], set: { isbn: material.isbn, productCode: material.productCode, title: material.title, sourceUrl: material.sourceUrl, aliases: material.aliases, updatedAt: new Date() } }).returning();
   return row;
 }
@@ -105,10 +137,12 @@ export async function addReferencedOwnedMaterial(actor: AuthenticatedActor, url:
 }
 
 export async function addKnownOwnedMaterial(actor: AuthenticatedActor, expectedIdentity: string, expectedTitle: string, database: Database = getDb()) {
-  const materials = await database.select().from(playerMaterials);
-  const material = materials.find((candidate) => materialMatchesReference(candidate, expectedIdentity, expectedTitle));
+  const catalog = await database.select().from(sourceMaterials);
+  const source = catalog.find((candidate) => materialMatchesReference({ identity: catalogMaterialIdentity(candidate), isbn: candidate.isbn, title: candidate.title, aliases: candidate.aliases }, expectedIdentity, expectedTitle));
+  const legacy = source ? null : (await database.select().from(playerMaterials).then((materials) => materials.find((candidate) => materialMatchesReference(candidate, expectedIdentity, expectedTitle))));
+  const material = source ? { identity: catalogMaterialIdentity(source), isbn: source.isbn, productCode: source.productCode, title: source.title, sourceUrl: source.paizoProductUrl, aliases: source.aliases } : legacy;
   if (!material) return null;
-  const duplicate = material.personId === actor.personId;
+  const duplicate = (await database.select({ id: playerMaterials.id }).from(playerMaterials).where(and(eq(playerMaterials.personId, actor.personId), eq(playerMaterials.identity, material.identity))).limit(1)).length > 0;
   if (!duplicate) await database.insert(playerMaterials).values({ id: randomUUID(), personId: actor.personId, identity: material.identity, isbn: material.isbn, productCode: material.productCode, title: material.title, sourceUrl: material.sourceUrl, aliases: material.aliases }).onConflictDoUpdate({ target: [playerMaterials.personId, playerMaterials.identity], set: { isbn: material.isbn, productCode: material.productCode, title: material.title, sourceUrl: material.sourceUrl, aliases: material.aliases, updatedAt: new Date() } });
   return { identities: materialValidationIdentities(material), duplicate };
 }

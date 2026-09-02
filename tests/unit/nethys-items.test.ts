@@ -13,6 +13,11 @@ describe("Archives of Nethys item import", () => {
     expect(nethysItemNotes(item)).not.toContain("Bulk:");
   });
 
+  it("extracts the canonical AoN source link when present", () => {
+    const html = `<div class="treasure"><h1 class="title">Tool <span class="feature-level">Item 1</span></h1><div class="sources"><strong>Source</strong> <a href="/sources/2-player-core">Player Core pg. 10</a></div></div>`;
+    expect(parseNethysItemHtml(html, "https://2e.aonsrd.com/treasure/1-tool")).toMatchObject({ source: "Player Core pg. 10", sourceUrl: "https://2e.aonsrd.com/sources/2-player-core" });
+  });
+
   it("returns nested item variants as separate import choices", () => {
     expect(parseNethysItemsHtml(sunshades, "https://2e.aonsrd.com/treasure/33-sunshades")).toEqual([
       expect.objectContaining({ name: "Sunshades (Commercial)", level: 0, priceCredits: 2, bulk: "—" }),

@@ -213,6 +213,26 @@ export const playerMaterials = pgTable(
   ],
 );
 
+/** Canonical Paizo source products discovered while importing rules content. */
+export const sourceMaterials = pgTable("source_materials", {
+  id: text("id").primaryKey(),
+  isbn: text("isbn"),
+  title: text("title").notNull(),
+  productCode: text("product_code"),
+  nethysSourceUrl: text("nethys_source_url"),
+  paizoProductUrl: text("paizo_product_url").notNull(),
+  aliases: jsonb("aliases").$type<string[]>().notNull().default([]),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("source_materials_isbn_unique").on(table.isbn).where(sql`${table.isbn} is not null`),
+  uniqueIndex("source_materials_product_code_unique").on(table.productCode).where(sql`${table.productCode} is not null`),
+  uniqueIndex("source_materials_nethys_url_unique").on(table.nethysSourceUrl).where(sql`${table.nethysSourceUrl} is not null`),
+  check("source_materials_identity_check", sql`${table.isbn} is not null or ${table.productCode} is not null`),
+  check("source_materials_isbn_format", sql`${table.isbn} is null or ${table.isbn} ~ '^[0-9]{13}$'`),
+  check("source_materials_title_not_blank", sql`length(btrim(${table.title})) > 0`),
+]);
+
 /** Reusable, globally deduplicated character options imported from Archives of Nethys. */
 export const characterOptions = pgTable(
   "character_options",
@@ -854,6 +874,7 @@ export const characterInventoryEntries = pgTable(
     bulkSnapshot: text("bulk_snapshot"),
     sourceMaterialIdentity: text("source_material_identity"),
     sourceMaterialTitle: text("source_material_title"),
+    sourceMaterialId: text("source_material_id").references(() => sourceMaterials.id, { onDelete: "set null" }),
     societyLegal: boolean("society_legal"),
     societyStatus: text("society_status"),
     rarity: text("rarity"),
@@ -875,6 +896,7 @@ export const characterInventoryEntries = pgTable(
     index("character_inventory_character_acquired_idx").on(table.characterId, table.acquiredOn, table.createdAt),
     index("character_inventory_content_item_idx").on(table.contentItemId),
     index("character_inventory_source_chronicle_idx").on(table.sourceChronicleId),
+    index("character_inventory_source_material_idx").on(table.sourceMaterialId),
     uniqueIndex("character_inventory_source_purchase_unique").on(table.sourcePurchaseId).where(sql`${table.sourcePurchaseId} is not null`),
     uniqueIndex("character_inventory_character_lot_unique").on(table.characterId, table.lotKey),
     check("character_inventory_name_check", sql`length(btrim(${table.itemNameSnapshot})) between 1 and 200`),

@@ -5,7 +5,7 @@ describe("purchase validation", () => {
   const valid = { itemName: "Laser pistol", quantity: 2, acquiredOn: "2026-08-26", unitPriceMinor: 25, totalPriceMinor: 50, idempotencyKey: "submission-1" };
 
   it("accepts exact whole-credit pricing and normalizes snapshots", () => {
-    expect(purchaseInputSchema.parse({ ...valid, itemName: " Laser pistol ", itemLink: "https://example.com/item", bulk: "1" })).toEqual({ ...valid, itemLink: "https://example.com/item", bulk: "1", contentItemId: null, sourceMaterialTitle: null, sourceMaterialIdentity: null, societyLegal: null, societyStatus: null, rarity: null, validationNote: null, sourceChronicleId: null, notes: null });
+    expect(purchaseInputSchema.parse({ ...valid, itemName: " Laser pistol ", itemLink: "https://example.com/item", bulk: "1" })).toEqual({ ...valid, itemLink: "https://example.com/item", bulk: "1", contentItemId: null, sourceMaterialId: null, sourceMaterialTitle: null, sourceMaterialIdentity: null, societyLegal: null, societyStatus: null, rarity: null, validationNote: null, sourceChronicleId: null, notes: null });
   });
 
   it.each([
