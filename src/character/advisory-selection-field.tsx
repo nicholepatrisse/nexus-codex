@@ -10,8 +10,8 @@ const presentation = {
   invalid: { className: "border-danger/40 bg-danger/10 text-danger" },
 } as const;
 
-export function AdvisorySelectionField({ type, value, context, note, onNoteChange, onMaterialAdded, children }: { type: IdentitySelectionType; value: string; context: IdentityValidationContext; note: string; onNoteChange: (value: string) => void; onMaterialAdded?: (identities: string[]) => void; children?: ReactNode }) {
-  const result = validateIdentitySelection(type, value, context);
+export function AdvisorySelectionField({ type, value, context, note, onNoteChange, onMaterialAdded, hasChronicleAccess = false, children }: { type: IdentitySelectionType; value: string; context: IdentityValidationContext; note: string; onNoteChange: (value: string) => void; onMaterialAdded?: (identities: string[]) => void; hasChronicleAccess?: boolean; children?: ReactNode }) {
+  const result = validateIdentitySelection(type, value, context, hasChronicleAccess);
   const option = context.options.find((candidate) => candidate.optionType === type && candidate.name.localeCompare(value.trim(), undefined, { sensitivity: "accent" }) === 0);
   const missingMaterial = result?.issues.find((issue) => issue.type === "missing_material_ownership" && issue.resolvable);
   const canAddMaterial = Boolean(missingMaterial && option?.sourceMaterialIdentity && option.sourceMaterialTitle && onMaterialAdded);

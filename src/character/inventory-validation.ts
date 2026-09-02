@@ -10,17 +10,19 @@ export type InventoryValidationEntry = {
   societyLegal: boolean | null;
   societyStatus: string | null;
   rarity: string | null;
+  sourceChronicleId?: string | null;
 };
 
 export function validateInventoryEntry(entry: InventoryValidationEntry, ownedMaterialIdentities: readonly string[]): ValidationResult {
   if (entry.societyStatus === "restricted" || entry.societyLegal === false) return validationReasons.societyRestriction(`${entry.itemNameSnapshot} is SFS Restricted.`);
+  if (entry.sourceChronicleId) return validationReasons.unsupportedAccessRule(`A Source Chronicle is linked for ${entry.itemNameSnapshot}, but Nexus cannot yet verify that it grants this item. GM review is required.`);
   if (!entry.sourceMaterialTitle) {
     return entry.itemLinkSnapshot
       ? validationReasons.incompleteSourceData(`The source information for ${entry.itemNameSnapshot} is incomplete.`)
       : validationReasons.missingSourceData(`No rules source is recorded for ${entry.itemNameSnapshot}.`);
   }
   if (/\bStarfinder Society Scenario\b/i.test(entry.sourceMaterialTitle)) {
-    return validationReasons.unsupportedAccessRule(`If ${entry.itemNameSnapshot} was granted by a Chronicle sheet, link that Chronicle to this inventory lot. Nexus cannot yet verify Chronicle-granted access.`);
+    return validationReasons.unsupportedAccessRule(`Link the Chronicle that grants access to ${entry.itemNameSnapshot} to validate this inventory lot.`);
   }
   if (entry.societyStatus === "limited") return validationReasons.unsupportedAccessRule(`${entry.itemNameSnapshot} is SFS Limited and requires specific boon, Chronicle, or other access that Nexus cannot verify.`);
   if (entry.rarity && entry.rarity.toLowerCase() !== "common") {

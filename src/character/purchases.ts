@@ -3,7 +3,7 @@ import { and, asc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { AuthenticatedActor } from "@/auth/actor";
 import { getDb } from "@/db/client";
-import { characterCreditLedgerEntries, characterInventoryEntries, characterPurchases, characters, contentItems } from "@/db/schema";
+import { characterCreditLedgerEntries, characterInventoryEntries, characterPurchases, characters, chronicles, contentItems } from "@/db/schema";
 
 type Database = ReturnType<typeof getDb>;
 const optionalText = (maximum: number) => z.string().trim().max(maximum).nullable().optional().transform((value) => value || null);
@@ -20,6 +20,7 @@ export const purchaseInputSchema = z.object({
   societyStatus: z.enum(["standard", "limited", "restricted"]).or(z.literal("")).nullable().optional().transform((value) => value || null),
   rarity: optionalText(30),
   validationNote: optionalText(1000),
+  sourceChronicleId: optionalText(100),
   notes: optionalText(5000),
   quantity: z.coerce.number().int("Quantity must be a whole number.").positive().max(2_000_000_000),
   acquiredOn: z.string().date("Enter a valid acquisition date."),
@@ -61,6 +62,11 @@ export async function purchaseItem(actor: AuthenticatedActor, characterId: strin
       .where(and(eq(characterPurchases.characterId, characterId), eq(characterPurchases.idempotencyKey, input.idempotencyKey))).limit(1);
     if (existing) return purchaseResult(existing.id, transaction as Database);
 
+    if (input.sourceChronicleId) {
+      const [source] = await transaction.select({ id: chronicles.id }).from(chronicles).where(and(eq(chronicles.id, input.sourceChronicleId), eq(chronicles.characterId, characterId))).limit(1);
+      if (!source) throw new Error("The source Chronicle must belong to this character.");
+    }
+
     let snapshot = { contentItemId: null as string | null, itemNameSnapshot: input.itemName, itemLinkSnapshot: input.itemLink, bulkSnapshot: input.bulk };
     if (input.contentItemId) {
       const [catalog] = await transaction.select({ id: contentItems.id, title: contentItems.title }).from(contentItems).where(eq(contentItems.id, input.contentItemId)).limit(1);
@@ -74,7 +80,7 @@ export async function purchaseItem(actor: AuthenticatedActor, characterId: strin
 
     const purchaseId = randomUUID();
     const [purchase] = await transaction.insert(characterPurchases).values({ id: purchaseId, characterId, ...snapshot, quantity: input.quantity, acquiredOn: input.acquiredOn, unitPriceMinor: input.unitPriceMinor, totalPriceMinor: input.totalPriceMinor, idempotencyKey: input.idempotencyKey }).returning();
-    const [inventory] = await transaction.insert(characterInventoryEntries).values({ id: randomUUID(), characterId, ...snapshot, sourceMaterialIdentity: input.sourceMaterialIdentity, sourceMaterialTitle: input.sourceMaterialTitle, societyLegal: input.societyLegal, societyStatus: input.societyStatus, rarity: input.rarity, quantity: input.quantity, acquisitionType: "purchased", acquiredOn: input.acquiredOn, amountPaidMinor: input.totalPriceMinor, valueMinor: input.unitPriceMinor, sourceChronicleId: null, sourcePurchaseId: purchaseId, notes: input.notes, validationNote: input.validationNote, lotKey: purchaseId }).returning();
+    const [inventory] = await transaction.insert(characterInventoryEntries).values({ id: randomUUID(), characterId, ...snapshot, sourceMaterialIdentity: input.sourceMaterialIdentity, sourceMaterialTitle: input.sourceMaterialTitle, societyLegal: input.societyLegal, societyStatus: input.societyStatus, rarity: input.rarity, quantity: input.quantity, acquisitionType: "purchased", acquiredOn: input.acquiredOn, amountPaidMinor: input.totalPriceMinor, valueMinor: input.unitPriceMinor, sourceChronicleId: input.sourceChronicleId, sourcePurchaseId: purchaseId, notes: input.notes, validationNote: input.validationNote, lotKey: purchaseId }).returning();
     const [ledgerEntry] = await transaction.insert(characterCreditLedgerEntries).values({ id: randomUUID(), characterId, amountMinor: -input.totalPriceMinor, displayScale: 1, type: "purchase", effectiveOn: input.acquiredOn, source: "purchase", sourceChronicleId: null, sourcePurchaseId: purchaseId, notes: `${input.quantity} × ${snapshot.itemNameSnapshot}` }).returning();
     if (!purchase || !inventory || !ledgerEntry) throw new Error("Purchase transaction did not return all created records.");
     return { purchase, inventory, ledgerEntry };

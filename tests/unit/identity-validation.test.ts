@@ -13,6 +13,9 @@ describe("character identity advisory validation", () => {
     expect(validateIdentitySelection("background", "Uncatalogued", { options: [], ownedMaterialIdentities: [] })?.status).toBe("unvalidated");
     const illegal: IdentityValidationContext = { options: [{ ...option, optionType: "background", name: "Outlaw", metadata: { societyLegal: false } }], ownedMaterialIdentities: ["galaxy-guide"] };
     expect(validateIdentitySelection("background", "Outlaw", illegal)?.status).toBe("invalid");
+    expect(validateIdentitySelection("ancestry", "Android", { options: [option], ownedMaterialIdentities: [] }, true)).toMatchObject({ status: "unvalidated", issues: [{ message: expect.stringContaining("GM review is required") }] });
+    expect(validateIdentitySelection("background", "Outlaw", illegal, true)?.status).toBe("invalid");
+    expect(validateIdentitySelection("background", "Scholar", { options: [{ ...option, optionType: "background", name: "Scholar" }], ownedMaterialIdentities: [] }, true)?.status).toBe("unvalidated");
   });
 
   it("never produces a write-gating result", () => {

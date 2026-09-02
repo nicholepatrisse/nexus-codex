@@ -1,0 +1,3 @@
+ALTER TABLE "characters" ADD COLUMN "background_source_chronicle_id" text;--> statement-breakpoint
+ALTER TABLE "characters" ADD CONSTRAINT "characters_background_source_chronicle_id_chronicles_id_fk" FOREIGN KEY ("background_source_chronicle_id") REFERENCES "public"."chronicles"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "characters_background_source_chronicle_idx" ON "characters" USING btree ("background_source_chronicle_id");

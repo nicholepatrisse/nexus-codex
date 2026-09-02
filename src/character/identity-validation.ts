@@ -7,13 +7,14 @@ export type IdentitySelectionType = "class" | "ancestry" | "background";
 export type IdentityValidationOption = { optionType: IdentitySelectionType; name: string; sourceMaterialIdentity: string | null; sourceMaterialTitle: string | null; metadata: Record<string, unknown> };
 export type IdentityValidationContext = { options: IdentityValidationOption[]; ownedMaterialIdentities: string[] };
 
-export function validateIdentitySelection(type: IdentitySelectionType, value: string, context: IdentityValidationContext): ValidationResult | null {
+export function validateIdentitySelection(type: IdentitySelectionType, value: string, context: IdentityValidationContext, hasChronicleAccess = false): ValidationResult | null {
   const selection = value.trim();
   if (!selection) return null;
   const option = context.options.find((candidate) => candidate.optionType === type && candidate.name.localeCompare(selection, undefined, { sensitivity: "accent" }) === 0);
   if (!option && type === "class" && CHARACTER_CLASSES.some((name) => name === selection)) return validated();
   if (!option) return validationReasons.unknownOption(`${selection} is not in the available ${type} catalog. Keep it selected and add a note if you know its source.`);
   if (option.metadata.societyLegal === false) return validationReasons.societyRestriction(`${selection} is marked as unavailable for Society play.`);
+  if ((type === "ancestry" || type === "background") && hasChronicleAccess) return validationReasons.unsupportedAccessRule(`A Source Chronicle is linked for ${selection}, but Nexus cannot yet verify that it grants this ${type}. GM review is required.`);
   if (!option.sourceMaterialIdentity || !option.sourceMaterialTitle) return validationReasons.incompleteSourceData(`The source information for ${selection} is incomplete.`);
   if (isFreeAccessMaterial(option.sourceMaterialTitle)) return validated();
   const canonicalIdentity = normalizeMaterialIdentity(materialTitleWithoutCitation(option.sourceMaterialTitle));

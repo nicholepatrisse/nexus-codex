@@ -5,6 +5,10 @@ import { withLegacyInventorySource } from "@/character/inventory";
 const item = { itemNameSnapshot: "Laser rifle", itemLinkSnapshot: "https://2e.aonsrd.com/equipment/weapons/laser-rifle", sourceMaterialIdentity: "galaxy-guide", sourceMaterialTitle: "Galaxy Guide", societyLegal: null, societyStatus: null, rarity: "Common" };
 
 describe("inventory advisory validation", () => {
+  it("accepts a linked Chronicle as access evidence unless the item is restricted", () => {
+    expect(validateInventoryEntry({ ...item, sourceChronicleId: "chronicle-1", sourceMaterialTitle: "Starfinder Society Scenario #1-01" }, [])).toMatchObject({ status: "unvalidated", issues: [{ message: expect.stringContaining("GM review is required") }] });
+    expect(validateInventoryEntry({ ...item, sourceChronicleId: "chronicle-1", societyLegal: false }, [])?.status).toBe("invalid");
+  });
   it("validates owned common items and leaves missing ownership unvalidated", () => {
     expect(validateInventoryEntry(item, ["galaxy-guide"]).status).toBe("validated");
     expect(validateInventoryEntry(item, []).status).toBe("unvalidated");
@@ -24,7 +28,7 @@ describe("inventory advisory validation", () => {
 
   it("asks for Chronicle evidence instead of scenario ownership", () => {
     const result = validateInventoryEntry({ ...item, sourceMaterialTitle: "Starfinder Society Scenario #1-12: Take the Bait pg. 14", sourceMaterialIdentity: "starfinder-society-scenario-1-12-take-the-bait" }, []);
-    expect(result).toMatchObject({ status: "unvalidated", issues: [{ message: expect.stringContaining("link that Chronicle") }] });
+    expect(result).toMatchObject({ status: "unvalidated", issues: [{ message: expect.stringContaining("Link the Chronicle") }] });
     expect(result.issues[0]?.message).not.toContain("owned materials");
   });
 

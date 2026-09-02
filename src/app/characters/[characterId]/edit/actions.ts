@@ -2,7 +2,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { AuthenticationRequiredError, requireAuthenticatedActor } from "@/auth/actor";
-import { StartingLevelLockedError, updateCharacter, updateCharacterInputSchema } from "@/character/characters";
+import { InvalidAncestryChronicleError, StartingLevelLockedError, updateCharacter, updateCharacterInputSchema } from "@/character/characters";
 
 export interface EditCharacterFormState { fieldErrors?: Record<string, string[] | undefined>; formError?: string }
 
@@ -11,7 +11,7 @@ export async function updateCharacterAction(characterId: string, _state: EditCha
   const startingItems = formData.get("startingItems");
   let parsedStartingItems: unknown;
   try { parsedStartingItems = typeof startingItems === "string" ? JSON.parse(startingItems) : undefined; } catch { parsedStartingItems = "invalid"; }
-  const parsed = updateCharacterInputSchema.safeParse({ name: formData.get("name"), startingLevel: startingLevel ?? undefined, startingCredits: formData.get("startingCredits") ?? undefined, startingItems: parsedStartingItems, className: formData.get("className"), classValidationNote: formData.get("classValidationNote"), ancestry: formData.get("ancestry"), ancestryValidationNote: formData.get("ancestryValidationNote"), background: formData.get("background"), backgroundValidationNote: formData.get("backgroundValidationNote"), backstory: formData.get("backstory"), notes: formData.get("notes") });
+  const parsed = updateCharacterInputSchema.safeParse({ name: formData.get("name"), startingLevel: startingLevel ?? undefined, startingCredits: formData.get("startingCredits") ?? undefined, startingItems: parsedStartingItems, className: formData.get("className"), classValidationNote: formData.get("classValidationNote"), ancestry: formData.get("ancestry"), ancestryValidationNote: formData.get("ancestryValidationNote"), ancestrySourceChronicleId: formData.get("ancestrySourceChronicleId"), background: formData.get("background"), backgroundValidationNote: formData.get("backgroundValidationNote"), backgroundSourceChronicleId: formData.get("backgroundSourceChronicleId"), backstory: formData.get("backstory"), notes: formData.get("notes") });
   if (!parsed.success) return { fieldErrors: z.flattenError(parsed.error).fieldErrors };
   try {
     const updated = await updateCharacter(await requireAuthenticatedActor(), characterId, parsed.data);
@@ -19,6 +19,7 @@ export async function updateCharacterAction(characterId: string, _state: EditCha
   } catch (error) {
     if (error instanceof AuthenticationRequiredError) return { formError: "Your session expired. Sign in and try again." };
     if (error instanceof StartingLevelLockedError) return { fieldErrors: { startingLevel: [error.message] } };
+    if (error instanceof InvalidAncestryChronicleError) return { fieldErrors: { [error.message.startsWith("The background") ? "backgroundSourceChronicleId" : "ancestrySourceChronicleId"]: [error.message] } };
     return { formError: "We couldn’t update that character. Please try again." };
   }
   redirect(`/characters/${characterId}`);
