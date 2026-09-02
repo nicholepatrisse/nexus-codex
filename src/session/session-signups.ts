@@ -343,7 +343,7 @@ export async function signupForSession(
     await transaction.insert(communityAuditEvents).values({
       id: randomUUID(), communityId: access.community.id, actorPersonId: actor.personId,
       eventType: status === "confirmed" ? "session.signup.confirmed" : "session.signup.waitlisted",
-      details: { sessionId: session.id, signupId, ...values }, occurredAt: now,
+      details: { sessionId: session.id, signupId, gmPersonId: session.gmPersonId, ...values }, occurredAt: now,
     });
     return { status, signupId, replayed: false, ...(waitlistPosition ? { waitlistPosition } : {}) };
   });
