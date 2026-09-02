@@ -4,12 +4,13 @@ import { getAuthenticatedActor } from "@/auth/actor";
 import { getCharacterDetail } from "@/character/characters";
 import { EditCharacterForm } from "./edit-character-form";
 import { getIdentityValidationContext } from "@/character/identity-validation-context";
+import { listOwnedChronicles } from "@/character/chronicles";
 
 export default async function EditCharacterPage({ params }: { params: Promise<{ characterId: string }> }) {
   const { characterId } = await params;
   const actor = await getAuthenticatedActor();
   if (!actor) redirect(`/sign-in?returnTo=${encodeURIComponent(`/characters/${characterId}/edit`)}`);
-  const [character, validationContext] = await Promise.all([getCharacterDetail(actor, characterId), getIdentityValidationContext(actor)]);
+  const [character, validationContext, chronicles] = await Promise.all([getCharacterDetail(actor, characterId), getIdentityValidationContext(actor), listOwnedChronicles(actor)]);
   if (!character || !character.isOwner) notFound();
-  return <main className="page-shell mx-auto min-h-screen max-w-2xl"><Link href={`/characters/${character.id}`} className="text-sm text-brand hover:underline">← Character details</Link><h1 className="responsive-title mt-6 break-words font-semibold sm:mt-8">Edit {character.name}</h1><p className="mt-3 text-text-muted">Update the details players and authorized GMs see.</p><EditCharacterForm character={character} validationContext={validationContext} /></main>;
+  return <main className="page-shell mx-auto min-h-screen max-w-2xl"><Link href={`/characters/${character.id}`} className="text-sm text-brand hover:underline">← Character details</Link><h1 className="responsive-title mt-6 break-words font-semibold sm:mt-8">Edit {character.name}</h1><p className="mt-3 text-text-muted">Update the details players and authorized GMs see.</p><EditCharacterForm character={character} validationContext={validationContext} chronicles={chronicles} /></main>;
 }

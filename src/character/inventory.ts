@@ -92,6 +92,16 @@ export async function updateInventoryEntry(actor: AuthenticatedActor, characterI
   return updated ?? null;
 }
 
+export async function updateInventorySourceChronicle(actor: AuthenticatedActor, characterId: string, entryId: string, sourceChronicleId: string | null, database: Database = getDb()) {
+  if (!await getOwnedInventoryEntry(actor, characterId, entryId, database)) return null;
+  if (sourceChronicleId) {
+    const [source] = await database.select({ id: chronicles.id }).from(chronicles).where(and(eq(chronicles.id, sourceChronicleId), eq(chronicles.characterId, characterId))).limit(1);
+    if (!source) throw new Error("The source Chronicle must belong to this character.");
+  }
+  const [updated] = await database.update(characterInventoryEntries).set({ sourceChronicleId, updatedAt: new Date() }).where(and(eq(characterInventoryEntries.id, entryId), eq(characterInventoryEntries.characterId, characterId))).returning();
+  return updated ?? null;
+}
+
 export async function deleteInventoryEntry(actor: AuthenticatedActor, characterId: string, entryId: string, database: Database = getDb()) {
   if (!await getOwnedInventoryEntry(actor, characterId, entryId, database)) return false;
   const deleted = await database.delete(characterInventoryEntries).where(and(eq(characterInventoryEntries.id, entryId), eq(characterInventoryEntries.characterId, characterId))).returning({ id: characterInventoryEntries.id });

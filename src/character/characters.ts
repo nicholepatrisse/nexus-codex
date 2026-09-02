@@ -64,8 +64,10 @@ export const updateCharacterInputSchema = z.object({
   classValidationNote: optionalValidationNoteSchema,
   ancestry: z.string().trim().max(100, "Ancestry must be 100 characters or fewer.").nullable().optional().transform((value) => value || null),
   ancestryValidationNote: optionalValidationNoteSchema,
+  ancestrySourceChronicleId: z.string().trim().max(100).nullable().optional().transform((value) => value || null),
   background: z.string().trim().max(100, "Background must be 100 characters or fewer.").nullable().optional().transform((value) => value || null),
   backgroundValidationNote: optionalValidationNoteSchema,
+  backgroundSourceChronicleId: z.string().trim().max(100).nullable().optional().transform((value) => value || null),
   backstory: z.string().trim().max(5000, "Backstory must be 5,000 characters or fewer.").nullable().optional().transform((value) => value || null),
   notes: z.string().trim().max(5000, "Notes must be 5,000 characters or fewer.").nullable().optional().transform((value) => value || null),
 }).superRefine((input, context) => {
@@ -84,6 +86,7 @@ export type UpdateCharacterInput = z.input<typeof updateCharacterInputSchema>;
 type Database = ReturnType<typeof getDb>;
 export class CharacterCreationError extends Error {}
 export class StartingLevelLockedError extends Error {}
+export class InvalidAncestryChronicleError extends Error {}
 
 export function formatSocietyNumber(societyPlayNumber: string, characterNumber: string) {
   const prefix = SUPPORTED_GAME_SYSTEM.societyCharacterPrefix;
@@ -110,7 +113,7 @@ export async function getCharacterProgressions(
   return new Map(characterRows.map((character) => [character.id, deriveSfs2Progression(character.startingLevel, rewardsByCharacter.get(character.id) ?? [])]));
 }
 export interface CharacterSession { id: string; communityName: string; communitySlug: string; scenarioCode: string; scenarioTitle: string; startsAt: Date; displayTimeZone: string; signupStatus: "confirmed" | "waitlisted" | "cancelled" | null; participationType: "player" | "gm_credit"; sessionStatus: "published" | "completed" | "cancelled"; }
-export interface CharacterDetail { id: string; name: string; societyNumber: string; gameSystemName: string; startingLevel: number; startingLevelLocked: boolean; startingCredits: number; startingItems: { url: string; name: string }[]; currentLevel: number; xp: number; creditsMinor: number | null; className: string | null; classValidationNote: string | null; ancestry: string | null; ancestryValidationNote: string | null; background: string | null; backgroundValidationNote: string | null; backstory: string | null; notes: string | null; isOwner: boolean; upcomingSessions: CharacterSession[]; pastSessions: CharacterSession[]; }
+export interface CharacterDetail { id: string; name: string; societyNumber: string; gameSystemName: string; startingLevel: number; startingLevelLocked: boolean; startingCredits: number; startingItems: { url: string; name: string }[]; currentLevel: number; xp: number; creditsMinor: number | null; className: string | null; classValidationNote: string | null; ancestry: string | null; ancestryValidationNote: string | null; ancestrySourceChronicleId: string | null; ancestrySourceChronicleCharacterId: string | null; background: string | null; backgroundValidationNote: string | null; backgroundSourceChronicleId: string | null; backgroundSourceChronicleCharacterId: string | null; backstory: string | null; notes: string | null; isOwner: boolean; upcomingSessions: CharacterSession[]; pastSessions: CharacterSession[]; }
 function communityRole(access: { isActiveMember: boolean; roles: ("owner" | "gm")[] }): CommunityRole | "member" | "visitor" {
   if (access.roles.includes("owner")) return "owner";
   if (access.roles.includes("gm")) return "gm";
@@ -118,7 +121,7 @@ function communityRole(access: { isActiveMember: boolean; roles: ("owner" | "gm"
 }
 /** Returns only character and game data the actor is authorized to see. */
 export async function getCharacterDetail(actor: AuthenticatedActor, characterId: string, now: Date = new Date(), database: Database = getDb()): Promise<CharacterDetail | null> {
-  const [character] = await database.select({ id: characters.id, personId: characters.personId, name: characters.name, societyNumber: characters.societyNumber, gameSystemName: gameSystems.name, startingLevel: characters.startingLevel, startingLevelLocked: characters.startingLevelLocked, className: characters.className, classValidationNote: characters.classValidationNote, ancestry: characters.ancestry, ancestryValidationNote: characters.ancestryValidationNote, background: characters.background, backgroundValidationNote: characters.backgroundValidationNote, backstory: characters.backstory, notes: characters.notes }).from(characters).innerJoin(gameSystems, eq(gameSystems.id, characters.gameSystemId)).where(eq(characters.id, characterId)).limit(1);
+  const [character] = await database.select({ id: characters.id, personId: characters.personId, name: characters.name, societyNumber: characters.societyNumber, gameSystemName: gameSystems.name, startingLevel: characters.startingLevel, startingLevelLocked: characters.startingLevelLocked, className: characters.className, classValidationNote: characters.classValidationNote, ancestry: characters.ancestry, ancestryValidationNote: characters.ancestryValidationNote, ancestrySourceChronicleId: characters.ancestrySourceChronicleId, background: characters.background, backgroundValidationNote: characters.backgroundValidationNote, backgroundSourceChronicleId: characters.backgroundSourceChronicleId, backstory: characters.backstory, notes: characters.notes }).from(characters).innerJoin(gameSystems, eq(gameSystems.id, characters.gameSystemId)).where(eq(characters.id, characterId)).limit(1);
   if (!character) return null;
   const isOwner = character.personId === actor.personId;
   if (!isOwner) {
@@ -147,6 +150,8 @@ export async function getCharacterDetail(actor: AuthenticatedActor, characterId:
   const creditsMinor = isOwner ? ledgerRows.reduce((sum, entry) => sum + entry.amountMinor, 0) : null;
   const [startingCredit] = isOwner ? await database.select({ amountMinor: characterCreditLedgerEntries.amountMinor }).from(characterCreditLedgerEntries).where(and(eq(characterCreditLedgerEntries.characterId, character.id), eq(characterCreditLedgerEntries.type, "starting_credits"))).limit(1) : [];
   const startingEquipment = isOwner ? await database.select({ url: characterInventoryEntries.itemLinkSnapshot, name: characterInventoryEntries.itemNameSnapshot, notes: characterInventoryEntries.notes }).from(characterInventoryEntries).where(and(eq(characterInventoryEntries.characterId, character.id), eq(characterInventoryEntries.acquisitionType, "starting_equipment"), sql`${characterInventoryEntries.notes} like 'Starting wealth permanent item (%)%'`)) : [];
+  const [ancestrySource] = character.ancestrySourceChronicleId ? await database.select({ characterId: chronicles.characterId }).from(chronicles).where(eq(chronicles.id, character.ancestrySourceChronicleId)).limit(1) : [];
+  const [backgroundSource] = character.backgroundSourceChronicleId ? await database.select({ characterId: chronicles.characterId }).from(chronicles).where(eq(chronicles.id, character.backgroundSourceChronicleId)).limit(1) : [];
   const remainingEquipment = [...startingEquipment];
   const startingItems = SFS2_STARTING_ITEM_LEVELS[character.startingLevel as Sfs2StartingLevel].flatMap((level) => {
     const index = remainingEquipment.findIndex((item) => item.notes?.startsWith(`Starting wealth permanent item (level ${level}).`) && item.url);
@@ -154,7 +159,7 @@ export async function getCharacterDetail(actor: AuthenticatedActor, characterId:
     const [item] = remainingEquipment.splice(index, 1);
     return item?.url ? [{ url: item.url, name: item.name }] : [];
   });
-  return { id: character.id, name: character.name, societyNumber: character.societyNumber, gameSystemName: character.gameSystemName, startingLevel: character.startingLevel, startingLevelLocked: character.startingLevelLocked, startingCredits: startingCredit?.amountMinor ?? SFS2_STARTING_WEALTH[character.startingLevel as Sfs2StartingLevel][0].credits, startingItems, currentLevel: progression.currentLevel, xp: progression.totalXp, creditsMinor, className: character.className, classValidationNote: character.classValidationNote, ancestry: character.ancestry, ancestryValidationNote: character.ancestryValidationNote, background: character.background, backgroundValidationNote: character.backgroundValidationNote, backstory: character.backstory, notes: character.notes, isOwner, upcomingSessions, pastSessions };
+  return { id: character.id, name: character.name, societyNumber: character.societyNumber, gameSystemName: character.gameSystemName, startingLevel: character.startingLevel, startingLevelLocked: character.startingLevelLocked, startingCredits: startingCredit?.amountMinor ?? SFS2_STARTING_WEALTH[character.startingLevel as Sfs2StartingLevel][0].credits, startingItems, currentLevel: progression.currentLevel, xp: progression.totalXp, creditsMinor, className: character.className, classValidationNote: character.classValidationNote, ancestry: character.ancestry, ancestryValidationNote: character.ancestryValidationNote, ancestrySourceChronicleId: character.ancestrySourceChronicleId, ancestrySourceChronicleCharacterId: ancestrySource?.characterId ?? null, background: character.background, backgroundValidationNote: character.backgroundValidationNote, backgroundSourceChronicleId: character.backgroundSourceChronicleId, backgroundSourceChronicleCharacterId: backgroundSource?.characterId ?? null, backstory: character.backstory, notes: character.notes, isOwner, upcomingSessions, pastSessions };
 }
 export async function createCharacter(actor: AuthenticatedActor, rawInput: CreateCharacterInput, database: Database = getDb()) {
   const input = createCharacterInputSchema.parse(rawInput);
@@ -210,8 +215,16 @@ export async function updateCharacter(actor: AuthenticatedActor, characterId: st
     return item;
   }));
   return database.transaction(async (transaction) => {
+    if (input.ancestrySourceChronicleId) {
+      const [source] = await transaction.select({ id: chronicles.id }).from(chronicles).innerJoin(characters, eq(characters.id, chronicles.characterId)).where(and(eq(chronicles.id, input.ancestrySourceChronicleId), eq(characters.personId, actor.personId))).limit(1);
+      if (!source) throw new InvalidAncestryChronicleError("The ancestry Source Chronicle must belong to one of your characters.");
+    }
+    if (input.backgroundSourceChronicleId) {
+      const [source] = await transaction.select({ id: chronicles.id }).from(chronicles).innerJoin(characters, eq(characters.id, chronicles.characterId)).where(and(eq(chronicles.id, input.backgroundSourceChronicleId), eq(characters.personId, actor.personId))).limit(1);
+      if (!source) throw new InvalidAncestryChronicleError("The background Source Chronicle must belong to one of your characters.");
+    }
     const { startingCredits } = input;
-    const details = { name: input.name, startingLevel: input.startingLevel, className: input.className, classValidationNote: input.classValidationNote, ancestry: input.ancestry, ancestryValidationNote: input.ancestryValidationNote, background: input.background, backgroundValidationNote: input.backgroundValidationNote, backstory: input.backstory, notes: input.notes };
+    const details = { name: input.name, startingLevel: input.startingLevel, className: input.className, classValidationNote: input.classValidationNote, ancestry: input.ancestry, ancestryValidationNote: input.ancestryValidationNote, ancestrySourceChronicleId: input.ancestry === null ? null : input.ancestrySourceChronicleId, background: input.background, backgroundValidationNote: input.backgroundValidationNote, backgroundSourceChronicleId: input.background === null ? null : input.backgroundSourceChronicleId, backstory: input.backstory, notes: input.notes };
     const [updated] = await transaction.update(characters).set({ ...details, updatedAt: new Date() })
       .where(and(eq(characters.id, characterId), eq(characters.personId, actor.personId), changingStartingSetup ? eq(characters.startingLevelLocked, false) : undefined))
       .returning({ id: characters.id, name: characters.name });

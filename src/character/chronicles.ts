@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, gt, isNull, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { AuthenticatedActor } from "@/auth/actor";
 import { resolveCommunityAccessBySlug } from "@/authorization/community-access";
 import { getDb } from "@/db/client";
-import { characterCreditLedgerEntries, characters, chronicles, communities, contentItems, sessionGmCredits, sessions } from "@/db/schema";
+import { characterCreditLedgerEntries, characters, chronicleSheetAttachments, chronicles, communities, contentItems, sessionGmCredits, sessions } from "@/db/schema";
 import { calculateEarnIncome, totalChronicleCredits } from "@/character/sfs2-chronicle-rewards";
 import { isValidPregenLevel, SFS2_PREGEN_LEVELS } from "@/character/sfs2-pregens";
 import { deriveSfs2Progression } from "@/character/sfs2-progression";
@@ -62,7 +62,7 @@ export const chronicleLifecycleSchema = z.discriminatedUnion("status", [
   z.object({ status: z.literal("applied"), appliedAt: z.date() }),
 ]);
 export type Chronicle = typeof chronicles.$inferSelect;
-export type ChronicleWithGmCredit = Chronicle & { isGmCredit: boolean };
+export type ChronicleWithGmCredit = Chronicle & { isGmCredit: boolean; hasOfficialSheet: boolean };
 export const totalCredits = (chronicle: Pick<Chronicle, "baseCreditsMinor" | "downtimeCreditsMinor">) => totalChronicleCredits(chronicle.baseCreditsMinor, chronicle.downtimeCreditsMinor);
 
 /** Derives every Chronicle number from date played, with ID as the stable same-day tie-breaker. */
@@ -101,7 +101,17 @@ export async function listChronicles(characterId: string, database: Database = g
     .leftJoin(sessionGmCredits, and(eq(sessionGmCredits.sessionId, chronicles.sessionId), eq(sessionGmCredits.characterId, chronicles.characterId)))
     .where(eq(chronicles.characterId, characterId))
     .orderBy(...chronicleOrder);
-  return rows.map(({ chronicle, gmCreditId }) => ({ ...chronicle, isGmCredit: gmCreditId !== null }));
+  const sheets = rows.length ? await database.select({ chronicleId: chronicleSheetAttachments.chronicleId }).from(chronicleSheetAttachments).where(and(inArray(chronicleSheetAttachments.chronicleId, rows.map(({ chronicle }) => chronicle.id)), eq(chronicleSheetAttachments.isCurrent, true))) : [];
+  const sheetIds = new Set(sheets.map(({ chronicleId }) => chronicleId));
+  return rows.map(({ chronicle, gmCreditId }) => ({ ...chronicle, isGmCredit: gmCreditId !== null, hasOfficialSheet: sheetIds.has(chronicle.id) }));
+}
+
+export async function listOwnedChronicles(actor: AuthenticatedActor, database: Database = getDb()) {
+  return database.select({ id: chronicles.id, characterId: chronicles.characterId, characterName: characters.name, scenarioNumberSnapshot: chronicles.scenarioNumberSnapshot, scenarioNameSnapshot: chronicles.scenarioNameSnapshot })
+    .from(chronicles)
+    .innerJoin(characters, eq(characters.id, chronicles.characterId))
+    .where(eq(characters.personId, actor.personId))
+    .orderBy(asc(characters.name), ...chronicleOrder);
 }
 
 /** Returns the source completion workflow only when the actor manages this Nexus session. */

@@ -54,7 +54,7 @@ describe("character creation", () => {
   });
 
   it("does not expose starting level through character updates", () => {
-    expect(updateCharacterInputSchema.parse({ name: "Navasi", startingLevel: 7, startingCredits: 7200, startingItems: [] })).toEqual({ name: "Navasi", startingLevel: 7, startingCredits: 7200, startingItems: [], className: null, classValidationNote: null, ancestry: null, ancestryValidationNote: null, background: null, backgroundValidationNote: null, backstory: null, notes: null });
+    expect(updateCharacterInputSchema.parse({ name: "Navasi", startingLevel: 7, startingCredits: 7200, startingItems: [] })).toEqual({ name: "Navasi", startingLevel: 7, startingCredits: 7200, startingItems: [], className: null, classValidationNote: null, ancestry: null, ancestryValidationNote: null, ancestrySourceChronicleId: null, background: null, backgroundValidationNote: null, backgroundSourceChronicleId: null, backstory: null, notes: null });
   });
 
   it("applies reasonable detail length limits", () => {
