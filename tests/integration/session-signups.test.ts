@@ -24,6 +24,7 @@ import {
 } from "@/db/schema";
 import { createSessionDraft } from "@/session/session-drafts";
 import { publishSession } from "@/session/publish-session";
+import { getCalendarEventForParticipant } from "@/session/calendar-export";
 import { cancelPublishedSession, updatePublishedSession } from "@/session/published-session";
 import {
   assignSignupCharacterAsGm,
@@ -135,6 +136,19 @@ describeWithDatabase("session signups", () => {
       eq(sessionSignups.sessionId, publishedSessionId),
       eq(sessionSignups.personId, actors[2]!.personId),
     ))).resolves.toEqual([]);
+  });
+
+  it("allows the assigned GM to export the session without a player signup", async () => {
+    await expect(getCalendarEventForParticipant(gm, community.slug, publishedSessionId, "https://nexus.example"))
+      .resolves.toMatchObject({
+        sessionId: publishedSessionId,
+        title: "1-01 — Signup scenario",
+        communityName: expect.stringContaining("Signup community"),
+        characterName: null,
+        timeZone: "America/Phoenix",
+      });
+    await expect(getCalendarEventForParticipant(actors[2]!, community.slug, publishedSessionId, "https://nexus.example"))
+      .resolves.toBeNull();
   });
 
   it("delivers each new game once to opted-in members and only affects future deliveries", async () => {
