@@ -14,10 +14,13 @@ export function validateIdentitySelection(type: IdentitySelectionType, value: st
   if (!option && type === "class" && CHARACTER_CLASSES.some((name) => name === selection)) return validated();
   if (!option) return validationReasons.unknownOption(`${selection} is not in the available ${type} catalog. Keep it selected and add a note if you know its source.`);
   if (option.metadata.societyLegal === false) return validationReasons.societyRestriction(`${selection} is marked as unavailable for Society play.`);
-  if ((type === "ancestry" || type === "background") && hasChronicleAccess) return validationReasons.unsupportedAccessRule(`A Source Chronicle is linked for ${selection}, but Nexus cannot yet verify that it grants this ${type}. GM review is required.`);
-  if (!option.sourceMaterialIdentity || !option.sourceMaterialTitle) return validationReasons.incompleteSourceData(`The source information for ${selection} is incomplete.`);
+  if (!option.sourceMaterialIdentity || !option.sourceMaterialTitle) return hasChronicleAccess && type !== "class" ? validationReasons.unsupportedAccessRule(`A Source Chronicle is linked for ${selection}, but Nexus cannot yet verify that it grants this ${type}. GM review is required.`) : validationReasons.incompleteSourceData(`The source information for ${selection} is incomplete.`);
   if (isFreeAccessMaterial(option.sourceMaterialTitle)) return validated();
   const canonicalIdentity = normalizeMaterialIdentity(materialTitleWithoutCitation(option.sourceMaterialTitle));
-  if (!context.ownedMaterialIdentities.includes(option.sourceMaterialIdentity) && !context.ownedMaterialIdentities.includes(canonicalIdentity)) return validationReasons.missingMaterialOwnership(`Add ${option.sourceMaterialTitle} to your owned materials to validate this selection.`);
+  if (!context.ownedMaterialIdentities.includes(option.sourceMaterialIdentity) && !context.ownedMaterialIdentities.includes(canonicalIdentity)) return hasChronicleAccess && type !== "class" ? validationReasons.unsupportedAccessRule(`A Source Chronicle is linked for ${selection}, but Nexus cannot yet verify that it grants this ${type}. GM review is required.`) : validationReasons.missingMaterialOwnership(`Add ${option.sourceMaterialTitle} to your owned materials to validate this selection.`);
   return validated();
+}
+
+export function identitySelectionNeedsChronicle(type: Exclude<IdentitySelectionType, "class">, value: string, context: IdentityValidationContext) {
+  return validateIdentitySelection(type, value, context)?.status === "unvalidated";
 }

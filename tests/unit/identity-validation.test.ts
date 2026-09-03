@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { validateIdentitySelection, type IdentityValidationContext } from "@/character/identity-validation";
+import { identitySelectionNeedsChronicle, validateIdentitySelection, type IdentityValidationContext } from "@/character/identity-validation";
 import { AdvisorySelectionField } from "@/character/advisory-selection-field";
 
 const option = { optionType: "ancestry" as const, name: "Android", sourceMaterialIdentity: "galaxy-guide", sourceMaterialTitle: "Galaxy Guide", metadata: {} };
@@ -33,6 +33,19 @@ describe("character identity advisory validation", () => {
   it.each(["Player Core", "Starfinder Player Core"])("always validates options from %s", (sourceMaterialTitle) => {
     const playerCoreOption = { ...option, sourceMaterialIdentity: "player-core", sourceMaterialTitle };
     expect(validateIdentitySelection("ancestry", "Android", { options: [playerCoreOption], ownedMaterialIdentities: [] })?.status).toBe("validated");
+  });
+
+  it.each(["ancestry", "background"] as const)("shows Chronicle access only for unresolved %s selections and reacts to option or ownership changes", (type) => {
+    const catalogOption = { ...option, optionType: type, name: type === "ancestry" ? "Human" : "Scholar" };
+    const unavailable = { options: [catalogOption], ownedMaterialIdentities: [] };
+    expect(identitySelectionNeedsChronicle(type, catalogOption.name, unavailable)).toBe(true);
+    expect(validateIdentitySelection(type, catalogOption.name, unavailable, true)?.issues[0]?.message).toContain("Source Chronicle is linked");
+    expect(identitySelectionNeedsChronicle(type, catalogOption.name, { ...unavailable, ownedMaterialIdentities: ["galaxy-guide"] })).toBe(false);
+    expect(identitySelectionNeedsChronicle(type, catalogOption.name, { options: [{ ...catalogOption, sourceMaterialIdentity: "player-core", sourceMaterialTitle: "Player Core" }], ownedMaterialIdentities: [] })).toBe(false);
+    expect(identitySelectionNeedsChronicle(type, "Unknown option", unavailable)).toBe(true);
+    expect(identitySelectionNeedsChronicle(type, "", unavailable)).toBe(false);
+    expect(identitySelectionNeedsChronicle(type, "Outlaw", { options: [{ ...catalogOption, name: "Outlaw", metadata: { societyLegal: false } }], ownedMaterialIdentities: [] })).toBe(false);
+    expect(validateIdentitySelection(type, catalogOption.name, { ...unavailable, ownedMaterialIdentities: ["galaxy-guide"] }, true)?.status).toBe("validated");
   });
 
   it("communicates status with accessible text and keeps the note editable", () => {
