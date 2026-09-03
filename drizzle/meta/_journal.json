@@ -435,6 +435,20 @@
       "when": 1788376032144,
       "tag": "0061_sku_material_identity",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1788378157578,
+      "tag": "0062_sparkling_sebastian_shaw",
+      "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1788383807826,
+      "tag": "0063_striped_bullseye",
+      "breakpoints": true
     }
   ]
 }
