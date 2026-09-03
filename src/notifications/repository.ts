@@ -8,6 +8,7 @@ import {
   communityMemberships,
   communityRoleGrants,
   contentItems,
+  newGameNotificationDeliveries,
   notificationReads,
   people,
   sessionSignups,
@@ -22,7 +23,7 @@ const applicantMessages: Record<string, string> = {
 
 /** Produces only notifications the person is currently authorized to know about. */
 export async function listNotificationsForPerson(personId: string, database = getDb()) {
-  const [ownerRows, applicantRows, sessionRows, signupRows] = await Promise.all([
+  const [ownerRows, applicantRows, newGameRows, sessionRows, signupRows] = await Promise.all([
     database.select({
       communityId: communities.id,
       communityName: communities.name,
@@ -42,6 +43,17 @@ export async function listNotificationsForPerson(personId: string, database = ge
       .leftJoin(communityMemberships, and(eq(communityMemberships.communityId, communities.id), eq(communityMemberships.personId, personId), eq(communityMemberships.status, "active")))
       .where(eq(communityMembershipRequests.personId, personId))
       .orderBy(communityMembershipRequests.communityId, desc(communityMembershipRequests.requestedAt), desc(communityMembershipRequests.id)),
+    database.select({
+      eventId: communityAuditEvents.id, occurredAt: communityAuditEvents.occurredAt,
+      communityName: communities.name, communitySlug: communities.slug, sessionId: sessions.id,
+      scenarioCode: contentItems.code, scenarioTitle: contentItems.title,
+    }).from(newGameNotificationDeliveries)
+      .innerJoin(communityAuditEvents, eq(communityAuditEvents.id, newGameNotificationDeliveries.auditEventId))
+      .innerJoin(communities, and(eq(communities.id, communityAuditEvents.communityId), eq(communities.lifecycleStatus, "active")))
+      .innerJoin(sessions, and(eq(sessions.communityId, communities.id), eq(sessions.id, sql<string>`${communityAuditEvents.details}->>'sessionId'`)))
+      .innerJoin(contentItems, eq(contentItems.id, sessions.contentItemId))
+      .where(eq(newGameNotificationDeliveries.personId, personId))
+      .orderBy(desc(communityAuditEvents.occurredAt)).limit(50),
     database.select({
       eventId: communityAuditEvents.id,
       eventType: communityAuditEvents.eventType,
@@ -114,6 +126,12 @@ export async function listNotificationsForPerson(personId: string, database = ge
     href: applicantNotificationDestination(row.communityVisibility, Boolean(row.activeMembershipId), row.communitySlug),
     occurredAt: row.updatedAt, actionable: row.status === "pending", isRead: false,
   }));
+  const newGameNotifications: AppNotification[] = newGameRows.map((row) => ({
+    id: `session-published:${row.eventId}`, kind: "session.published", title: row.communityName,
+    message: `New game: ${row.scenarioCode} — ${row.scenarioTitle}.`,
+    href: `/communities/${encodeURIComponent(row.communitySlug)}/sessions/${row.sessionId}`,
+    occurredAt: row.occurredAt, actionable: false, isRead: false,
+  }));
   const sessionNotifications: AppNotification[] = sessionRows.map((row) => {
     const cancelled = row.eventType === "session.cancelled";
     return {
@@ -139,7 +157,7 @@ export async function listNotificationsForPerson(personId: string, database = ge
       isRead: false,
     };
   });
-  const notifications = [...ownerNotifications, ...applicantNotifications, ...sessionNotifications, ...signupNotifications];
+  const notifications = [...ownerNotifications, ...applicantNotifications, ...newGameNotifications, ...sessionNotifications, ...signupNotifications];
   const readRows = notifications.length === 0 ? [] : await database
     .select({ notificationId: notificationReads.notificationId, clearedAt: notificationReads.clearedAt })
     .from(notificationReads)

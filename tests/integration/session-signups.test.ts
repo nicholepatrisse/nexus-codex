@@ -1,10 +1,11 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { AuthenticatedActor } from "@/auth/actor";
 import { createTestIdentity } from "@/auth/test-fixture";
 import { createCommunity } from "@/community/create-community";
 import { getDb } from "@/db/client";
 import { listNotificationsForPerson } from "@/notifications/repository";
+import { updateCommunityNotificationPreferences } from "@/notifications/preferences";
 import {
   authUsers,
   characters,
@@ -134,6 +135,38 @@ describeWithDatabase("session signups", () => {
       eq(sessionSignups.sessionId, publishedSessionId),
       eq(sessionSignups.personId, actors[2]!.personId),
     ))).resolves.toEqual([]);
+  });
+
+  it("delivers each new game once to opted-in members and only affects future deliveries", async () => {
+    const initialGmNotifications = (await listNotificationsForPerson(gm.personId)).filter(({ kind }) => kind === "session.published");
+    const initialOwnerNotifications = (await listNotificationsForPerson(owner.personId)).filter(({ kind }) => kind === "session.published");
+    expect(initialGmNotifications).toHaveLength(1);
+    expect(initialOwnerNotifications).toHaveLength(1);
+    expect(initialGmNotifications[0]).toMatchObject({
+      message: "New game: 1-01 — Signup scenario.",
+      href: `/communities/${community.slug}/sessions/${publishedSessionId}`,
+    });
+    await expect(listNotificationsForPerson(actors[2]!.personId)).resolves.not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ kind: "session.published" })]),
+    );
+
+    await updateCommunityNotificationPreferences(gm, []);
+    const draft = await createSessionDraft(owner, community.slug, {
+      contentItemId: scenarioId, gmPersonId: gm.personId,
+      startsAt: "2030-09-02T18:00:00-07:00", endsAt: "2030-09-02T22:00:00-07:00",
+      displayTimeZone: "America/Phoenix", locationType: "physical",
+    });
+    if (draft.status !== "created") throw new Error("second session was not created");
+    await publishSession(owner, community.slug, draft.sessionId);
+    await publishSession(owner, community.slug, draft.sessionId);
+
+    expect((await listNotificationsForPerson(gm.personId)).filter(({ kind }) => kind === "session.published")).toHaveLength(1);
+    expect((await listNotificationsForPerson(owner.personId)).filter(({ kind }) => kind === "session.published")).toHaveLength(2);
+    await getDb().delete(communityAuditEvents).where(and(
+      eq(communityAuditEvents.communityId, community.id),
+      eq(sql<string>`${communityAuditEvents.details}->>'sessionId'`, draft.sessionId),
+    ));
+    await getDb().delete(sessions).where(eq(sessions.id, draft.sessionId));
   });
 
   it("confirms only capacity seats and orders concurrent overflow on the waitlist", async () => {

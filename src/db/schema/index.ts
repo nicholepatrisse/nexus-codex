@@ -434,6 +434,20 @@ export const communityMemberships = pgTable(
   ],
 );
 
+export const communityNotificationPreferences = pgTable(
+  "community_notification_preferences",
+  {
+    personId: text("person_id").notNull().references(() => people.id, { onDelete: "cascade" }),
+    communityId: text("community_id").notNull().references(() => communities.id, { onDelete: "cascade" }),
+    newGameNotificationsEnabled: boolean("new_game_notifications_enabled").notNull().default(true),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("community_notification_preferences_person_community_unique").on(table.personId, table.communityId),
+    index("community_notification_preferences_community_id_idx").on(table.communityId),
+  ],
+);
+
 export const communityRoleGrants = pgTable(
   "community_role_grants",
   {
@@ -516,6 +530,20 @@ export const communityAuditEvents = pgTable(
       sql`${table.eventType} in ('community.settings.updated', 'community.archived', 'community.restored', 'community.invitation.created', 'community.invitation.accepted', 'community.invitation.revoked', 'community.invitation.expired', 'community.membership.requested', 'community.membership.approved', 'community.membership.rejected', 'community.membership.cancelled', 'community.gm.requested', 'community.gm.approved', 'community.gm.rejected', 'community.gm.cancelled', 'community.gm.revoked', 'community.gm.self_service_promoted', 'session.draft.created', 'session.draft.updated', 'session.gm.reassigned', 'session.published', 'session.published.updated', 'session.cancelled', 'session.completed', 'session.notes.updated', 'session.signup.confirmed', 'session.signup.waitlisted', 'session.signup.cancelled', 'session.signup.promoted', 'session.signup.updated')`,
     ),
     check("community_audit_events_details_object_check", sql`jsonb_typeof(${table.details}) = 'object'`),
+  ],
+);
+
+/** Durable recipients for new-game announcements, captured when a game is published. */
+export const newGameNotificationDeliveries = pgTable(
+  "new_game_notification_deliveries",
+  {
+    personId: text("person_id").notNull().references(() => people.id, { onDelete: "cascade" }),
+    auditEventId: text("audit_event_id").notNull().references(() => communityAuditEvents.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("new_game_notification_deliveries_person_event_unique").on(table.personId, table.auditEventId),
+    index("new_game_notification_deliveries_person_id_idx").on(table.personId),
   ],
 );
 

@@ -2,6 +2,7 @@ export type AppNotificationKind =
   | "owner.membership.pending"
   | "applicant.membership.status"
   | "gm.session.signup"
+  | "session.published"
   | "session.changed"
   | "session.cancelled";
 
