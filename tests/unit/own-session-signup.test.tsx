@@ -28,4 +28,10 @@ describe("own session signup", () => {
     expect(markup).toContain("You’re waitlisted at position 2");
     expect(markup).toContain("Chiskisk");
   });
+
+  it("renders secondary actions inside the registration panel", () => {
+    const markup = renderToStaticMarkup(<OwnSessionSignup signup={{ status: "confirmed", characterName: "Navasi" }}><a href="/calendar">Add to calendar</a></OwnSessionSignup>);
+    expect(markup).toContain('href="/calendar"');
+    expect(markup).toContain("Add to calendar");
+  });
 });
