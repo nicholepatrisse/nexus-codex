@@ -252,7 +252,7 @@ export const characterOptions = pgTable(
   (table) => [
     uniqueIndex("character_options_source_url_unique").on(table.sourceUrl),
     index("character_options_type_name_idx").on(table.optionType, table.normalizedName),
-    check("character_options_type_check", sql`${table.optionType} in ('class', 'ancestry', 'background', 'item')`),
+    check("character_options_type_check", sql`${table.optionType} in ('class', 'ancestry', 'background', 'heritage', 'feat', 'item')`),
     check("character_options_name_not_blank", sql`length(btrim(${table.name})) > 0`),
   ],
 );
@@ -784,6 +784,45 @@ export const chronicles = pgTable(
     check("chronicles_metadata_lengths_check", sql`(${table.chronicleNumber} is null or length(${table.chronicleNumber}) <= 100) and (${table.partnerCode} is null or length(${table.partnerCode}) <= 100) and (${table.eventName} is null or length(${table.eventName}) <= 200) and (${table.eventCode} is null or length(${table.eventCode}) <= 100) and (${table.gmOrganizedPlayId} is null or length(${table.gmOrganizedPlayId}) <= 100)`),
     check("chronicles_player_notes_length_check", sql`${table.playerNotes} is null or length(${table.playerNotes}) <= 5000`),
     check("chronicles_gm_notes_length_check", sql`${table.gmNotes} is null or length(${table.gmNotes}) <= 5000`),
+  ],
+);
+
+/** Heritage and feat choices as acquired character facts. Catalog links are optional; snapshots remain authoritative history. */
+export const characterOptionSelections = pgTable(
+  "character_option_selections",
+  {
+    id: text("id").primaryKey(),
+    characterId: text("character_id").notNull().references(() => characters.id, { onDelete: "cascade" }),
+    selectionKind: text("selection_kind").notNull(),
+    featCategory: text("feat_category"),
+    acquiredLevel: integer("acquired_level").notNull(),
+    acquisitionMethod: text("acquisition_method"),
+    grantOrigin: text("grant_origin"),
+    characterOptionId: text("character_option_id").references(() => characterOptions.id, { onDelete: "set null" }),
+    nameSnapshot: text("name_snapshot").notNull(),
+    sourceMaterialIdentitySnapshot: text("source_material_identity_snapshot"),
+    sourceMaterialTitleSnapshot: text("source_material_title_snapshot"),
+    sourceUrlSnapshot: text("source_url_snapshot"),
+    validationNote: text("validation_note"),
+    sourceChronicleId: text("source_chronicle_id").references(() => chronicles.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("character_option_selections_one_heritage_unique").on(table.characterId).where(sql`${table.selectionKind} = 'heritage'`),
+    index("character_option_selections_character_idx").on(table.characterId, table.selectionKind, table.acquiredLevel),
+    index("character_option_selections_catalog_idx").on(table.characterOptionId),
+    index("character_option_selections_chronicle_idx").on(table.sourceChronicleId),
+    check("character_option_selections_kind_check", sql`${table.selectionKind} in ('heritage', 'feat')`),
+    check("character_option_selections_category_check", sql`(${table.selectionKind} = 'heritage' and ${table.featCategory} is null) or (${table.selectionKind} = 'feat' and (${table.featCategory} is null or ${table.featCategory} in ('class', 'ancestry', 'skill', 'general')))`),
+    check("character_option_selections_level_check", sql`${table.acquiredLevel} between 1 and 20`),
+    check("character_option_selections_method_check", sql`${table.acquisitionMethod} is null or ${table.acquisitionMethod} in ('selected', 'awarded')`),
+    check("character_option_selections_name_check", sql`length(btrim(${table.nameSnapshot})) between 1 and 200`),
+    check("character_option_selections_grant_origin_check", sql`${table.grantOrigin} is null or length(btrim(${table.grantOrigin})) between 1 and 300`),
+    check("character_option_selections_source_identity_check", sql`${table.sourceMaterialIdentitySnapshot} is null or length(btrim(${table.sourceMaterialIdentitySnapshot})) between 1 and 200`),
+    check("character_option_selections_source_title_check", sql`${table.sourceMaterialTitleSnapshot} is null or length(btrim(${table.sourceMaterialTitleSnapshot})) between 1 and 300`),
+    check("character_option_selections_source_url_check", sql`${table.sourceUrlSnapshot} is null or length(btrim(${table.sourceUrlSnapshot})) between 1 and 2000`),
+    check("character_option_selections_validation_note_check", sql`${table.validationNote} is null or length(btrim(${table.validationNote})) between 1 and 1000`),
   ],
 );
 
