@@ -132,4 +132,5 @@ test.describe.serial("community GM admission", () => {
     await expect(page.getByText("cannot be restored through self-service", { exact: false })).toBeVisible();
     await expect(page.getByRole("button", { name: "Request GM access" })).toHaveCount(0);
   });
+
 });

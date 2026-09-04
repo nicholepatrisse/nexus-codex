@@ -8,10 +8,15 @@ import { getAuthenticatedActor } from "@/auth/actor";
 import { GmReportingQueueLoading } from "@/app/gm-reporting-queue";
 import { UnappliedChroniclesLoading } from "@/app/unapplied-chronicles";
 import { HomepageFollowups } from "@/app/homepage-followups";
+import { GameDiscoveryHero } from "@/app/game-discovery-hero";
+import { listGameCreationCommunitiesForPerson } from "@/community/repository";
 
 export default async function Home() {
   const actor = await getAuthenticatedActor();
   const signedIn = Boolean(actor);
+  const gameCreationCommunities = actor
+    ? await listGameCreationCommunitiesForPerson(actor.personId)
+    : [];
 
   return (
     <main className={`mx-auto min-h-screen max-w-5xl px-6 ${signedIn ? "py-10" : "py-20"}`}>
@@ -44,6 +49,7 @@ export default async function Home() {
           </div>
         </section>
       </AccentSurface> : null}
+      {actor ? <GameDiscoveryHero eligibleCommunities={gameCreationCommunities} /> : null}
       {actor ? <Suspense fallback={<SignedUpGamesLoading />}><SignedUpGames actor={actor} /></Suspense> : null}
       {actor ? <Suspense fallback={<><GmReportingQueueLoading /><UnappliedChroniclesLoading /></>}><HomepageFollowups actor={actor} /></Suspense> : null}
       <MyCommunities />

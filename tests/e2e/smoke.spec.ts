@@ -31,3 +31,9 @@ test("protects the all-games view and preserves its return path", async ({ page 
   await expect(page).toHaveURL(/\/sign-in\?callbackURL=%2Fgames$/);
   await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
 });
+
+test("protects community game browsing and preserves its return path", async ({ page }) => {
+  await page.goto("/games/browse");
+  await expect(page).toHaveURL(/\/sign-in\?callbackURL=%2Fgames%2Fbrowse$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
+});

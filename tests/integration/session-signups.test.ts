@@ -26,6 +26,7 @@ import { createSessionDraft } from "@/session/session-drafts";
 import { publishSession } from "@/session/publish-session";
 import { getCalendarEventForParticipant } from "@/session/calendar-export";
 import { cancelPublishedSession, updatePublishedSession } from "@/session/published-session";
+import { listUpcomingCommunityGames } from "@/session/browse-games";
 import {
   assignSignupCharacterAsGm,
   cancelOwnSessionSignup,
@@ -323,6 +324,13 @@ describeWithDatabase("session signups", () => {
           signupStatus: "confirmed",
         }),
       ]);
+    await expect(listUpcomingCommunityGames(owner.personId, new Date("2030-01-01T00:00:00Z")))
+      .resolves.toEqual(expect.arrayContaining([
+        expect.objectContaining({ sessionId: publishedSessionId, communityName: expect.any(String) }),
+        expect.objectContaining({ sessionId: laterSessionId, communityName: expect.any(String) }),
+      ]));
+    await expect(listUpcomingCommunityGames(crypto.randomUUID(), new Date("2030-01-01T00:00:00Z")))
+      .resolves.toEqual([]);
     await expect(listUpcomingSignedUpGames(crypto.randomUUID(), new Date("2030-01-01T00:00:00Z")))
       .resolves.toEqual([]);
 
