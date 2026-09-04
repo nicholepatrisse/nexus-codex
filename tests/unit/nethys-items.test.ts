@@ -25,6 +25,15 @@ describe("Archives of Nethys item import", () => {
     ]);
   });
 
+  it("inherits Player Core source metadata for variants whose source is recorded on the parent", () => {
+    const playerCoreTools = `<div class="treasure"><h1 class="title">Medkit <span class="feature-level">Item 0+</span></h1><div class="sources"><strong>Source</strong> <a href="/sources/2-player-core">Player Core pg. 269</a></div><div class="treasure"><h2 class="title">Medkit (Commercial) <span class="feature-level">Item 0</span></h2><div><b>Price</b> 5 credits</div></div><div class="treasure"><h2 class="title">Medkit (Tactical) <span class="feature-level">Item 3</span></h2><div><b>Price</b> 600 credits</div></div></div>`;
+
+    expect(parseNethysItemsHtml(playerCoreTools, "https://2e.aonsrd.com/treasure/medkit")).toEqual([
+      expect.objectContaining({ name: "Medkit (Commercial)", source: "Player Core pg. 269", sourceUrl: "https://2e.aonsrd.com/sources/2-player-core" }),
+      expect.objectContaining({ name: "Medkit (Tactical)", source: "Player Core pg. 269", sourceUrl: "https://2e.aonsrd.com/sources/2-player-core" }),
+    ]);
+  });
+
   it("returns weapon grade-table rows as separate import choices", () => {
     const weapon = `<div class="weapon"><h1 class="title"><span class="sfs">SFS Standard</span> Arc Pistol</h1><div><b>Price</b> 25 credits</div><div><b>Bulk</b> 1</div><div><b>Hands</b> 1</div><table><thead><tr><th>Grade</th><th>Level</th><th>Upgrade Price</th><th>Total Price</th></tr></thead><tbody><tr><td>Commercial Arc Pistol</td><td>0</td><td>—</td><td>25 credits</td></tr><tr><td>Tactical Arc Pistol</td><td>2</td><td>+350 credits</td><td>375 credits</td></tr></tbody></table></div>`;
     expect(parseNethysItemsHtml(weapon, "https://2e.aonsrd.com/equipment/weapons/36-arc-pistol")).toEqual([
@@ -42,9 +51,18 @@ describe("Archives of Nethys item import", () => {
 
   it("only accepts recognized HTTPS item URLs", () => {
     expect(validateNethysItemUrl("https://2e.aonsrd.com/treasure/19-hygiene-kit").href).toBe("https://2e.aonsrd.com/treasure/19-hygiene-kit");
+    expect(validateNethysItemUrl("https://2e.aonsrd.com/equipment/ammunition/1-projectile-ammo").href).toBe("https://2e.aonsrd.com/equipment/ammunition/1-projectile-ammo");
     expect(() => validateNethysItemUrl("not a url")).toThrowError(NethysItemError);
     expect(() => validateNethysItemUrl("https://example.com/treasure/19-hygiene-kit")).toThrow("Use a Starfinder 2e");
     expect(() => validateNethysItemUrl("https://2e.aonsrd.com/feats/1-example")).toThrow("not a supported item page");
+  });
+
+  it("imports ammunition rows with their inherited source metadata", () => {
+    const projectileAmmo = `<div class="ammunition-type"><h1 class="title">Projectile Ammo</h1><div class="sources"><strong>Source</strong> <a href="/sources/2-player-core">Player Core pg. 267</a></div><table class="table-ammunition-grades"><thead><tr><th>Ammunition</th><th>Level</th><th>Price</th><th>Magazine</th><th>Bulk</th></tr></thead><tbody><tr><td>Projectile Ammo (10)</td><td>0</td><td>1 credits</td><td>—</td><td>—</td></tr></tbody></table></div>`;
+
+    expect(parseNethysItemsHtml(projectileAmmo, "https://2e.aonsrd.com/equipment/ammunition/1-projectile-ammo")).toEqual([
+      expect.objectContaining({ name: "Projectile Ammo (10)", level: 0, price: "1 credits", priceCredits: 1, bulk: "—", source: "Player Core pg. 267", sourceUrl: "https://2e.aonsrd.com/sources/2-player-core", category: "Ammunition" }),
+    ]);
   });
 
   it("allows missing optional metadata and reports upstream failures", async () => {
