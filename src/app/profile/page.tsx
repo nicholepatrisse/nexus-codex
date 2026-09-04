@@ -8,7 +8,7 @@ import { listCatalogMaterials, listOwnedMaterials } from "@/materials/materials"
 import { MaterialsOwned } from "./materials-owned";
 import { removeMaterialAction } from "./material-actions";
 import { NotificationPreferencesForm } from "./notification-preferences-form";
-import { listCommunityNotificationPreferences } from "@/notifications/preferences";
+import { listNotificationPreferences } from "@/notifications/preferences";
 
 const profileTabs = ["details", "notifications", "materials"] as const;
 type ProfileTab = (typeof profileTabs)[number];
@@ -25,7 +25,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
   const profile = await getProfile(actor);
   if (!profile) redirect("/sign-in");
   const [materials, catalog] = tab === "materials" ? await Promise.all([listOwnedMaterials(actor), listCatalogMaterials()]) : [null, null];
-  const notificationPreferences = tab === "notifications" ? await listCommunityNotificationPreferences(actor) : null;
+  const notificationPreferences = tab === "notifications" ? await listNotificationPreferences(actor) : null;
   return <main className="page-shell mx-auto min-h-screen max-w-3xl"><section className="card-standard responsive-card sm:rounded-3xl sm:p-10">
     <p className="text-xs font-semibold tracking-[0.18em] text-brand uppercase sm:text-sm sm:tracking-[0.2em]">Your account</p>
     <h1 className="responsive-title mt-2 font-semibold sm:mt-3">Personal profile</h1>

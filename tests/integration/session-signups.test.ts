@@ -5,7 +5,7 @@ import { createTestIdentity } from "@/auth/test-fixture";
 import { createCommunity } from "@/community/create-community";
 import { getDb } from "@/db/client";
 import { listNotificationsForPerson } from "@/notifications/repository";
-import { updateCommunityNotificationPreferences } from "@/notifications/preferences";
+import { listNotificationPreferences, updateCommunityNotificationPreferences, updateNotificationPreferences } from "@/notifications/preferences";
 import {
   authUsers,
   characters,
@@ -71,7 +71,7 @@ async function identity(label: string) {
 describeWithDatabase("session signups", () => {
   beforeAll(async () => {
     [owner, gm] = await Promise.all([identity("owner"), identity("gm")]);
-    await Promise.all(Array.from({ length: 8 }, (_, index) => identity(`player-${index + 1}`)));
+    await Promise.all(Array.from({ length: 9 }, (_, index) => identity(`player-${index + 1}`)));
     community = await createCommunity(owner, { name: `Signup community ${suffix}` });
     await getDb().update(communities).set({ visibility: "public", scheduleVisibility: "public" })
       .where(eq(communities.id, community.id));
@@ -223,6 +223,26 @@ describeWithDatabase("session signups", () => {
     await expect(listNotificationsForPerson(owner.personId)).resolves.not.toEqual(
       expect.arrayContaining([expect.objectContaining({ kind: "gm.session.signup" })]),
     );
+  });
+
+  it("persists GM signup opt-out and applies it only to future deliveries", async () => {
+    const player = actors[10]!;
+    const allCommunityCategories = {
+      newGames: [community.id], membershipRequests: [community.id],
+      gmSignups: [], joinedGameChanges: [community.id], joinedGameCancellations: [community.id],
+    };
+    await updateNotificationPreferences(gm, { communities: allCommunityCategories, membershipStatus: true });
+    expect((await listNotificationPreferences(gm)).communities[0]?.gmSignups).toBe(false);
+
+    await signupForSession(player, community.slug, publishedSessionId, characterIdFor(player));
+    expect((await listNotificationsForPerson(gm.personId)).filter(({ kind }) => kind === "gm.session.signup")).toHaveLength(7);
+
+    await updateNotificationPreferences(gm, { communities: { ...allCommunityCategories, gmSignups: [community.id] }, membershipStatus: true });
+    expect((await listNotificationsForPerson(gm.personId)).filter(({ kind }) => kind === "gm.session.signup")).toHaveLength(7);
+    await cancelOwnSessionSignup(player, community.slug, publishedSessionId);
+    await signupForSession(player, community.slug, publishedSessionId, characterIdFor(player));
+    expect((await listNotificationsForPerson(gm.personId)).filter(({ kind }) => kind === "gm.session.signup")).toHaveLength(8);
+    await cancelOwnSessionSignup(player, community.slug, publishedSessionId);
   });
 
   it("lets the assigned GM select a missing character only from that player's eligible characters", async () => {

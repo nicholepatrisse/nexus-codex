@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { deliverMembershipStatus } from "@/notifications/deliveries";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { AuthenticatedActor } from "@/auth/actor";
@@ -116,8 +117,9 @@ export async function decideCommunityAdmission(
       .returning({ id: communityMembershipRequests.id });
     if (updated.length !== 1) return { status: "not-found" };
 
+    const auditEventId = randomUUID();
     await transaction.insert(communityAuditEvents).values({
-      id: randomUUID(),
+      id: auditEventId,
       communityId,
       actorPersonId: actor.personId,
       eventType:
@@ -128,6 +130,7 @@ export async function decideCommunityAdmission(
       details: { requestId },
       occurredAt: now,
     });
+    await deliverMembershipStatus(transaction as Database, request.personId, auditEventId, now);
     return { status: terminalStatus, requestId };
   });
 }
@@ -165,14 +168,16 @@ export async function cancelCommunityAdmission(
       });
     if (!cancelled) return { status: "not-found" };
 
+    const auditEventId = randomUUID();
     await transaction.insert(communityAuditEvents).values({
-      id: randomUUID(),
+      id: auditEventId,
       communityId: cancelled.communityId,
       actorPersonId: actor.personId,
       eventType: "community.membership.cancelled",
       details: { requestId },
       occurredAt: now,
     });
+    await deliverMembershipStatus(transaction as Database, actor.personId, auditEventId, now);
     return { status: "cancelled", requestId };
   });
 }

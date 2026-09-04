@@ -2,20 +2,20 @@
 
 import { revalidatePath } from "next/cache";
 import { AuthenticationRequiredError, requireAuthenticatedActor } from "@/auth/actor";
-import { updateCommunityNotificationPreferences } from "@/notifications/preferences";
+import { communityPreferenceKeys, updateNotificationPreferences } from "@/notifications/preferences";
 
-export interface NotificationPreferencesState { formError?: string; saved?: boolean; enabledCommunityIds?: string[] }
+export interface NotificationPreferencesState { formError?: string; saved?: boolean }
 
 export async function updateNotificationPreferencesAction(
   _previousState: NotificationPreferencesState,
   formData: FormData,
 ): Promise<NotificationPreferencesState> {
   try {
-    const enabledCommunityIds = formData.getAll("enabledCommunityId").map(String);
-    await updateCommunityNotificationPreferences(await requireAuthenticatedActor(), enabledCommunityIds);
+    const communities = Object.fromEntries(communityPreferenceKeys.map((key) => [key, formData.getAll(key).map(String)])) as Record<typeof communityPreferenceKeys[number], string[]>;
+    await updateNotificationPreferences(await requireAuthenticatedActor(), { communities, membershipStatus: formData.get("membershipStatus") === "on" });
     revalidatePath("/", "layout");
     revalidatePath("/profile");
-    return { saved: true, enabledCommunityIds };
+    return { saved: true };
   } catch (error) {
     if (error instanceof AuthenticationRequiredError) return { formError: "Your session expired. Sign in and try again." };
     return { formError: "We couldn’t save your notification preferences. Please try again." };

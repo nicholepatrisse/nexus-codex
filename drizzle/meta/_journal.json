@@ -449,6 +449,13 @@
       "when": 1788383807826,
       "tag": "0063_striped_bullseye",
       "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1788540119773,
+      "tag": "0064_fat_steve_rogers",
+      "breakpoints": true
     }
   ]
 }

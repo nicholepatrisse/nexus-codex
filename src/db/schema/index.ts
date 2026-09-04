@@ -440,6 +440,10 @@ export const communityNotificationPreferences = pgTable(
     personId: text("person_id").notNull().references(() => people.id, { onDelete: "cascade" }),
     communityId: text("community_id").notNull().references(() => communities.id, { onDelete: "cascade" }),
     newGameNotificationsEnabled: boolean("new_game_notifications_enabled").notNull().default(true),
+    membershipRequestNotificationsEnabled: boolean("membership_request_notifications_enabled").notNull().default(true),
+    gmSignupNotificationsEnabled: boolean("gm_signup_notifications_enabled").notNull().default(true),
+    joinedGameChangeNotificationsEnabled: boolean("joined_game_change_notifications_enabled").notNull().default(true),
+    joinedGameCancellationNotificationsEnabled: boolean("joined_game_cancellation_notifications_enabled").notNull().default(true),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   },
   (table) => [
@@ -447,6 +451,12 @@ export const communityNotificationPreferences = pgTable(
     index("community_notification_preferences_community_id_idx").on(table.communityId),
   ],
 );
+
+export const accountNotificationPreferences = pgTable("account_notification_preferences", {
+  personId: text("person_id").primaryKey().references(() => people.id, { onDelete: "cascade" }),
+  membershipStatusNotificationsEnabled: boolean("membership_status_notifications_enabled").notNull().default(true),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+});
 
 export const communityRoleGrants = pgTable(
   "community_role_grants",
@@ -544,6 +554,22 @@ export const newGameNotificationDeliveries = pgTable(
   (table) => [
     uniqueIndex("new_game_notification_deliveries_person_event_unique").on(table.personId, table.auditEventId),
     index("new_game_notification_deliveries_person_id_idx").on(table.personId),
+  ],
+);
+
+/** Durable recipients for preference-controlled notifications, captured at event time. */
+export const notificationDeliveries = pgTable(
+  "notification_deliveries",
+  {
+    personId: text("person_id").notNull().references(() => people.id, { onDelete: "cascade" }),
+    auditEventId: text("audit_event_id").notNull().references(() => communityAuditEvents.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("notification_deliveries_person_event_kind_unique").on(table.personId, table.auditEventId, table.kind),
+    index("notification_deliveries_person_id_idx").on(table.personId),
+    check("notification_deliveries_kind_check", sql`${table.kind} in ('owner.membership.pending', 'applicant.membership.status', 'gm.session.signup', 'session.changed', 'session.cancelled')`),
   ],
 );
 
