@@ -5,6 +5,7 @@ import { defaultPregenLevel, SFS2_PREGENS } from "@/character/sfs2-pregens";
 import { resolveCommunityAccessBySlug } from "@/authorization/community-access";
 import { canPerformCommunityOperation, type CommunityRole } from "@/authorization/policy";
 import { getDb } from "@/db/client";
+import { deliverSignupToGm } from "@/notifications/deliveries";
 import {
   communities,
   characters,
@@ -340,11 +341,13 @@ export async function signupForSession(
       createdAt: now,
       updatedAt: now,
     });
+    const auditEventId = randomUUID();
     await transaction.insert(communityAuditEvents).values({
-      id: randomUUID(), communityId: access.community.id, actorPersonId: actor.personId,
+      id: auditEventId, communityId: access.community.id, actorPersonId: actor.personId,
       eventType: status === "confirmed" ? "session.signup.confirmed" : "session.signup.waitlisted",
       details: { sessionId: session.id, signupId, gmPersonId: session.gmPersonId, ...values }, occurredAt: now,
     });
+    await deliverSignupToGm(transaction as Database, access.community.id, session.gmPersonId, auditEventId, now);
     return { status, signupId, replayed: false, ...(waitlistPosition ? { waitlistPosition } : {}) };
   });
 }

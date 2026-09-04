@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray, isNull, max, ne, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, max, sql } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import {
   characters,
@@ -9,6 +9,7 @@ import {
   communityRoleGrants,
   contentItems,
   newGameNotificationDeliveries,
+  notificationDeliveries,
   notificationReads,
   people,
   sessionSignups,
@@ -17,7 +18,7 @@ import {
 import { applicantNotificationDestination, type AppNotification } from "@/notifications/model";
 
 const applicantMessages: Record<string, string> = {
-  pending: "Your membership request is awaiting review.", approved: "Your membership request was approved.",
+  requested: "Your membership request is awaiting review.", approved: "Your membership request was approved.",
   rejected: "Your membership request was not approved.", cancelled: "Your membership request was cancelled.",
 };
 
@@ -31,18 +32,24 @@ export async function listNotificationsForPerson(personId: string, database = ge
       pendingCount: count(communityMembershipRequests.id),
       latestPendingAt: max(communityMembershipRequests.requestedAt),
     })
-      .from(communityRoleGrants).innerJoin(communities, eq(communities.id, communityRoleGrants.communityId))
-      .innerJoin(communityMembershipRequests, and(eq(communityMembershipRequests.communityId, communities.id), eq(communityMembershipRequests.status, "pending")))
+      .from(notificationDeliveries)
+      .innerJoin(communityAuditEvents, eq(communityAuditEvents.id, notificationDeliveries.auditEventId))
+      .innerJoin(communityRoleGrants, and(eq(communityRoleGrants.personId, notificationDeliveries.personId), eq(communityRoleGrants.communityId, communityAuditEvents.communityId)))
+      .innerJoin(communities, eq(communities.id, communityRoleGrants.communityId))
+      .innerJoin(communityMembershipRequests, and(eq(communityMembershipRequests.id, sql<string>`${communityAuditEvents.details}->>'requestId'`), eq(communityMembershipRequests.status, "pending")))
       .where(and(eq(communityRoleGrants.personId, personId), eq(communityRoleGrants.role, "owner"), eq(communityRoleGrants.status, "active"), isNull(communityRoleGrants.revokedAt)))
       .groupBy(communities.id, communities.name, communities.slug),
-    database.selectDistinctOn([communityMembershipRequests.communityId], {
-      requestId: communityMembershipRequests.id, communityName: communities.name, communitySlug: communities.slug,
-      communityVisibility: communities.visibility, status: communityMembershipRequests.status,
-      updatedAt: communityMembershipRequests.updatedAt, activeMembershipId: communityMemberships.id,
-    }).from(communityMembershipRequests).innerJoin(communities, eq(communities.id, communityMembershipRequests.communityId))
+    database.select({
+      eventId: communityAuditEvents.id, requestId: communityMembershipRequests.id, communityName: communities.name, communitySlug: communities.slug,
+      communityVisibility: communities.visibility, eventType: communityAuditEvents.eventType,
+      occurredAt: communityAuditEvents.occurredAt, activeMembershipId: communityMemberships.id,
+    }).from(notificationDeliveries)
+      .innerJoin(communityAuditEvents, eq(communityAuditEvents.id, notificationDeliveries.auditEventId))
+      .innerJoin(communityMembershipRequests, eq(communityMembershipRequests.id, sql<string>`${communityAuditEvents.details}->>'requestId'`))
+      .innerJoin(communities, eq(communities.id, communityMembershipRequests.communityId))
       .leftJoin(communityMemberships, and(eq(communityMemberships.communityId, communities.id), eq(communityMemberships.personId, personId), eq(communityMemberships.status, "active")))
-      .where(eq(communityMembershipRequests.personId, personId))
-      .orderBy(communityMembershipRequests.communityId, desc(communityMembershipRequests.requestedAt), desc(communityMembershipRequests.id)),
+      .where(and(eq(notificationDeliveries.personId, personId), eq(notificationDeliveries.kind, "applicant.membership.status")))
+      .orderBy(desc(communityAuditEvents.occurredAt)),
     database.select({
       eventId: communityAuditEvents.id, occurredAt: communityAuditEvents.occurredAt,
       communityName: communities.name, communitySlug: communities.slug, sessionId: sessions.id,
@@ -63,7 +70,8 @@ export async function listNotificationsForPerson(personId: string, database = ge
       sessionId: sessions.id,
       scenarioCode: contentItems.code,
       scenarioTitle: contentItems.title,
-    }).from(communityAuditEvents)
+    }).from(notificationDeliveries)
+      .innerJoin(communityAuditEvents, eq(communityAuditEvents.id, notificationDeliveries.auditEventId))
       .innerJoin(communities, and(
         eq(communities.id, communityAuditEvents.communityId),
         eq(communities.lifecycleStatus, "active"),
@@ -72,15 +80,12 @@ export async function listNotificationsForPerson(personId: string, database = ge
         eq(sessions.communityId, communities.id),
         eq(sessions.id, sql<string>`${communityAuditEvents.details}->>'sessionId'`),
       ))
-      .innerJoin(sessionSignups, and(
-        eq(sessionSignups.sessionId, sessions.id),
-        eq(sessionSignups.personId, personId),
-        inArray(sessionSignups.status, ["confirmed", "waitlisted"]),
-      ))
+      .innerJoin(sessionSignups, and(eq(sessionSignups.sessionId, sessions.id), eq(sessionSignups.personId, personId)))
       .innerJoin(contentItems, eq(contentItems.id, sessions.contentItemId))
       .where(and(
-        inArray(communityAuditEvents.eventType, ["session.published.updated", "session.cancelled"]),
-        ne(communityAuditEvents.actorPersonId, personId),
+        eq(notificationDeliveries.personId, personId),
+        inArray(notificationDeliveries.kind, ["session.changed", "session.cancelled"]),
+        inArray(sessionSignups.status, ["confirmed", "waitlisted"]),
       ))
       .orderBy(desc(communityAuditEvents.occurredAt))
       .limit(50),
@@ -95,7 +100,8 @@ export async function listNotificationsForPerson(personId: string, database = ge
       playerName: people.displayName,
       characterName: characters.name,
       pregenName: sql<string | null>`${communityAuditEvents.details}->>'pregenName'`,
-    }).from(communityAuditEvents)
+    }).from(notificationDeliveries)
+      .innerJoin(communityAuditEvents, eq(communityAuditEvents.id, notificationDeliveries.auditEventId))
       .innerJoin(communities, and(
         eq(communities.id, communityAuditEvents.communityId),
         eq(communities.lifecycleStatus, "active"),
@@ -107,10 +113,7 @@ export async function listNotificationsForPerson(personId: string, database = ge
       .innerJoin(contentItems, eq(contentItems.id, sessions.contentItemId))
       .innerJoin(people, eq(people.id, communityAuditEvents.actorPersonId))
       .leftJoin(characters, eq(characters.id, sql<string>`${communityAuditEvents.details}->>'characterId'`))
-      .where(and(
-        inArray(communityAuditEvents.eventType, ["session.signup.confirmed", "session.signup.waitlisted"]),
-        eq(sql<string>`${communityAuditEvents.details}->>'gmPersonId'`, personId),
-      ))
+      .where(and(eq(notificationDeliveries.personId, personId), eq(notificationDeliveries.kind, "gm.session.signup"), eq(sessions.gmPersonId, personId)))
       .orderBy(desc(communityAuditEvents.occurredAt))
       .limit(50),
   ]);
@@ -120,12 +123,14 @@ export async function listNotificationsForPerson(personId: string, database = ge
     message: `${row.pendingCount} membership ${row.pendingCount === 1 ? "request needs" : "requests need"} review.`,
     href: `/communities/${encodeURIComponent(row.communitySlug)}/settings`, occurredAt: new Date(0), actionable: true, isRead: false,
   }));
-  const applicantNotifications: AppNotification[] = applicantRows.map((row) => ({
-    id: `applicant-membership:${row.requestId}:${row.status}`, kind: "applicant.membership.status", title: row.communityName,
-    message: applicantMessages[row.status] ?? "Your membership request changed status.",
+  const applicantNotifications: AppNotification[] = applicantRows.map((row) => {
+    const status = row.eventType.replace("community.membership.", "");
+    return ({
+    id: `applicant-membership:${row.eventId}`, kind: "applicant.membership.status", title: row.communityName,
+    message: applicantMessages[status] ?? "Your membership request changed status.",
     href: applicantNotificationDestination(row.communityVisibility, Boolean(row.activeMembershipId), row.communitySlug),
-    occurredAt: row.updatedAt, actionable: row.status === "pending", isRead: false,
-  }));
+    occurredAt: row.occurredAt, actionable: status === "requested", isRead: false,
+  }); });
   const newGameNotifications: AppNotification[] = newGameRows.map((row) => ({
     id: `session-published:${row.eventId}`, kind: "session.published", title: row.communityName,
     message: `New game: ${row.scenarioCode} — ${row.scenarioTitle}.`,

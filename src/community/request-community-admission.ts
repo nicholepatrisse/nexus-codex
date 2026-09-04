@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { deliverMembershipRequestToOwners, deliverMembershipStatus } from "@/notifications/deliveries";
 import { and, desc, eq, sql } from "drizzle-orm";
 import type { AuthenticatedActor } from "@/auth/actor";
 import { acceptInvitationForAdmission } from "@/community/community-invitations";
@@ -134,14 +135,19 @@ export async function processCommunityAdmission(
     updatedAt: now,
   });
 
+  const requestedEventId = randomUUID();
   await transaction.insert(communityAuditEvents).values({
-    id: randomUUID(),
+    id: requestedEventId,
     communityId: community.id,
     actorPersonId: actor.personId,
     eventType: "community.membership.requested",
     details: { requestId },
     occurredAt: now,
   });
+  if (!automatic) {
+    await deliverMembershipRequestToOwners(transaction as Database, community.id, requestedEventId, now);
+    await deliverMembershipStatus(transaction as Database, actor.personId, requestedEventId, now);
+  }
 
   if (!automatic) {
     return { status: "pending", communityId: community.id, requestId };
@@ -161,14 +167,16 @@ export async function processCommunityAdmission(
     });
   }
 
+  const approvedEventId = randomUUID();
   await transaction.insert(communityAuditEvents).values({
-    id: randomUUID(),
+    id: approvedEventId,
     communityId: community.id,
     actorPersonId: actor.personId,
     eventType: "community.membership.approved",
     details: { requestId, policy: "automatic" },
     occurredAt: now,
   });
+  await deliverMembershipStatus(transaction as Database, actor.personId, approvedEventId, now);
 
   return { status: "admitted", communityId: community.id, requestId };
 }

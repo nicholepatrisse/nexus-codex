@@ -5,6 +5,7 @@ import { resolveCommunityAccessBySlug } from "@/authorization/community-access";
 import { canPerformSessionOperation } from "@/authorization/policy";
 import { getDb } from "@/db/client";
 import { communityAuditEvents, sessions } from "@/db/schema";
+import { deliverSessionChange } from "@/notifications/deliveries";
 import { type SessionDraftInput, updateSessionDraft } from "./session-drafts";
 
 type Database = ReturnType<typeof getDb>;
@@ -43,10 +44,12 @@ export async function updatePublishedSession(
     const now = new Date();
     await transaction.update(sessions).set({ status: "published", updatedAt: now })
       .where(eq(sessions.id, sessionId));
+    const auditEventId = randomUUID();
     await transaction.insert(communityAuditEvents).values({
-      id: randomUUID(), communityId: access.community.id, actorPersonId: actor.personId,
+      id: auditEventId, communityId: access.community.id, actorPersonId: actor.personId,
       eventType: "session.published.updated", details: { sessionId }, occurredAt: now,
     });
+    await deliverSessionChange(transaction as Database, access.community.id, sessionId, actor.personId, auditEventId, "session.changed", now);
     return { status: "updated", sessionId };
   });
 }
@@ -70,10 +73,12 @@ export async function cancelPublishedSession(
     const now = new Date();
     await transaction.update(sessions).set({ status: "cancelled", updatedByPersonId: actor.personId, updatedAt: now })
       .where(and(eq(sessions.id, sessionId), eq(sessions.status, "published")));
+    const auditEventId = randomUUID();
     await transaction.insert(communityAuditEvents).values({
-      id: randomUUID(), communityId: access.community.id, actorPersonId: actor.personId,
+      id: auditEventId, communityId: access.community.id, actorPersonId: actor.personId,
       eventType: "session.cancelled", details: { sessionId }, occurredAt: now,
     });
+    await deliverSessionChange(transaction as Database, access.community.id, sessionId, actor.personId, auditEventId, "session.cancelled", now);
     return { status: "cancelled", sessionId, replayed: false };
   });
 }
