@@ -7,7 +7,7 @@ describe("community list", () => {
     const markup = renderToStaticMarkup(<CommunityList communities={[]} />);
 
     expect(markup).toContain("No communities yet");
-    expect(markup).toContain('href="/communities"');
+    expect(markup).toContain('href="/communities/directory"');
     expect(markup).toContain("Find communities");
     expect(markup).toContain('href="/communities/new"');
   });

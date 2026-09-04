@@ -14,6 +14,6 @@ describe("browse games list", () => {
     expect(renderToStaticMarkup(<BrowseGamesList games={[]} />)).toContain("No upcoming games");
     const link = renderToStaticMarkup(<FindMoreCommunitiesLink />);
     expect(link).toContain("Find new communities");
-    expect(link).toContain('href="/communities"');
+    expect(link).toContain('href="/communities/directory"');
   });
 });

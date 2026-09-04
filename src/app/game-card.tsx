@@ -50,8 +50,10 @@ function RelationshipPill({ relationship, waitlistPosition }: { relationship: Ga
 export function GameCard({ href, scenarioCode, scenarioTitle, startsAt, displayTimeZone, status, paizoReportedAt, gmName, communityName, confirmedCount, capacity, relationship, waitlistPosition, characterName, warning, actions }: GameCardProps) {
   const cancelled = status === "cancelled";
   const scenario = scenarioCode ? `${scenarioCode} — ${scenarioTitle}` : scenarioTitle;
-  return <article className={`card-standard flex h-full min-w-0 flex-col p-4 sm:p-5 ${cancelled ? "border-danger/40" : warning ? "border-warning/40" : ""}`}>
-    <div className="min-w-0">
+  return <article className={`card-standard card-interactive relative flex h-full min-w-0 flex-col p-4 pl-16 sm:p-5 sm:pl-20 ${cancelled ? "border-danger/40" : warning ? "border-warning/40" : ""}`}>
+    <span aria-hidden="true" className="absolute top-4 left-4 grid size-10 place-items-center rounded-xl bg-brand-muted text-brand sm:top-5 sm:left-5 sm:size-11"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="size-5"><rect x="4" y="5.5" width="16" height="14" rx="2" /><path strokeLinecap="round" d="M8 3.5v4M16 3.5v4M4 10h16" /></svg></span>
+    <span aria-hidden="true" className="absolute top-1/2 right-4 -translate-y-1/2 text-2xl text-brand">›</span>
+    <div className="min-w-0 pr-7">
       <h3 className="min-w-0 font-semibold text-text-primary">
         <Link href={href} className="break-words hover:text-brand hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand">{scenario}</Link>
       </h3>
@@ -61,7 +63,7 @@ export function GameCard({ href, scenarioCode, scenarioTitle, startsAt, displayT
         <SessionStatusPill status={status} startsAt={startsAt} paizoReportedAt={paizoReportedAt} />
       </div>
     </div>
-    <dl className="mt-4 grid min-w-0 grid-cols-1 gap-x-5 gap-y-2 text-sm sm:grid-cols-2">
+    <dl className="mt-4 grid min-w-0 grid-cols-1 gap-x-5 gap-y-2 pr-7 text-sm sm:grid-cols-2">
       <div className="min-w-0 sm:col-span-2"><dt className="sr-only">Date and time</dt><dd><time dateTime={startsAt.toISOString()} className={cancelled ? "text-danger line-through" : "text-text-muted"}>{formatGameDateTime(startsAt, displayTimeZone)}</time></dd></div>
       {gmName ? <div className="min-w-0"><dt className="sr-only">Game Master</dt><dd className="break-words text-text-muted">GM: {gmName}</dd></div> : null}
       {communityName ? <div className="min-w-0"><dt className="sr-only">Community</dt><dd className="break-words text-text-muted">{communityName}</dd></div> : null}

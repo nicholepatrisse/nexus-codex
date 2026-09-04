@@ -1,71 +1,22 @@
 import Link from "next/link";
-import { PublicCommunityList } from "@/app/communities/public-community-list";
-import { directoryHref, parseDirectoryQuery } from "@/app/communities/discovery-query";
-import { listPublicCommunities } from "@/community/public-discovery";
+import { redirect } from "next/navigation";
+import { CommunityList } from "@/app/my-communities";
 import { socialMetadata } from "@/app/social-metadata";
+import { getAuthenticatedActor } from "@/auth/actor";
+import { listHomepageAdmissionStatusesForPerson, listHomepageCommunitiesForPerson } from "@/community/repository";
 
-export const metadata = socialMetadata({
-  title: "Public Communities | Nexus Codex",
-  description: "Browse public Starfinder 2E communities, games, and sessions on Nexus Codex.",
-  pathname: "/communities",
-});
-
+export const metadata = socialMetadata({ title: "My Communities | Nexus Codex", description: "Manage your Starfinder 2E communities on Nexus Codex.", pathname: "/communities" });
 export const dynamic = "force-dynamic";
 
-interface CommunitiesPageProps {
-  searchParams: Promise<{ page?: string | string[] }>;
-}
-
-export default async function CommunitiesPage({ searchParams }: CommunitiesPageProps) {
-  const { page } = parseDirectoryQuery(await searchParams);
-  const result = await listPublicCommunities({ page }).catch(() => null);
-
-  if (!result) {
-    return (
-      <main className="page-shell mx-auto min-h-screen max-w-5xl sm:py-24">
-        <section className="card-standard responsive-card">
-          <h1 className="text-3xl font-semibold">Community directory unavailable</h1>
-          <p className="mt-3 text-text-muted">Please try again in a moment.</p>
-        </section>
-      </main>
-    );
-  }
-
-  const pageCount = Math.max(1, Math.ceil(result.total / result.pageSize));
-
-  return (
-    <main className="page-shell mx-auto min-h-screen max-w-5xl sm:py-24">
-      <section>
-        <p className="text-sm font-semibold tracking-[0.2em] text-brand uppercase">
-          Community directory
-        </p>
-        <h1 className="responsive-title mt-3 font-semibold sm:text-5xl">
-          Public communities
-        </h1>
-        <p className="mt-4 max-w-2xl leading-7 text-text-muted">
-          Browse communities that have chosen to make their profile public.
-        </p>
-
-        <PublicCommunityList communities={result.items} />
-
-        {pageCount > 1 ? (
-          <nav aria-label="Community results pages" className="mt-8 flex items-center gap-4">
-            {page > 1 ? (
-              <Link href={directoryHref(page - 1)} className="text-brand hover:underline">
-                ← Previous
-              </Link>
-            ) : null}
-            <span className="text-sm text-text-muted">
-              Page {Math.min(page, pageCount)} of {pageCount}
-            </span>
-            {page < pageCount ? (
-              <Link href={directoryHref(page + 1)} className="text-brand hover:underline">
-                Next →
-              </Link>
-            ) : null}
-          </nav>
-        ) : null}
-      </section>
-    </main>
-  );
+export default async function CommunitiesPage() {
+  const actor = await getAuthenticatedActor();
+  if (!actor) redirect("/communities/directory");
+  const [communities, admissions] = await Promise.all([
+    listHomepageCommunitiesForPerson(actor.personId),
+    listHomepageAdmissionStatusesForPerson(actor.personId),
+  ]);
+  return <main className="page-shell mx-auto min-h-screen max-w-5xl sm:py-16">
+    <div className="flex flex-wrap items-end justify-between gap-5"><div><p className="text-sm font-semibold tracking-[0.2em] text-brand uppercase">Your space</p><h1 className="responsive-title mt-3 font-semibold sm:text-5xl">My communities</h1><p className="mt-4 max-w-2xl leading-7 text-text-muted">Open the communities you belong to, review membership requests, or discover another table.</p></div><div className="flex flex-wrap gap-3"><Link href="/communities/directory" className="inline-flex min-h-11 items-center rounded-full border border-border-strong px-5 py-2.5 text-sm font-semibold transition hover:border-brand hover:text-brand">Browse community directory <span aria-hidden="true" className="ml-2">→</span></Link><Link href="/communities/new" className="inline-flex min-h-11 items-center rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-on-brand transition hover:bg-brand-hover">Create a community</Link></div></div>
+    <CommunityList communities={communities} admissions={admissions} showAll hideHeading />
+  </main>;
 }

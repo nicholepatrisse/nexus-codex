@@ -99,9 +99,13 @@ export function AdmissionStatusList({ admissions }: { admissions: AdmissionSumma
 export function CommunityList({
   communities,
   admissions = [],
+  showAll = false,
+  hideHeading = false,
 }: {
   communities: CommunitySummary[];
   admissions?: AdmissionSummary[];
+  showAll?: boolean;
+  hideHeading?: boolean;
 }) {
   const activeCommunities = communities.filter(({ lifecycleStatus }) => lifecycleStatus === "active");
   const archivedCommunities = communities.filter(
@@ -109,8 +113,8 @@ export function CommunityList({
   );
 
   return (
-    <section aria-labelledby="my-communities-heading" className="mt-14 border-t border-border pt-10">
-      <div className="flex flex-wrap items-end justify-between gap-5">
+    <section aria-label={hideHeading ? "My communities" : undefined} aria-labelledby={hideHeading ? undefined : "my-communities-heading"} className={hideHeading ? "mt-8" : "mt-14 border-t border-border pt-10"}>
+      {!hideHeading ? <div className="flex flex-wrap items-end justify-between gap-5">
         <div>
           <p className="text-sm font-semibold tracking-[0.2em] text-brand uppercase">
             Your space
@@ -121,7 +125,7 @@ export function CommunityList({
         </div>
         <div className="flex flex-wrap gap-3">
           <Link
-            href="/communities"
+            href="/communities/directory"
             className="inline-flex rounded-full border border-border-strong px-5 py-2.5 text-sm font-semibold transition hover:border-brand hover:text-brand"
           >
             Find communities
@@ -133,7 +137,7 @@ export function CommunityList({
             Create a community
           </Link>
         </div>
-      </div>
+      </div> : null}
 
       {activeCommunities.length === 0 && archivedCommunities.length === 0 ? (
         <EmptyState className="accent-brand-gradient mt-6" icon={<SparkAccent size={14} />} title="No communities yet" description="Create a community to start organizing Society games." />
@@ -141,7 +145,7 @@ export function CommunityList({
 
       {activeCommunities.length > 0 ? (
         <ul className="mt-6 grid gap-4 sm:grid-cols-2">
-          {activeCommunities.slice(0, 2).map((community) => (
+          {(showAll ? activeCommunities : activeCommunities.slice(0, 2)).map((community) => (
             <li key={community.id}>
               <CommunityCard name={community.name} slug={community.slug} href={`/communities/${community.slug}`} metadata={<span className="capitalize">{community.visibility} community</span>} />
             </li>
@@ -158,7 +162,7 @@ export function CommunityList({
             Only owners can see archived communities and restore them.
           </p>
           <ul className="mt-4 grid gap-4 sm:grid-cols-2">
-            {archivedCommunities.slice(0, 2).map((community) => (
+            {(showAll ? archivedCommunities : archivedCommunities.slice(0, 2)).map((community) => (
               <li key={community.id}>
                 <CommunityCard name={community.name} slug={community.slug} href={`/communities/${community.slug}/settings`} metadata="Archived · Open settings to restore" muted />
               </li>
