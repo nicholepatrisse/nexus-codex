@@ -10,9 +10,12 @@ export interface PublicCommunitySummary {
 
 export function PublicCommunityList({
   communities,
+  joinedCommunityIds = [],
 }: {
   communities: PublicCommunitySummary[];
+  joinedCommunityIds?: readonly string[];
 }) {
+  const joinedIds = new Set(joinedCommunityIds);
   if (communities.length === 0) {
     return (
       <EmptyState className="mt-8 p-7" title="No public communities yet" description="Public communities will appear here when they are available." />
@@ -27,7 +30,7 @@ export function PublicCommunityList({
       <ul className="grid gap-4 sm:grid-cols-2">
         {communities.map((community) => (
           <li key={community.id}>
-            <CommunityCard name={community.name} slug={community.slug} description={community.description} href={`/communities/${encodeURIComponent(community.slug)}`} />
+            <CommunityCard name={community.name} slug={community.slug} description={community.description} href={`/communities/${encodeURIComponent(community.slug)}`} joined={joinedIds.has(community.id)} />
           </li>
         ))}
       </ul>

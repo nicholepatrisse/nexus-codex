@@ -12,7 +12,7 @@ describe("public community discovery query", () => {
   });
 
   it("builds pagination links", () => {
-    expect(directoryHref(3)).toBe("/communities?page=3");
-    expect(directoryHref(1)).toBe("/communities");
+    expect(directoryHref(3)).toBe("/communities/directory?page=3");
+    expect(directoryHref(1)).toBe("/communities/directory");
   });
 });

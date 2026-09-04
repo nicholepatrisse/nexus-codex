@@ -18,5 +18,5 @@ export function parseDirectoryQuery(parameters: {
 }
 
 export function directoryHref(page: number): string {
-  return page > 1 ? `/communities?page=${page}` : "/communities";
+  return page > 1 ? `/communities/directory?page=${page}` : "/communities/directory";
 }

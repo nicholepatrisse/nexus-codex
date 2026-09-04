@@ -11,5 +11,5 @@ export function BrowseGamesList({ games }: { games: readonly CommunityGame[] }) 
 }
 
 export function FindMoreCommunitiesLink() {
-  return <Link href="/communities" className="inline-flex min-h-11 items-center rounded-full border border-border-strong px-5 py-2.5 text-sm font-semibold transition hover:border-brand hover:text-brand focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand">Find new communities</Link>;
+  return <Link href="/communities/directory" className="inline-flex min-h-11 items-center rounded-full border border-border-strong px-5 py-2.5 text-sm font-semibold transition hover:border-brand hover:text-brand focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand">Find new communities</Link>;
 }

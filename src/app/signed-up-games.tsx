@@ -29,7 +29,7 @@ export function SignedUpGamesList({
     {games.length === 0 ? <div className="mt-6 rounded-2xl border border-dashed border-border-strong bg-surface p-6">
       <p className="font-semibold">{emptyHeading}</p>
       <p className="mt-2 text-sm text-text-muted">{emptyMessage}</p>
-    </div> : <ul className="mt-6 grid gap-4 sm:grid-cols-2">
+    </div> : <ul className="mt-6 grid gap-5 lg:grid-cols-2">
       {games.map((game) => {
         return <li key={game.sessionId}>
           <GameCard href={`/communities/${encodeURIComponent(game.communitySlug)}/sessions/${encodeURIComponent(game.sessionId)}`} scenarioCode={game.scenarioCode} scenarioTitle={game.scenarioTitle} startsAt={game.startsAt} displayTimeZone={game.displayTimeZone} status={game.sessionStatus} paizoReportedAt={game.paizoReportedAt} communityName={game.communityName} relationship={game.participationRole === "gm" ? "gm" : game.signupStatus === "waitlisted" ? "waitlisted" : "registered"} waitlistPosition={game.waitlistPosition} characterName={game.participationRole === "player" ? game.characterName : null} />

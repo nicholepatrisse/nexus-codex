@@ -31,4 +31,15 @@ describe("public community discovery list", () => {
     expect(markup).not.toContain("private");
     expect(markup).not.toContain("archived");
   });
+
+  it("gives joined communities a distinct treatment", () => {
+    const markup = renderToStaticMarkup(<PublicCommunityList communities={[
+      { id: "joined", name: "Joined Lodge", slug: "joined-lodge", description: null },
+      { id: "available", name: "Available Lodge", slug: "available-lodge", description: null },
+    ]} joinedCommunityIds={["joined"]} />);
+
+    expect(markup).toContain("Joined");
+    expect(markup).toContain("border-l-success");
+    expect(markup.match(/>Joined</g)).toHaveLength(1);
+  });
 });

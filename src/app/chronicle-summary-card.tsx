@@ -21,8 +21,10 @@ export function ChronicleSummaryCard({ href, scenarioNumber, scenarioName, playe
   actions?: ReactNode;
   secondaryActions?: ReactNode;
 }) {
-  return <article className="card-standard card-interactive h-full p-5">
-    <div className="flex items-start justify-between gap-4">
+  return <article className="card-standard card-interactive card-stable-warning-rail relative h-full border-l-4 border-l-warning p-5 pl-20">
+    <span aria-hidden="true" className="absolute top-5 left-4 grid size-11 place-items-center rounded-full bg-warning/10 text-xl text-warning">✦</span>
+    <span aria-hidden="true" className="absolute top-1/2 right-4 -translate-y-1/2 text-2xl text-brand">›</span>
+    <div className="flex items-start justify-between gap-4 pr-7">
       <div className="min-w-0">
         {chronicleNumber ? <p className="text-xs font-semibold tracking-wide text-text-muted uppercase">Chronicle {chronicleNumber}</p> : null}
         <div className={`${chronicleNumber ? "mt-1" : ""} flex flex-wrap items-center gap-2`}>

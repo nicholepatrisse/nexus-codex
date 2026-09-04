@@ -21,7 +21,7 @@ export default async function ChooseGameCommunityPage() {
         <section className="mt-8 rounded-3xl border border-border bg-surface p-6">
           <h2 className="text-xl font-semibold">You need an eligible community first</h2>
           <p className="mt-2 text-text-muted">Join or create a community, or ask a community owner for Game Master access.</p>
-          <div className="mt-6 flex flex-wrap gap-3"><Link href="/communities" className="rounded-full border border-border-strong px-5 py-2.5 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand">Find communities</Link><Link href="/communities/new" className="rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-on-brand focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand">Create a community</Link></div>
+          <div className="mt-6 flex flex-wrap gap-3"><Link href="/communities/directory" className="rounded-full border border-border-strong px-5 py-2.5 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand">Find communities</Link><Link href="/communities/new" className="rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-on-brand focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand">Create a community</Link></div>
         </section>
       ) : (
         <section aria-labelledby="community-choice-heading" className="mt-8">
