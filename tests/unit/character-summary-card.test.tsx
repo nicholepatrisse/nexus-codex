@@ -13,6 +13,7 @@ describe("character summary card", () => {
     const markup = renderToStaticMarkup(<CharacterSummaryCard character={character} validation={validation} />);
     expect(markup).toContain(rail);
     expect(markup).toContain(tone);
+    expect(markup).toContain("select-none");
     expect(markup).toContain(validation);
     expect(markup).toContain('href="/characters/character%2Fone"');
   });
