@@ -1,7 +1,8 @@
 import { load } from "cheerio";
 
 const HOST = "2e.aonsrd.com";
-const ITEM_PATH = /^\/(?:treasure\/[^/]+|equipment\/(?:armor|shields|weapons)\/[^/]+)\/?$/i;
+const ITEM_PATH = /^\/(?:treasure\/[^/]+|equipment\/(?:ammunition|armor|shields|weapons)\/[^/]+)\/?$/i;
+const ITEM_ROOT_SELECTOR = ".ammunition-type, .treasure, .armor, .shield, .weapon";
 
 export type NethysItem = {
   url: string;
@@ -46,7 +47,9 @@ export function validateNethysItemUrl(value: string) {
 
 const clean = (value?: string | null) => value?.replace(/\s+/g, " ").trim() || undefined;
 
-function parseItemRoot($: ReturnType<typeof load>, root: ReturnType<ReturnType<typeof load>>, sourceUrl: string, inheritedSocietyStatus?: NethysItem["societyStatus"]): NethysItem {
+type InheritedItemMetadata = Pick<NethysItem, "societyStatus" | "source" | "sourceUrl">;
+
+function parseItemRoot($: ReturnType<typeof load>, root: ReturnType<ReturnType<typeof load>>, sourceUrl: string, inherited: InheritedItemMetadata = {}): NethysItem {
   const rootElement = root.get(0);
 
   const title = root.children("h1.title, h2.title").first().clone();
@@ -57,7 +60,7 @@ function parseItemRoot($: ReturnType<typeof load>, root: ReturnType<ReturnType<t
   if (!name) throw new NethysItemError("parse_failed", "Nethys returned the page, but its required item details could not be read.");
 
   const values = new Map<string, string>();
-  root.find("b, strong").filter((_index, element) => $(element).closest(".treasure, .armor, .shield, .weapon").get(0) === rootElement).each((_index, element) => {
+  root.find("b, strong").filter((_index, element) => $(element).closest(ITEM_ROOT_SELECTOR).get(0) === rootElement).each((_index, element) => {
     const label = clean($(element).text())?.replace(/:$/, "").toLowerCase();
     const parent = $(element).parent().clone();
     parent.find("b, strong").first().remove();
@@ -66,13 +69,16 @@ function parseItemRoot($: ReturnType<typeof load>, root: ReturnType<ReturnType<t
   });
   const price = values.get("price");
   const creditMatch = price?.match(/^([\d,]+(?:\.\d+)?)\s+credits?$/i);
-  const traits = root.find(".trait, .traits a, a.link-trait").filter((_index, element) => $(element).closest(".treasure, .armor, .shield, .weapon").get(0) === rootElement).map((_index, element) => clean($(element).text())).get().filter((value): value is string => Boolean(value));
+  const traits = root.find(".trait, .traits a, a.link-trait").filter((_index, element) => $(element).closest(ITEM_ROOT_SELECTOR).get(0) === rootElement).map((_index, element) => clean($(element).text())).get().filter((value): value is string => Boolean(value));
   const rarity = traits.find((trait) => /^(common|uncommon|rare|unique)$/i.test(trait));
   const societyMarker = root.find(".sfs img").first();
   const societyMarkerText = [societyMarker.attr("alt"), societyMarker.attr("title"), societyMarker.attr("src")].filter(Boolean).join(" ");
-  const societyStatus = /\brestricted\b/i.test(societyMarkerText) ? "restricted" : /\blimited\b/i.test(societyMarkerText) ? "limited" : /\bstandard\b/i.test(societyMarkerText) ? "standard" : inheritedSocietyStatus;
+  const societyStatus = /\brestricted\b/i.test(societyMarkerText) ? "restricted" : /\blimited\b/i.test(societyMarkerText) ? "limited" : /\bstandard\b/i.test(societyMarkerText) ? "standard" : inherited.societyStatus;
   const societyLegal = societyStatus === "restricted" ? false : undefined;
   const pathCategory = new URL(sourceUrl).pathname.split("/")[1];
+  const sourceElement = root.children(".sources").first();
+  const source = clean(sourceElement.text())?.replace(/^Source\s*/i, "") ?? inherited.source;
+  const canonicalSourceUrl = (() => { const href = sourceElement.find("a[href]").first().attr("href"); if (!href) return inherited.sourceUrl; try { const resolved = new URL(href, sourceUrl); return resolved.hostname === HOST && /^\/sources\//i.test(resolved.pathname) ? resolved.href : inherited.sourceUrl; } catch { return inherited.sourceUrl; } })();
 
   return {
     url: sourceUrl,
@@ -82,26 +88,49 @@ function parseItemRoot($: ReturnType<typeof load>, root: ReturnType<ReturnType<t
     priceCredits: creditMatch?.[1] ? Number(creditMatch[1].replaceAll(",", "")) : undefined,
     hands: values.get("hands"),
     bulk: values.get("bulk"),
-    source: clean(root.children(".sources").first().text())?.replace(/^Source\s*/i, ""),
-    sourceUrl: (() => { const href = root.children(".sources").first().find("a[href]").first().attr("href"); if (!href) return undefined; try { const resolved = new URL(href, sourceUrl); return resolved.hostname === HOST && /^\/sources\//i.test(resolved.pathname) ? resolved.href : undefined; } catch { return undefined; } })(),
+    source,
+    sourceUrl: canonicalSourceUrl,
     description: clean(root.children(".treasure-description, .description").first().text()),
     traits: [...new Set(traits)],
     rarity,
     societyLegal,
     societyStatus,
     usage: values.get("usage"),
-    category: pathCategory === "treasure" ? "Treasure" : clean(pathCategory)?.replace(/^./, (letter) => letter.toUpperCase()),
+    category: pathCategory === "treasure" ? "Treasure" : root.hasClass("ammunition-type") ? "Ammunition" : clean(pathCategory)?.replace(/^./, (letter) => letter.toUpperCase()),
   };
 }
 
 export function parseNethysItemsHtml(html: string, sourceUrl: string): NethysItem[] {
   const $ = load(html);
-  const root = $(".treasure, .armor, .shield, .weapon").first();
+  const root = $(ITEM_ROOT_SELECTOR).first();
   if (!root.length) throw new NethysItemError("not_item", "The referenced page does not appear to contain a supported item.");
-  const variants = root.children(".treasure, .armor, .shield, .weapon");
+  const variants = root.children(ITEM_ROOT_SELECTOR);
   const parentMarker = root.children("h1.title, h2.title").first().find(".sfs img").first();
   const parentMarkerText = [parentMarker.attr("alt"), parentMarker.attr("title"), parentMarker.attr("src")].filter(Boolean).join(" ");
   const parentSocietyStatus: NethysItem["societyStatus"] = /\brestricted\b/i.test(parentMarkerText) ? "restricted" : /\blimited\b/i.test(parentMarkerText) ? "limited" : /\bstandard\b/i.test(parentMarkerText) ? "standard" : undefined;
+  const parentSourceElement = root.children(".sources").first();
+  const parentSource = clean(parentSourceElement.text())?.replace(/^Source\s*/i, "");
+  const parentSourceUrl = (() => { const href = parentSourceElement.find("a[href]").first().attr("href"); if (!href) return undefined; try { const resolved = new URL(href, sourceUrl); return resolved.hostname === HOST && /^\/sources\//i.test(resolved.pathname) ? resolved.href : undefined; } catch { return undefined; } })();
+  const inherited = { societyStatus: parentSocietyStatus, source: parentSource, sourceUrl: parentSourceUrl };
+  if (root.hasClass("ammunition-type")) {
+    const ammunitionTable = root.find("table.table-ammunition-grades").first();
+    const headings = ammunitionTable.find("thead th").map((_index, heading) => clean($(heading).text())?.toLowerCase()).get();
+    const nameIndex = headings.indexOf("ammunition");
+    const levelIndex = headings.indexOf("level");
+    const priceIndex = headings.indexOf("price");
+    const bulkIndex = headings.indexOf("bulk");
+    const ammunition = ammunitionTable.find("tbody tr").toArray().flatMap((row) => {
+      const cells = $(row).children("td").toArray().map((cell) => clean($(cell).text()));
+      const name = cells[nameIndex];
+      const level = Number(cells[levelIndex]);
+      const price = cells[priceIndex];
+      if (!name || !Number.isInteger(level) || level < 0) return [];
+      const parsed = parseItemRoot($, root, sourceUrl, inherited);
+      const creditMatch = price?.match(/^([\d,]+(?:\.\d+)?)\s+credits?$/i);
+      return [{ ...parsed, name, level, price, priceCredits: creditMatch?.[1] ? Number(creditMatch[1].replaceAll(",", "")) : undefined, bulk: cells[bulkIndex] }];
+    });
+    if (ammunition.length) return ammunition;
+  }
   if (root.hasClass("weapon")) {
     const gradeTable = root.find("table").filter((_index, table) => {
       const headings = $(table).find("thead th").map((_headingIndex, heading) => clean($(heading).text())?.toLowerCase()).get();
@@ -120,14 +149,14 @@ export function parseNethysItemsHtml(html: string, sourceUrl: string): NethysIte
         if (!name || !Number.isInteger(level) || level < 0) return [];
         const variant = root.clone();
         variant.children("h1.title, h2.title").first().html(`${name}<span class="feature-level">Item ${level}</span>`);
-        const parsed = parseItemRoot($, variant, sourceUrl, parentSocietyStatus);
+        const parsed = parseItemRoot($, variant, sourceUrl, inherited);
         const creditMatch = price?.match(/^([\d,]+(?:\.\d+)?)\s+credits?$/i);
         return [{ ...parsed, name, level, price, priceCredits: creditMatch?.[1] ? Number(creditMatch[1].replaceAll(",", "")) : undefined }];
       });
       if (weaponVariants.length) return weaponVariants;
     }
   }
-  return (variants.length ? variants.toArray().map((element) => $(element)) : [root]).map((itemRoot) => parseItemRoot($, itemRoot, sourceUrl, parentSocietyStatus));
+  return (variants.length ? variants.toArray().map((element) => $(element)) : [root]).map((itemRoot) => parseItemRoot($, itemRoot, sourceUrl, inherited));
 }
 
 export function parseNethysItemHtml(html: string, sourceUrl: string): NethysItem {
