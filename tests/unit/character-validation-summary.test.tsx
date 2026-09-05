@@ -7,6 +7,7 @@ import type { CharacterDetail } from "@/character/characters";
 import type { IdentityValidationContext } from "@/character/identity-validation";
 import type { ValidatedInventoryEntry } from "@/character/inventory";
 import { invalid, unvalidated, validated } from "@/validation/advisory-validation";
+import type { CharacterOptionSelection } from "@/character/option-selections";
 
 const character = (fields: Partial<CharacterDetail> = {}): CharacterDetail => ({ id: "char-1", name: "Nova", societyNumber: "123-2001", gameSystemName: "Starfinder 2E", startingLevel: 1, startingLevelLocked: false, startingCredits: 1000, startingItems: [], currentLevel: 1, xp: 0, creditsMinor: 1000, className: null, classValidationNote: null, ancestry: null, ancestryValidationNote: null, ancestrySourceChronicleId: null, ancestrySourceChronicleCharacterId: null, background: null, backgroundValidationNote: null, backgroundSourceChronicleId: null, backgroundSourceChronicleCharacterId: null, backstory: null, notes: null, isOwner: true, upcomingSessions: [], pastSessions: [], ...fields });
 const context: IdentityValidationContext = { ownedMaterialIdentities: ["player-core"], options: [
@@ -14,6 +15,7 @@ const context: IdentityValidationContext = { ownedMaterialIdentities: ["player-c
   { optionType: "background", name: "Outlaw", sourceMaterialIdentity: "restricted-book", sourceMaterialTitle: "Restricted Book", sourceUrl: "https://2e.aonsrd.com/backgrounds/outlaw", metadata: { societyLegal: false } },
 ] };
 const item = (id: string, status: "validated" | "unvalidated" | "invalid"): ValidatedInventoryEntry => ({ id, itemNameSnapshot: `Item ${id}`, sourceMaterialTitle: "Galaxy Guide", validationNote: status === "validated" ? null : "Access from a boon", validation: status === "validated" ? validated() : status === "unvalidated" ? unvalidated("unsupported_access_rule", "Nexus cannot confirm this access.") : invalid("society_restriction", "This item is SFS Restricted."), } as ValidatedInventoryEntry);
+const feat = { id: "feat-1", characterId: "char-1", selectionKind: "feat", featCategory: "general", acquiredLevel: 1, acquisitionMethod: "awarded", grantOrigin: "Scenario reward", characterOptionId: "catalog-feat", nameSnapshot: "Awarded Feat", sourceMaterialIdentitySnapshot: "player-core", sourceMaterialTitleSnapshot: "Starfinder Player Core", sourceUrlSnapshot: "https://2e.aonsrd.com/feats/1", validationNote: "Shown on Chronicle", sourceChronicleId: "chronicle-1", createdAt: new Date(), updatedAt: new Date() } as CharacterOptionSelection;
 
 describe("character validation summary", () => {
   it("treats an empty character as validated with zero counts", () => {
@@ -56,5 +58,12 @@ describe("character validation summary", () => {
     expect(html).toContain('href="https://2e.aonsrd.com/backgrounds/outlaw"');
     expect(html).not.toContain("Review option");
     expect(html).not.toContain("/edit");
+  });
+
+  it("counts each heritage and feat once and links review to its edit section", () => {
+    const optionContext: IdentityValidationContext = { ...context, options: [...context.options, { id: "catalog-feat", optionType: "feat", name: "Awarded Feat", sourceMaterialIdentity: "player-core", sourceMaterialTitle: "Starfinder Player Core", sourceUrl: "https://2e.aonsrd.com/feats/1", metadata: { level: 1, featCategory: "general" } }] };
+    const summary = deriveCharacterValidationSummary(character(), optionContext, [], [feat]);
+    expect(summary).toMatchObject({ validatedCount: 0, unvalidatedCount: 1, invalidCount: 0, details: [{ category: "Feat", playerNote: "Shown on Chronicle", sourceChronicleHref: "/characters/char-1/chronicles/chronicle-1", editHref: "/characters/char-1/edit#heritage-feats" }] });
+    expect(renderToStaticMarkup(createElement(SummaryView, { summary, readOnly: true }))).toContain('href="/characters/char-1/chronicles/chronicle-1"');
   });
 });
