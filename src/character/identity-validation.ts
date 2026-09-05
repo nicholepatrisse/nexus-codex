@@ -4,7 +4,7 @@ import { validated, validationReasons } from "@/validation/advisory-validation";
 import { isFreeAccessMaterial, materialTitleWithoutCitation, normalizeMaterialIdentity } from "@/materials/material-identity";
 
 export type IdentitySelectionType = "class" | "ancestry" | "background";
-export type IdentityValidationOption = { optionType: IdentitySelectionType; name: string; sourceMaterialIdentity: string | null; sourceMaterialTitle: string | null; sourceUrl?: string | null; metadata: Record<string, unknown> };
+export type IdentityValidationOption = { id?: string; optionType: IdentitySelectionType | "heritage" | "feat"; name: string; sourceMaterialIdentity: string | null; sourceMaterialTitle: string | null; sourceUrl?: string | null; metadata: Record<string, unknown> };
 export type IdentityValidationContext = { options: IdentityValidationOption[]; ownedMaterialIdentities: string[] };
 
 export function validateIdentitySelection(type: IdentitySelectionType, value: string, context: IdentityValidationContext, hasChronicleAccess = false): ValidationResult | null {
