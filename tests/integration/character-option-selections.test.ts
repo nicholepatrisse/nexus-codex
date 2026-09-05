@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 import { createTestIdentity } from "@/auth/test-fixture";
 import { createCharacter } from "@/character/characters";
-import { createCharacterOptionSelection, deleteCharacterOptionSelection, listOwnedCharacterOptionSelections, updateCharacterOptionSelection } from "@/character/option-selections";
+import { createCharacterOptionSelection, deleteCharacterOptionSelection, listOwnedCharacterOptionSelections, replaceCharacterOptionSelections, updateCharacterOptionSelection } from "@/character/option-selections";
 import { getDb } from "@/db/client";
 import { authUsers, characterOptionSelections, characterOptions, characters, gameSystems, people } from "@/db/schema";
 import { SUPPORTED_GAME_SYSTEM } from "@/game-system/config";
@@ -56,5 +56,23 @@ describeWithDatabase("character option selection persistence", () => {
     expect((await listOwnedCharacterOptionSelections(ownerActor, character.id))?.[0]).toEqual(expect.objectContaining({ characterOptionId: null, nameSnapshot: "Catalog Feat", sourceMaterialTitleSnapshot: "Player Core" }));
     await getDb().delete(characters).where(eq(characters.id, character.id));
     expect(await getDb().select().from(characterOptionSelections).where(eq(characterOptionSelections.id, selection!.id))).toEqual([]);
+  });
+
+  it("replaces an owner's manual selections while preserving duplicate names and rejects non-owners", async () => {
+    const { ownerActor, otherActor, character } = await fixture();
+    const first = [
+      { selectionKind: "heritage" as const, acquiredLevel: 1, name: "Unknown Heritage" },
+      { selectionKind: "feat" as const, featCategory: "skill" as const, acquiredLevel: 1, acquisitionMethod: "selected" as const, name: "Skill Training" },
+      { selectionKind: "feat" as const, featCategory: "general" as const, acquiredLevel: 3, acquisitionMethod: "awarded" as const, grantOrigin: "Scenario reward", name: "Skill Training" },
+    ];
+    expect(await replaceCharacterOptionSelections(otherActor, character.id, first)).toBeNull();
+    const replaced = await replaceCharacterOptionSelections(ownerActor, character.id, first);
+    expect(replaced).toHaveLength(3);
+    expect(replaced).toEqual(expect.arrayContaining([
+      expect.objectContaining({ nameSnapshot: "Unknown Heritage" }),
+      expect.objectContaining({ nameSnapshot: "Skill Training", featCategory: "skill", acquisitionMethod: "selected" }),
+      expect.objectContaining({ nameSnapshot: "Skill Training", featCategory: "general", acquisitionMethod: "awarded", grantOrigin: "Scenario reward" }),
+    ]));
+    expect(await replaceCharacterOptionSelections(ownerActor, character.id, [{ selectionKind: "feat", acquiredLevel: 5, name: "Manual replacement" }])).toEqual([expect.objectContaining({ nameSnapshot: "Manual replacement", featCategory: null })]);
   });
 });
