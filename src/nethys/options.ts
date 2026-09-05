@@ -16,10 +16,13 @@ const paths: Record<OptionType, RegExp> = {
   class: /^\/classes\/[^/]+\/?$/i,
   ancestry: /^\/ancestries\/[^/]+\/?$/i,
   background: /^\/backgrounds\/[^/]+\/?$/i,
-  heritage: /^\/(?:heritages\/[^/]+|ancestries\/[^/]+\/heritages\/[^/]+)\/?$/i,
+  // Borai and Prismeni are selectable versatile heritages, but AoN publishes
+  // their entries under Rules rather than under the ordinary heritage routes.
+  heritage: /^\/(?:heritages\/[^/]+|ancestries\/[^/]+\/heritages\/[^/]+|rules\/\d+-(?:borai|prismeni))\/?$/i,
   feat: /^\/feats\/[^/]+\/?$/i,
   item: /^\/(?:treasure|equipment)\//i,
 };
+const versatileHeritagePath = /^\/(?:ancestries\/(?:17-borai|18-prismeni)|rules\/\d+-(?:borai|prismeni))\/?$/i;
 
 /** Explicit aliases are deliberately small: ambiguous spellings must be resolved by a person. */
 export const OPTION_NAME_ALIASES: Readonly<Record<string, readonly string[]>> = {
@@ -51,7 +54,12 @@ function restrictionValues(value: string | undefined) {
   return value.split(/[,;]|\bor\b/i).map((part) => part.trim()).filter(Boolean);
 }
 
-export function optionTypeFromUrl(url: URL): OptionType | null { return OPTION_TYPES.find((type) => paths[type].test(url.pathname)) ?? null; }
+export function optionTypeFromUrl(url: URL): OptionType | null {
+  // AoN files versatile heritages in the ancestry section even though they
+  // replace a heritage during character creation.
+  if (versatileHeritagePath.test(url.pathname)) return "heritage";
+  return OPTION_TYPES.find((type) => paths[type].test(url.pathname)) ?? null;
+}
 export function parseNethysOptionHtml(html: string, sourceUrl: string): NethysOption {
   let url: URL; try { url = new URL(sourceUrl); } catch { throw new NethysOptionError("invalid_url", "Enter a complete URL."); }
   if (url.protocol !== "https:" || url.hostname.toLowerCase() !== "2e.aonsrd.com") throw new NethysOptionError("unsupported", "Use a Starfinder 2e Archives of Nethys URL.");
@@ -84,6 +92,7 @@ export function parseNethysOptionHtml(html: string, sourceUrl: string): NethysOp
   const prerequisites = textAfterLabel($, ["Prerequisites?"]);
   const ancestryRestrictions = restrictionValues(textAfterLabel($, ["Ancestr(?:y|ies)"]));
   const classRestrictions = restrictionValues(textAfterLabel($, ["Class(?:es)?"]));
+  const versatileHeritage = optionType === "heritage" && versatileHeritagePath.test(url.pathname);
   const missingFields = [
     !sourceMaterialTitle && "sourceMaterial",
     optionType === "feat" && !levelMatch && "level",
@@ -102,6 +111,7 @@ export function parseNethysOptionHtml(html: string, sourceUrl: string): NethysOp
       ...(prerequisites ? { prerequisites } : {}),
       ...(ancestryRestrictions ? { ancestryRestrictions } : {}),
       ...(classRestrictions ? { classRestrictions } : {}),
+      ...(versatileHeritage ? { versatileHeritage: true } : {}),
       ...(societyRestricted ? { societyStatus: "restricted", societyLegal: false } : societyLimited ? { societyStatus: "limited" } : societyStandard ? { societyStatus: "standard", societyLegal: true } : {}),
       ...(missingFields.length ? { missingFields } : {}),
     },

@@ -11,6 +11,7 @@ import { IdentityOptionField } from "@/character/identity-option-field";
 import { SFS2_STARTING_ITEM_LEVELS, SFS2_STARTING_WEALTH, type Sfs2StartingLevel } from "@/character/sfs2-starting-wealth";
 import { createCharacterAction, type CreateCharacterFormState } from "./actions";
 import { StartingItemPicker, type StartingItemSelection } from "./starting-item-picker";
+import { CharacterOptionFields } from "@/app/characters/character-option-fields";
 
 const inputClass = "w-full rounded-xl border border-border-strong bg-surface-raised px-4 py-3 outline-none focus:border-brand";
 
@@ -83,6 +84,8 @@ export function CharacterForm({ societyPlayNumber, usedCharacterNumbers, validat
       <fieldset className="sm:col-span-2"><legend className="text-sm font-semibold">Starting wealth</legend><p className="mt-1 text-sm text-text-muted">Choose one option for your level {startingLevel} character.</p><div className={`mt-3 grid gap-3 ${SFS2_STARTING_WEALTH[startingLevel].length > 1 ? "sm:grid-cols-2" : ""}`}>{SFS2_STARTING_WEALTH[startingLevel].map((option) => <SelectionCard key={option.credits} name="startingCredits" value={option.credits} required title={option.kind === "credits_only" ? "Credits only" : "Permanent items"} description={option.label} checked={startingCredits === option.credits} onChange={() => { setStartingCredits(option.credits); setStartingItems([]); }} />)}</div>{field("startingCredits") ? <p role="alert" className="mt-2 text-sm text-danger">{field("startingCredits")}</p> : null}</fieldset>
       {usesItems ? <div id="startingItems" tabIndex={-1} className="sm:col-span-2"><StartingItemPicker levels={SFS2_STARTING_ITEM_LEVELS[startingLevel]} selections={startingItems} onChange={setStartingItems} />{field("startingItems") ? <p role="alert" className="mt-2 text-sm text-danger">{field("startingItems")}</p> : null}</div> : null}
       {(["ancestry", "background"] as const).map((name) => <div className="sm:col-span-2" key={name}><IdentityOptionField type={name} value={name === "ancestry" ? ancestry : background} onValueChange={name === "ancestry" ? setAncestry : setBackground} note={validationNotes[name]} onNoteChange={(value) => setValidationNote(name, value)} context={validationContext} invalid={Boolean(field(name))} />{field(name) ? <p role="alert" className="mt-2 text-sm text-danger">{field(name)}</p> : null}</div>)}
+      <CharacterOptionFields startingLevel={startingLevel} />
+      {field("characterOptions") ? <p role="alert" className="sm:col-span-2 text-sm text-danger">{field("characterOptions")}</p> : null}
       {(["backstory", "notes"] as const).map((name) => <FormField key={name} id={name} label={name === "backstory" ? "Backstory" : "Notes"} optional errors={state.fieldErrors?.[name]} className="sm:col-span-2">{(controlProps) => <textarea {...controlProps} name={name} rows={6} maxLength={5000} className={`resize-y ${inputClass}`} />}</FormField>)}
     </div></fieldset>
     {state.formError ? <p role="alert" className="rounded-xl bg-danger/10 p-4 text-danger">{state.formError}</p> : null}

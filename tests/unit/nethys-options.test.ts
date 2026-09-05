@@ -18,6 +18,14 @@ describe("Archives of Nethys character options", () => {
   it("preserves the Society standard marker", () => expect(parseNethysOptionHtml('<h1 class="title"><span class="sfs"><img alt="SFS Standard"></span> Adaptable <span class="feature-level">Feat 1</span></h1><div data-feat-category="ancestry"></div>', "https://2e.aonsrd.com/feats/20-adaptable")).toMatchObject({ metadata: { featCategory: "ancestry", societyStatus: "standard", societyLegal: true } }));
   it("parses a heritage with ancestry restrictions", () => expect(parseNethysOptionHtml('<main><h1>Moonborn</h1><div class="sources">Source Galaxy Guide pg. 42</div><p><b>Ancestry:</b> Astrazoan, Human</p><a class="trait">Rare</a></main>', "https://2e.aonsrd.com/heritages/7-moonborn?ref=list#rules")).toMatchObject({ optionType: "heritage", sourceUrl: "https://2e.aonsrd.com/heritages/7-moonborn", metadata: { traits: ["Rare"], ancestryRestrictions: ["Astrazoan", "Human"] } }));
   it.each([
+    ["https://2e.aonsrd.com/ancestries/17-borai", "Borai"],
+    ["https://2e.aonsrd.com/ancestries/18-prismeni", "Prismeni"],
+    ["https://2e.aonsrd.com/rules/129-borai", "Borai"],
+    ["https://2e.aonsrd.com/rules/130-prismeni", "Prismeni"],
+  ])("parses the versatile heritage page %s", (url, name) => {
+    expect(parseNethysOptionHtml(`<main><h1>${name}</h1><div class="sources">Source Player Core pg. 83</div></main>`, url)).toMatchObject({ name, optionType: "heritage", sourceMaterialTitle: "Player Core", metadata: { versatileHeritage: true } });
+  });
+  it.each([
     ["class", "Class", "Envoy"],
     ["ancestry", "Ancestry", "Android"],
     ["skill", "Skill", undefined],
@@ -33,6 +41,7 @@ describe("Archives of Nethys character options", () => {
   it("rejects malformed and unsupported pages", () => {
     expect(() => parseNethysOptionHtml("<p>missing</p>", "https://2e.aonsrd.com/classes/envoy")).toThrow(NethysOptionError);
     expect(() => parseNethysOptionHtml("<h1>Feat</h1>", "https://2e.aonsrd.com/feats")).toThrow(/not supported/);
+    expect(() => parseNethysOptionHtml("<h1>Versatile Heritages</h1>", "https://2e.aonsrd.com/rules/124-versatile-heritages")).toThrow(/not supported/);
   });
   it("turns timeouts into recoverable errors", async () => {
     const fetcher = async () => { throw new Error("timeout"); };

@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { AuthenticatedActor } from "@/auth/actor";
 import { getDb } from "@/db/client";
 import { characterOptionSelections, characterOptions, characters, chronicles } from "@/db/schema";
+import { getCharacterDetail } from "@/character/characters";
 
 type Database = ReturnType<typeof getDb>;
 const optionalText = (maximum: number) => z.string().trim().max(maximum).nullable().optional().transform((value) => value || null);
@@ -47,6 +48,32 @@ async function selectionSnapshots(input: z.output<typeof characterOptionSelectio
 export async function listOwnedCharacterOptionSelections(actor: AuthenticatedActor, characterId: string, database: Database = getDb()) {
   if (!await ownedCharacter(actor, characterId, database)) return null;
   return database.select().from(characterOptionSelections).where(eq(characterOptionSelections.characterId, characterId)).orderBy(asc(characterOptionSelections.acquiredLevel), asc(characterOptionSelections.createdAt), asc(characterOptionSelections.id));
+}
+
+/** Lists selections only when the actor may view the character (owner or its authorized GM). */
+export async function listVisibleCharacterOptionSelections(actor: AuthenticatedActor, characterId: string, database: Database = getDb()) {
+  if (!await getCharacterDetail(actor, characterId, new Date(), database)) return null;
+  return database.select().from(characterOptionSelections).where(eq(characterOptionSelections.characterId, characterId)).orderBy(asc(characterOptionSelections.acquiredLevel), asc(characterOptionSelections.createdAt), asc(characterOptionSelections.id));
+}
+
+export async function replaceCharacterOptionSelections(actor: AuthenticatedActor, characterId: string, rawSelections: CharacterOptionSelectionInput[], database: Database = getDb()) {
+  const inputs = z.array(characterOptionSelectionInputSchema).max(100).parse(rawSelections);
+  if (inputs.filter(({ selectionKind }) => selectionKind === "heritage").length > 1) throw new Error("A character can have only one heritage.");
+  return database.transaction(async (transaction) => {
+    const owned = await ownedCharacter(actor, characterId, transaction as Database);
+    if (!owned) return null;
+    const values = await Promise.all(inputs.map(async (input) => ({
+      id: randomUUID(), characterId, selectionKind: input.selectionKind,
+      featCategory: input.selectionKind === "feat" ? input.featCategory : null,
+      acquiredLevel: input.acquiredLevel, acquisitionMethod: input.acquisitionMethod,
+      grantOrigin: input.grantOrigin, validationNote: input.validationNote,
+      sourceChronicleId: input.sourceChronicleId,
+      ...await selectionSnapshots(input, characterId, owned.gameSystemId, transaction as Database),
+    })));
+    await transaction.delete(characterOptionSelections).where(eq(characterOptionSelections.characterId, characterId));
+    if (values.length) await transaction.insert(characterOptionSelections).values(values);
+    return transaction.select().from(characterOptionSelections).where(eq(characterOptionSelections.characterId, characterId)).orderBy(asc(characterOptionSelections.acquiredLevel), asc(characterOptionSelections.createdAt), asc(characterOptionSelections.id));
+  });
 }
 
 export async function createCharacterOptionSelection(actor: AuthenticatedActor, characterId: string, raw: CharacterOptionSelectionInput, database: Database = getDb()) {
