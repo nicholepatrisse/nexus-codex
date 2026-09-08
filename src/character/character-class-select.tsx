@@ -9,13 +9,14 @@ function isCharacterClass(value: string): value is CharacterClass {
   return CHARACTER_CLASSES.some((className) => className === value);
 }
 
-export function CharacterClassSelect({ defaultValue, invalid = false, onValueChange }: { defaultValue?: string | null; invalid?: boolean; onValueChange?: (value: CharacterClass | "") => void }) {
-  const initialValue = defaultValue && isCharacterClass(defaultValue) ? defaultValue : "";
-  const [value, setValue] = useState<CharacterClass | "">(initialValue);
+export function CharacterClassSelect({ defaultValue, invalid = false, allowUnknown = false, onValueChange }: { defaultValue?: string | null; invalid?: boolean; allowUnknown?: boolean; onValueChange?: (value: string) => void }) {
+  const requestedValue = defaultValue?.trim() ?? "";
+  const initialValue = requestedValue && (allowUnknown || isCharacterClass(requestedValue)) ? requestedValue : "";
+  const [value, setValue] = useState<string>(initialValue);
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const listboxId = useId();
-  const options: readonly (CharacterClass | "")[] = ["", ...CHARACTER_CLASSES];
+  const options: readonly string[] = initialValue && !isCharacterClass(initialValue) ? ["", initialValue, ...CHARACTER_CLASSES] : ["", ...CHARACTER_CLASSES];
 
   useEffect(() => {
     function closeOnOutsideClick(event: PointerEvent) {
@@ -25,7 +26,7 @@ export function CharacterClassSelect({ defaultValue, invalid = false, onValueCha
     return () => document.removeEventListener("pointerdown", closeOnOutsideClick);
   }, []);
 
-  function select(nextValue: CharacterClass | "") {
+  function select(nextValue: string) {
     setValue(nextValue);
     onValueChange?.(nextValue);
     setOpen(false);
