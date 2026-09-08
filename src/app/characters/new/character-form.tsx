@@ -11,7 +11,8 @@ import { IdentityOptionField } from "@/character/identity-option-field";
 import { SFS2_STARTING_ITEM_LEVELS, SFS2_STARTING_WEALTH, type Sfs2StartingLevel } from "@/character/sfs2-starting-wealth";
 import { createCharacterAction, type CreateCharacterFormState } from "./actions";
 import { StartingItemPicker, type StartingItemSelection } from "./starting-item-picker";
-import { CharacterOptionFields } from "@/app/characters/character-option-fields";
+import { CharacterOptionFields, type CharacterOptionDraft } from "@/app/characters/character-option-fields";
+import { PathmuncherImport } from "@/app/characters/pathmuncher-import";
 
 const inputClass = "w-full rounded-xl border border-border-strong bg-surface-raised px-4 py-3 outline-none focus:border-brand";
 
@@ -50,6 +51,7 @@ export function CharacterForm({ societyPlayNumber, usedCharacterNumbers, validat
   const formRef = useRef<HTMLFormElement>(null);
   const suggestedCharacterNumber = nextAvailableCharacterNumber(usedCharacterNumbers);
   const [characterNumber, setCharacterNumber] = useState(suggestedCharacterNumber);
+  const [name, setName] = useState("");
   const [className, setClassName] = useState("");
   const [ancestry, setAncestry] = useState("");
   const [background, setBackground] = useState("");
@@ -58,6 +60,8 @@ export function CharacterForm({ societyPlayNumber, usedCharacterNumbers, validat
   const [startingLevel, setStartingLevel] = useState<Sfs2StartingLevel>(1);
   const [startingCredits, setStartingCredits] = useState<number>(SFS2_STARTING_WEALTH[1][0].credits);
   const [startingItems, setStartingItems] = useState<(StartingItemSelection | undefined)[]>([]);
+  const [characterOptions, setCharacterOptions] = useState<CharacterOptionDraft[]>([]);
+  const [importRevision, setImportRevision] = useState(0);
   const [idempotencyKey] = useState(() => crypto.randomUUID());
   const permanentOption = SFS2_STARTING_WEALTH[startingLevel].find((option) => option.kind === "permanent_items");
   const usesItems = permanentOption?.credits === startingCredits;
@@ -72,7 +76,8 @@ export function CharacterForm({ societyPlayNumber, usedCharacterNumbers, validat
     {returnTo ? <input type="hidden" name="returnTo" value={returnTo} /> : null}
     <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
     <input type="hidden" name="startingItems" value={JSON.stringify(startingItems.filter(Boolean))} />
-    <FormField id="name" label="Character name" errors={state.fieldErrors?.name}>{(controlProps) => <input {...controlProps} name="name" required maxLength={100} className={inputClass} />}</FormField>
+    <PathmuncherImport onApply={(values) => { setName(values.name); setClassName(values.className); setAncestry(values.ancestry); setBackground(values.background); setCharacterOptions(values.options); setImportRevision((value) => value + 1); }} />
+    <FormField id="name" label="Character name" errors={state.fieldErrors?.name}>{(controlProps) => <input {...controlProps} name="name" required maxLength={100} value={name} onChange={(event) => setName(event.currentTarget.value)} className={inputClass} />}</FormField>
     <fieldset><legend className="block text-sm font-semibold">Society identification</legend><div className="mt-2 grid grid-cols-[1fr_auto_1fr] items-start gap-3">
       <div aria-label="Society player number" className="rounded-xl border border-border bg-surface px-4 py-3 text-text-muted">{societyPlayNumber || "Not set"}</div>
       <span aria-hidden="true" className="pt-3 text-text-muted">—</span>
@@ -80,11 +85,11 @@ export function CharacterForm({ societyPlayNumber, usedCharacterNumbers, validat
     </div><p className="mt-2 text-sm text-text-muted">Your society player number comes from your profile. Enter the character sequence from 1 to 99.</p></fieldset>
     <fieldset><legend className="block text-sm font-semibold">Character details</legend><p className="mt-1 text-sm text-text-muted">Choose the permanent Society starting level. You can fill in or change the other details later.</p><div className="mt-4 grid gap-5 sm:grid-cols-2">
       <div><span id="starting-level-label" className="block text-sm font-semibold">Starting level</span><div role="radiogroup" aria-labelledby="starting-level-label" aria-describedby={field("startingLevel") ? "starting-level-error" : undefined} aria-invalid={Boolean(field("startingLevel"))} className="mt-2 grid grid-cols-4 overflow-hidden rounded-xl border border-border-strong bg-surface-raised">{([1, 3, 5, 7] as const).map((level) => <label key={level} className="relative cursor-pointer border-r border-border-strong last:border-r-0"><input type="radio" name="startingLevel" value={level} required checked={startingLevel === level} onChange={() => { setStartingLevel(level); setStartingCredits(SFS2_STARTING_WEALTH[level][0].credits); setStartingItems([]); }} className="peer sr-only" /><span className="flex min-h-12 items-center justify-center font-semibold text-text-muted transition-colors peer-checked:bg-brand peer-checked:text-on-brand peer-hover:bg-surface-hover peer-checked:peer-hover:bg-brand-hover peer-focus-visible:outline-3 peer-focus-visible:-outline-offset-3 peer-focus-visible:outline-brand-hover">{level}</span></label>)}</div>{field("startingLevel") ? <p id="starting-level-error" role="alert" className="mt-2 text-sm text-danger">{field("startingLevel")}</p> : null}</div>
-      <div><label htmlFor="className" className="block text-sm font-semibold">Class <span className="font-normal text-text-muted">(optional)</span></label><CharacterClassSelect invalid={Boolean(field("className"))} onValueChange={setClassName} />{field("className") ? <p role="alert" className="mt-2 text-sm text-danger">{field("className")}</p> : null}</div>
+      <div><label htmlFor="className" className="block text-sm font-semibold">Class <span className="font-normal text-text-muted">(optional)</span></label><CharacterClassSelect key={`${importRevision}-${className}`} defaultValue={className} allowUnknown invalid={Boolean(field("className"))} onValueChange={setClassName} />{field("className") ? <p role="alert" className="mt-2 text-sm text-danger">{field("className")}</p> : null}</div>
       <fieldset className="sm:col-span-2"><legend className="text-sm font-semibold">Starting wealth</legend><p className="mt-1 text-sm text-text-muted">Choose one option for your level {startingLevel} character.</p><div className={`mt-3 grid gap-3 ${SFS2_STARTING_WEALTH[startingLevel].length > 1 ? "sm:grid-cols-2" : ""}`}>{SFS2_STARTING_WEALTH[startingLevel].map((option) => <SelectionCard key={option.credits} name="startingCredits" value={option.credits} required title={option.kind === "credits_only" ? "Credits only" : "Permanent items"} description={option.label} checked={startingCredits === option.credits} onChange={() => { setStartingCredits(option.credits); setStartingItems([]); }} />)}</div>{field("startingCredits") ? <p role="alert" className="mt-2 text-sm text-danger">{field("startingCredits")}</p> : null}</fieldset>
       {usesItems ? <div id="startingItems" tabIndex={-1} className="sm:col-span-2"><StartingItemPicker levels={SFS2_STARTING_ITEM_LEVELS[startingLevel]} selections={startingItems} onChange={setStartingItems} />{field("startingItems") ? <p role="alert" className="mt-2 text-sm text-danger">{field("startingItems")}</p> : null}</div> : null}
       {(["ancestry", "background"] as const).map((name) => <div className="sm:col-span-2" key={name}><IdentityOptionField type={name} value={name === "ancestry" ? ancestry : background} onValueChange={name === "ancestry" ? setAncestry : setBackground} note={validationNotes[name]} onNoteChange={(value) => setValidationNote(name, value)} context={validationContext} invalid={Boolean(field(name))} />{field(name) ? <p role="alert" className="mt-2 text-sm text-danger">{field(name)}</p> : null}</div>)}
-      <CharacterOptionFields startingLevel={startingLevel} />
+      <CharacterOptionFields key={importRevision} initial={characterOptions} startingLevel={startingLevel} />
       {field("characterOptions") ? <p role="alert" className="sm:col-span-2 text-sm text-danger">{field("characterOptions")}</p> : null}
       {(["backstory", "notes"] as const).map((name) => <FormField key={name} id={name} label={name === "backstory" ? "Backstory" : "Notes"} optional errors={state.fieldErrors?.[name]} className="sm:col-span-2">{(controlProps) => <textarea {...controlProps} name={name} rows={6} maxLength={5000} className={`resize-y ${inputClass}`} />}</FormField>)}
     </div></fieldset>
