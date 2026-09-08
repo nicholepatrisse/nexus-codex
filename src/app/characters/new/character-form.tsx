@@ -13,6 +13,7 @@ import { createCharacterAction, type CreateCharacterFormState } from "./actions"
 import { StartingItemPicker, type StartingItemSelection } from "./starting-item-picker";
 import { CharacterOptionFields, type CharacterOptionDraft } from "@/app/characters/character-option-fields";
 import { PathmuncherImport } from "@/app/characters/pathmuncher-import";
+import { CharacterFormSection, focusFirstCharacterFormError } from "@/app/characters/character-form-section";
 
 const inputClass = "w-full rounded-xl border border-border-strong bg-surface-raised px-4 py-3 outline-none focus:border-brand";
 
@@ -28,17 +29,6 @@ export function nextAvailableCharacterNumber(usedCharacterNumbers: string[]) {
     if (!used.has(candidate)) return candidate;
   }
   return "";
-}
-
-export function focusFirstCharacterFormError(form: HTMLFormElement, fieldErrors: Record<string, string[] | undefined>) {
-  const invalidFields = new Set(Object.entries(fieldErrors).filter(([, errors]) => errors?.length).map(([name]) => name));
-  const controls = [...form.querySelectorAll<HTMLElement>('input:not([type="hidden"]), button, textarea, select, [role="radiogroup"], [tabindex]')];
-  const target = controls.find((control) => control.getAttribute("aria-invalid") === "true" || invalidFields.has(control.getAttribute("name") ?? "") || invalidFields.has(control.id));
-  if (!target) return false;
-  const focusTarget = target.getAttribute("role") === "radiogroup" ? target.querySelector<HTMLElement>('input:not([type="hidden"])') ?? target : target;
-  focusTarget.focus({ preventScroll: true });
-  target.scrollIntoView({ behavior: "smooth", block: "center" });
-  return true;
 }
 
 function SubmitButton({ disabled }: { disabled: boolean }) {
@@ -76,7 +66,7 @@ export function CharacterForm({ societyPlayNumber, usedCharacterNumbers, validat
     {returnTo ? <input type="hidden" name="returnTo" value={returnTo} /> : null}
     <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
     <input type="hidden" name="startingItems" value={JSON.stringify(startingItems.filter(Boolean))} />
-    <PathmuncherImport onApply={(values) => { setName(values.name); setClassName(values.className); setAncestry(values.ancestry); setBackground(values.background); setCharacterOptions(values.options); setImportRevision((value) => value + 1); }} />
+    <CharacterFormSection id="import" title="Pathmuncher import" summary="Upload and review a Pathbuilder export"><PathmuncherImport onApply={(values) => { setName(values.name); setClassName(values.className); setAncestry(values.ancestry); setBackground(values.background); setCharacterOptions(values.options); setImportRevision((value) => value + 1); }} /></CharacterFormSection>
     <FormField id="name" label="Character name" errors={state.fieldErrors?.name}>{(controlProps) => <input {...controlProps} name="name" required maxLength={100} value={name} onChange={(event) => setName(event.currentTarget.value)} className={inputClass} />}</FormField>
     <fieldset><legend className="block text-sm font-semibold">Society identification</legend><div className="mt-2 grid grid-cols-[1fr_auto_1fr] items-start gap-3">
       <div aria-label="Society player number" className="rounded-xl border border-border bg-surface px-4 py-3 text-text-muted">{societyPlayNumber || "Not set"}</div>
@@ -89,8 +79,7 @@ export function CharacterForm({ societyPlayNumber, usedCharacterNumbers, validat
       <fieldset className="sm:col-span-2"><legend className="text-sm font-semibold">Starting wealth</legend><p className="mt-1 text-sm text-text-muted">Choose one option for your level {startingLevel} character.</p><div className={`mt-3 grid gap-3 ${SFS2_STARTING_WEALTH[startingLevel].length > 1 ? "sm:grid-cols-2" : ""}`}>{SFS2_STARTING_WEALTH[startingLevel].map((option) => <SelectionCard key={option.credits} name="startingCredits" value={option.credits} required title={option.kind === "credits_only" ? "Credits only" : "Permanent items"} description={option.label} checked={startingCredits === option.credits} onChange={() => { setStartingCredits(option.credits); setStartingItems([]); }} />)}</div>{field("startingCredits") ? <p role="alert" className="mt-2 text-sm text-danger">{field("startingCredits")}</p> : null}</fieldset>
       {usesItems ? <div id="startingItems" tabIndex={-1} className="sm:col-span-2"><StartingItemPicker levels={SFS2_STARTING_ITEM_LEVELS[startingLevel]} selections={startingItems} onChange={setStartingItems} />{field("startingItems") ? <p role="alert" className="mt-2 text-sm text-danger">{field("startingItems")}</p> : null}</div> : null}
       {(["ancestry", "background"] as const).map((name) => <div className="sm:col-span-2" key={name}><IdentityOptionField type={name} value={name === "ancestry" ? ancestry : background} onValueChange={name === "ancestry" ? setAncestry : setBackground} note={validationNotes[name]} onNoteChange={(value) => setValidationNote(name, value)} context={validationContext} invalid={Boolean(field(name))} />{field(name) ? <p role="alert" className="mt-2 text-sm text-danger">{field(name)}</p> : null}</div>)}
-      <CharacterOptionFields key={importRevision} initial={characterOptions} startingLevel={startingLevel} />
-      {field("characterOptions") ? <p role="alert" className="sm:col-span-2 text-sm text-danger">{field("characterOptions")}</p> : null}
+      <div id="heritage-feats" className="sm:col-span-2"><CharacterFormSection id="heritage-feats-section" title="Heritage and feats" summary={`${characterOptions.filter(({ selectionKind }) => selectionKind === "heritage").length ? "1 heritage" : "No heritage"} · ${characterOptions.filter(({ selectionKind }) => selectionKind === "feat").length} feats · ${characterOptions.filter(({ name, characterOptionId }) => name.trim() && !characterOptionId).length} need catalog import`} hasError={Boolean(field("characterOptions"))}><CharacterOptionFields key={importRevision} initial={characterOptions} startingLevel={startingLevel} />{field("characterOptions") ? <p role="alert" className="mt-3 text-sm text-danger">{field("characterOptions")}</p> : null}</CharacterFormSection></div>
       {(["backstory", "notes"] as const).map((name) => <FormField key={name} id={name} label={name === "backstory" ? "Backstory" : "Notes"} optional errors={state.fieldErrors?.[name]} className="sm:col-span-2">{(controlProps) => <textarea {...controlProps} name={name} rows={6} maxLength={5000} className={`resize-y ${inputClass}`} />}</FormField>)}
     </div></fieldset>
     {state.formError ? <p role="alert" className="rounded-xl bg-danger/10 p-4 text-danger">{state.formError}</p> : null}

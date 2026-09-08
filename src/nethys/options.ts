@@ -37,6 +37,10 @@ export function normalizeOptionName(name: string, aliases: Readonly<Record<strin
   return candidates[0]!.normalize("NFKC").trim().toLocaleLowerCase("en-US");
 }
 
+export function stripOptionActionMarkers(name: string) {
+  return name.replace(/\s*\[(?:(?:one|two|three)[- ]actions?|free[- ]action|reaction)\]\s*$/i, "").trim();
+}
+
 function textAfterLabel($: ReturnType<typeof load>, labels: readonly string[]) {
   const labelPattern = new RegExp(`^(?:${labels.join("|")})\\s*:?\\s*`, "i");
   for (const element of $("b, strong, dt").toArray()) {
@@ -66,7 +70,7 @@ export function parseNethysOptionHtml(html: string, sourceUrl: string): NethysOp
   const optionType = optionTypeFromUrl(url); if (!optionType) throw new NethysOptionError("unsupported", "That Archives of Nethys option type is not supported.");
   url.hash = ""; url.search = ""; url.pathname = url.pathname.replace(/\/$/, "");
   const $ = load(html); const heading = $("main h1, article h1, h1.title, h1").first().clone(); heading.find(".feature-level, .sfs, img").remove();
-  const name = heading.text().replace(/\s+/g, " ").trim();
+  const name = stripOptionActionMarkers(heading.text().replace(/\s+/g, " ").trim());
   if (!name) throw new NethysOptionError("parse_failed", "Nethys returned the page, but its option name could not be read.");
   const rawSourceMaterialTitle = $(".sources").first().text().replace(/^\s*Source\s*/i, "").replace(/\s+/g, " ").trim();
   const sourceMaterialTitle = rawSourceMaterialTitle ? materialTitleWithoutCitation(rawSourceMaterialTitle) : undefined;
@@ -92,6 +96,11 @@ export function parseNethysOptionHtml(html: string, sourceUrl: string): NethysOp
   const prerequisites = textAfterLabel($, ["Prerequisites?"]);
   const ancestryRestrictions = restrictionValues(textAfterLabel($, ["Ancestr(?:y|ies)"]));
   const classRestrictions = restrictionValues(textAfterLabel($, ["Class(?:es)?"]));
+  const grantedFeats = optionType === "background" ? $("main a[href], article a[href]").toArray().filter((element) => {
+    const href = $(element).attr("href") ?? "";
+    const context = $(element).parent().text().replace(/\s+/g, " ");
+    return /^\/?feats\//i.test(href) && /\bgain\b/i.test(context) && /\bfeat\b/i.test(context);
+  }).map((element) => stripOptionActionMarkers($(element).text().replace(/\s+/g, " ").trim())).filter(Boolean) : [];
   const versatileHeritage = optionType === "heritage" && versatileHeritagePath.test(url.pathname);
   const missingFields = [
     !sourceMaterialTitle && "sourceMaterial",
@@ -111,6 +120,7 @@ export function parseNethysOptionHtml(html: string, sourceUrl: string): NethysOp
       ...(prerequisites ? { prerequisites } : {}),
       ...(ancestryRestrictions ? { ancestryRestrictions } : {}),
       ...(classRestrictions ? { classRestrictions } : {}),
+      ...(grantedFeats.length ? { grantedFeats: [...new Set(grantedFeats)] } : {}),
       ...(versatileHeritage ? { versatileHeritage: true } : {}),
       ...(societyRestricted ? { societyStatus: "restricted", societyLegal: false } : societyLimited ? { societyStatus: "limited" } : societyStandard ? { societyStatus: "standard", societyLegal: true } : {}),
       ...(missingFields.length ? { missingFields } : {}),
