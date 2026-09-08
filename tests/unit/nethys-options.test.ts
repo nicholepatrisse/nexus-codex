@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fetchNethysOption, NethysOptionError, normalizeOptionName, parseNethysOptionHtml, stripOptionActionMarkers } from "@/nethys/options";
+import { fetchNethysOption, NethysOptionError, normalizeNethysSearchResponse, normalizeOptionName, parseNethysOptionHtml, searchNethysOptions, stripOptionActionMarkers } from "@/nethys/options";
 
 describe("Archives of Nethys character options", () => {
   it("removes action markers from feat names", () => {
@@ -58,5 +58,19 @@ describe("Archives of Nethys character options", () => {
   it("rejects unsupported URLs before making a request", async () => {
     const fetcher = async () => new Response("<h1>Not AoN</h1>");
     await expect(fetchNethysOption("https://example.com/feats/1", fetcher as typeof fetch)).rejects.toMatchObject({ code: "unsupported" });
+  });
+  it("normalizes search results and filters incompatible option types and feat categories", () => {
+    const response = { hits: { hits: [
+      { _source: { name: "Intimidating Shot", type: "Feat", url: "/feats/821-intimidating-shot", level: 1, primary_source: "Player Core", trait: ["General", "Skill"], summary: "Demoralize with a ranged weapon." } },
+      { _source: { name: "Moonborn", type: "Heritage", url: "/heritages/7-moonborn", primary_source: "Galaxy Guide" } },
+      { _source: { name: "Wrong URL", type: "Feat", url: "https://example.com/feats/1" } },
+    ] } };
+    expect(normalizeNethysSearchResponse(response, "feat", "skill")).toEqual([{ name: "Intimidating Shot", optionType: "feat", sourceUrl: "https://2e.aonsrd.com/feats/821-intimidating-shot", sourceMaterialTitle: "Player Core", level: 1, featCategory: "skill", summary: "Demoralize with a ranged weapon." }]);
+    expect(normalizeNethysSearchResponse(response, "heritage")).toEqual([{ name: "Moonborn", optionType: "heritage", sourceUrl: "https://2e.aonsrd.com/heritages/7-moonborn", sourceMaterialTitle: "Galaxy Guide", level: undefined, featCategory: undefined, summary: undefined }]);
+  });
+  it("surfaces malformed and unavailable search responses as recoverable errors", async () => {
+    expect(() => normalizeNethysSearchResponse({}, "feat")).toThrow(/unreadable/);
+    const unavailable = async () => { throw new Error("timeout"); };
+    await expect(searchNethysOptions("Intimidating Shot", "feat", undefined, unavailable as typeof fetch)).rejects.toMatchObject({ code: "unavailable" });
   });
 });
