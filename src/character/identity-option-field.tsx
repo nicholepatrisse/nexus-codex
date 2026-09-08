@@ -7,7 +7,8 @@ import { AdvisorySelectionField } from "@/character/advisory-selection-field";
 import { validateIdentitySelection, type IdentitySelectionType, type IdentityValidationContext, type IdentityValidationOption } from "@/character/identity-validation";
 
 type Type = Exclude<IdentitySelectionType, "class">;
-export function IdentityOptionField({ type, value, onValueChange, note, onNoteChange, context, hasChronicleAccess = false, invalid = false, onOptionImported, onMaterialAdded }: { type: Type; value: string; onValueChange: (value: string) => void; note: string; onNoteChange: (value: string) => void; context: IdentityValidationContext; hasChronicleAccess?: boolean; invalid?: boolean; onOptionImported?: (option: IdentityValidationOption) => void; onMaterialAdded?: (identities: string[]) => void }) {
+const EMPTY_VALIDATION_CONTEXT: IdentityValidationContext = { options: [], ownedMaterialIdentities: [] };
+export function IdentityOptionField({ type, value, onValueChange, note, onNoteChange, context = EMPTY_VALIDATION_CONTEXT, hasChronicleAccess = false, invalid = false, onOptionImported, onMaterialAdded }: { type: Type; value: string; onValueChange: (value: string) => void; note: string; onNoteChange: (value: string) => void; context?: IdentityValidationContext; hasChronicleAccess?: boolean; invalid?: boolean; onOptionImported?: (option: IdentityValidationOption) => void; onMaterialAdded?: (identities: string[]) => void }) {
   const [url, setUrl] = useState("");
   const [imported, setImported] = useState<IdentityValidationOption[]>([]);
   const [message, setMessage] = useState("");

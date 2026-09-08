@@ -63,7 +63,7 @@ describe("character validation summary", () => {
   it("counts each heritage and feat once and links review to its edit section", () => {
     const optionContext: IdentityValidationContext = { ...context, options: [...context.options, { id: "catalog-feat", optionType: "feat", name: "Awarded Feat", sourceMaterialIdentity: "player-core", sourceMaterialTitle: "Starfinder Player Core", sourceUrl: "https://2e.aonsrd.com/feats/1", metadata: { level: 1, featCategory: "general" } }] };
     const summary = deriveCharacterValidationSummary(character(), optionContext, [], [feat]);
-    expect(summary).toMatchObject({ validatedCount: 0, unvalidatedCount: 1, invalidCount: 0, details: [{ category: "Feat", playerNote: "Shown on Chronicle", sourceChronicleHref: "/characters/char-1/chronicles/chronicle-1", editHref: "/characters/char-1/edit#heritage-feats" }] });
+    expect(summary).toMatchObject({ validatedCount: 0, unvalidatedCount: 1, invalidCount: 0, details: [{ category: "Feat", playerNote: "Shown on Chronicle", sourceChronicleHref: "/characters/char-1/chronicles/chronicle-1", editHref: "/characters/char-1?tab=feats#option-feat-1" }] });
     expect(renderToStaticMarkup(createElement(SummaryView, { summary, readOnly: true }))).toContain('href="/characters/char-1/chronicles/chronicle-1"');
   });
 });

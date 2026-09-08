@@ -15,7 +15,7 @@ describe("Pathbuilder catalog resolution v1", () => {
     expect(review.character).not.toHaveProperty("startingLevel");
   });
 
-  it("resolves Vey's awarded feat category and likely background origin while retaining the raw category", () => {
+  it("resolves Vey's awarded feat category and catalog-derived Outlaw origin", () => {
     const review = resolvePathbuilderImportV1(candidate({ feats: [["Intimidating Shot", null, "Awarded Feat", 1]] }), [
       option("class", "Envoy"), option("ancestry", "Android"), option("heritage", "Warrior Android"),
       option("background", "Outlaw", { grantedFeats: ["Intimidating Shot"] }), option("feat", "Intimidating Shot", { featCategory: "skill" }),

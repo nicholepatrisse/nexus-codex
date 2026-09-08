@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { fetchNethysOption, NethysOptionError, normalizeOptionName, parseNethysOptionHtml } from "@/nethys/options";
+import { fetchNethysOption, NethysOptionError, normalizeOptionName, parseNethysOptionHtml, stripOptionActionMarkers } from "@/nethys/options";
 
 describe("Archives of Nethys character options", () => {
+  it("removes action markers from feat names", () => {
+    expect(stripOptionActionMarkers("Debris Zone [one-action]")).toBe("Debris Zone");
+    expect(parseNethysOptionHtml('<main><h1>Debris Zone [one-action]<span class="feature-level">Feat 1</span></h1><div class="sources">Source Player Core pg. 120</div><a class="trait">Class</a></main>', "https://2e.aonsrd.com/feats/669-debris-zone")).toMatchObject({ name: "Debris Zone", metadata: { level: 1, featCategory: "class" } });
+  });
+  it("extracts linked feats granted by backgrounds", () => {
+    const html = '<main><h1>Acolyte</h1><div class="sources">Source Guilt of the Grave World Player Guide pg. 5</div><p>You gain the <a href="/feats/123-urban-survivalist">Urban Survivalist</a> skill feat.</p></main>';
+    expect(parseNethysOptionHtml(html, "https://2e.aonsrd.com/backgrounds/134-acolyte").metadata).toMatchObject({ grantedFeats: ["Urban Survivalist"] });
+  });
   it.each([
     ["class", "https://2e.aonsrd.com/classes/envoy", "Envoy"],
     ["ancestry", "https://2e.aonsrd.com/ancestries/android", "Android"],
