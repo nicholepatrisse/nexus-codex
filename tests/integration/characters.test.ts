@@ -41,16 +41,22 @@ describeWithDatabase("characters persistence", () => {
     const ownerActor = { personId: owner.person.id, authUserId: owner.authUser.id, sessionId: "owner" };
     const otherActor = { personId: other.person.id, authUserId: other.authUser.id, sessionId: "other" };
     await getDb().update(people).set({ societyPlayNumber: "654321" }).where(eq(people.id, owner.person.id));
-    const created = await createCharacter(ownerActor, { name: "Navasi", characterNumber: "01" });
+    const created = await createCharacter(ownerActor, { name: "Navasi", characterNumber: "01", characterSheetUrl: "https://example.com/sheets/navasi" });
     if (!created) throw new Error("Expected character creation to return a record.");
 
+    expect(await getCharacterDetail(ownerActor, created.id)).toEqual(expect.objectContaining({ characterSheetUrl: "https://example.com/sheets/navasi" }));
+    expect(await getCharacterDetail(otherActor, created.id)).toBeNull();
     expect(await updateCharacter(otherActor, created.id, { name: "Stolen" })).toBeNull();
     const attemptedStartingLevelChange = { name: " Navasi ", startingLevel: 7, startingCredits: 7200, startingItems: [], className: " Envoy ", classValidationNote: "  Acquired through multiclass training.  ", ancestry: "Human", ancestryValidationNote: "  ", background: "  ", backgroundValidationNote: "  Granted by a boon.  ", backstory: "  Raised aboard a station.  ", notes: "  " } as Parameters<typeof updateCharacter>[2];
     expect(await updateCharacter(ownerActor, created.id, attemptedStartingLevelChange)).toEqual(expect.objectContaining({ id: created.id }));
-    expect(await getCharacterDetail(ownerActor, created.id)).toEqual(expect.objectContaining({ name: "Navasi", startingLevel: 7, startingCredits: 7200, creditsMinor: 7200, currentLevel: 7, xp: 0, className: "Envoy", classValidationNote: "Acquired through multiclass training.", ancestry: "Human", ancestryValidationNote: null, background: null, backgroundValidationNote: "Granted by a boon.", backstory: "Raised aboard a station.", notes: null, isOwner: true }));
+    expect(await getCharacterDetail(ownerActor, created.id)).toEqual(expect.objectContaining({ name: "Navasi", startingLevel: 7, startingCredits: 7200, creditsMinor: 7200, currentLevel: 7, xp: 0, className: "Envoy", classValidationNote: "Acquired through multiclass training.", ancestry: "Human", ancestryValidationNote: null, background: null, backgroundValidationNote: "Granted by a boon.", backstory: "Raised aboard a station.", notes: null, characterSheetUrl: "https://example.com/sheets/navasi", isOwner: true }));
 
     expect(await updateCharacter(ownerActor, created.id, { name: "Navasi", classValidationNote: "", ancestryValidationNote: null, backgroundValidationNote: "   " })).toEqual(expect.objectContaining({ id: created.id }));
     expect(await getCharacterDetail(ownerActor, created.id)).toEqual(expect.objectContaining({ classValidationNote: null, ancestryValidationNote: null, backgroundValidationNote: null }));
+    expect(await updateCharacter(ownerActor, created.id, { name: "Navasi", characterSheetUrl: "https://example.com/sheets/revised" })).toEqual(expect.objectContaining({ id: created.id }));
+    expect(await getCharacterDetail(ownerActor, created.id)).toEqual(expect.objectContaining({ characterSheetUrl: "https://example.com/sheets/revised" }));
+    expect(await updateCharacter(ownerActor, created.id, { name: "Navasi", characterSheetUrl: "" })).toEqual(expect.objectContaining({ id: created.id }));
+    expect(await getCharacterDetail(ownerActor, created.id)).toEqual(expect.objectContaining({ characterSheetUrl: null }));
   });
 
   it("owner-manages manual Chronicles without changing identity", async () => {

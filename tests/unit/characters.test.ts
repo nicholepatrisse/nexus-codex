@@ -27,6 +27,16 @@ describe("character creation", () => {
     expect(createCharacterInputSchema.safeParse({ name: "Navasi", characterNumber: "01", className: "x".repeat(101) }).success).toBe(false);
   });
 
+  it("normalizes safe character sheet URLs and rejects unsafe or malformed values", () => {
+    expect(createCharacterInputSchema.parse({ name: "Navasi", characterNumber: "01", characterSheetUrl: "  https://example.com/sheet  " }).characterSheetUrl).toBe("https://example.com/sheet");
+    expect(updateCharacterInputSchema.parse({ name: "Navasi", characterSheetUrl: "" }).characterSheetUrl).toBeNull();
+    for (const characterSheetUrl of ["javascript:alert(1)", "ftp://example.com/sheet", "not a URL"]) {
+      const result = createCharacterInputSchema.safeParse({ name: "Navasi", characterNumber: "01", characterSheetUrl });
+      expect(result.success).toBe(false);
+      if (!result.success) expect(result.error.issues[0]?.message).toContain("http:// or https://");
+    }
+  });
+
   it.each([0, 2, 4, 6, 8, 20, 1.5, "not a level"])("rejects invalid starting level %s", (startingLevel) => {
     expect(createCharacterInputSchema.safeParse({ name: "Navasi", characterNumber: "01", startingLevel }).success).toBe(false);
   });

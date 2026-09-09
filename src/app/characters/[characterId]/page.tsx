@@ -94,6 +94,7 @@ export default async function CharacterPage({ params, searchParams }: { params: 
         </TabRow>
       </nav>
       {tab === "overview" ? <>
+      {character.characterSheetUrl ? <a href={character.characterSheetUrl} target="_blank" rel="noopener noreferrer" className="mt-6 inline-flex items-center gap-2 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-on-brand hover:bg-brand-hover sm:mt-8">View character sheet<svg aria-hidden="true" viewBox="0 0 20 20" className="size-4 shrink-0 fill-none stroke-current" strokeWidth="1.75"><path d="M7 5h8v8M15 5 6 14" strokeLinecap="round" strokeLinejoin="round" /></svg><span className="sr-only"> (opens in a new tab)</span></a> : null}
       <dl className="mt-6 grid gap-4 sm:mt-8 sm:grid-cols-2 sm:gap-5"><div><dt className="text-sm text-text-muted">Society number</dt><dd className="mt-1 font-semibold">{character.societyNumber}</dd></div><CharacterProgress startingLevel={character.startingLevel} currentLevel={character.currentLevel} xp={character.xp} />
         {character.isOwner ? <div><dt className="text-sm text-text-muted">Credit balance</dt><dd className="mt-1 font-semibold">{formatCredits(character.creditsMinor ?? 0)} credits</dd></div> : null}
         {character.className ? <div><dt className="text-sm text-text-muted">Class</dt><dd className="mt-1 font-semibold">{character.className}</dd>{character.classValidationNote ? <dd className="mt-1 whitespace-pre-wrap text-sm text-text-muted"><span className="font-semibold">Validation note:</span> {character.classValidationNote}</dd> : null}</div> : null}

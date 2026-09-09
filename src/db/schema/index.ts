@@ -164,6 +164,7 @@ export const characters = pgTable(
     backgroundSourceChronicleId: text("background_source_chronicle_id").references((): AnyPgColumn => chronicles.id, { onDelete: "set null" }),
     backstory: text("backstory"),
     notes: text("notes"),
+    characterSheetUrl: text("character_sheet_url"),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   },
@@ -184,6 +185,7 @@ export const characters = pgTable(
     check("characters_background_validation_note_length_check", sql`${table.backgroundValidationNote} is null or length(${table.backgroundValidationNote}) <= 1000`),
     check("characters_backstory_length_check", sql`${table.backstory} is null or length(${table.backstory}) <= 5000`),
     check("characters_notes_length_check", sql`${table.notes} is null or length(${table.notes}) <= 5000`),
+    check("characters_character_sheet_url_length_check", sql`${table.characterSheetUrl} is null or length(${table.characterSheetUrl}) <= 2048`),
     check("characters_society_number_format", sql`${table.societyNumber} ~ '^[0-9]+-[0-9]+$'`),
   ],
 );
