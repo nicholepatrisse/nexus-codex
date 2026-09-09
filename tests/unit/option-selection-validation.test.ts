@@ -16,10 +16,10 @@ describe("heritage and feat advisory validation", () => {
     expect(validateCharacterOptionSelection(selection({ nameSnapshot: "Intimidating Shot", acquiredLevel: 1, featCategory: "skill", acquisitionMethod: "awarded", grantOrigin: "Outlaw" }), character, validationContext).status).toBe("validated");
   });
 
-  it("does not validate a different feat against a stale grant origin", () => {
+  it("leaves awarded feat and grant-origin checking to character sheet builders", () => {
     const validationContext = context({ level: 1, featCategory: "ancestry" }, { name: "Natural Ambition" });
     validationContext.options.push({ optionType: "background", name: "Outlaw", sourceMaterialIdentity: "player-core", sourceMaterialTitle: "Player Core", metadata: {} });
-    expect(validateCharacterOptionSelection(selection({ nameSnapshot: "Natural Ambition", acquiredLevel: 1, featCategory: "ancestry", acquisitionMethod: "awarded", grantOrigin: "Outlaw" }), character, validationContext).status).toBe("unvalidated");
+    expect(validateCharacterOptionSelection(selection({ nameSnapshot: "Natural Ambition", acquiredLevel: 1, featCategory: "ancestry", acquisitionMethod: "awarded", grantOrigin: "Outlaw" }), character, validationContext).status).toBe("validated");
   });
 
   it("marks confirmed Society restrictions invalid", () => expect(validateCharacterOptionSelection(selection(), character, context({ societyLegal: false })).status).toBe("invalid"));
@@ -28,7 +28,6 @@ describe("heritage and feat advisory validation", () => {
 
   it.each([
     ["unknown catalog selection", selection({ characterOptionId: null }), context()],
-    ["awarded feat", selection({ acquisitionMethod: "awarded", grantOrigin: "Scenario reward" }), context()],
     ["linked Chronicle", selection({ sourceChronicleId: "chronicle-1" }), context()],
     ["wrong level", selection({ acquiredLevel: 1 }), context({ level: 2 })],
     ["wrong category", selection({ featCategory: "skill" }), context({ featCategory: "general" })],

@@ -8,10 +8,6 @@ type CharacterIdentity = { className: string | null; ancestry: string | null; ba
 
 const strings = (value: unknown) => Array.isArray(value) && value.every((item) => typeof item === "string") ? value : null;
 const same = (left: string | null, right: string) => Boolean(left && left.localeCompare(right, undefined, { sensitivity: "accent" }) === 0);
-const knownGrant = (origin: IdentityValidationContext["options"][number], featName: string) => {
-  const metadataGrants = [origin.metadata.grantedFeats, origin.metadata.awardedFeats, origin.metadata.feats].flatMap((value) => Array.isArray(value) ? value : []).filter((value): value is string => typeof value === "string");
-  return metadataGrants.some((name) => same(name, featName));
-};
 
 /** Advisory validation only: callers must never use this result to gate writes or play. */
 export function validateCharacterOptionSelection(selection: CharacterOptionSelection, character: CharacterIdentity, context: IdentityValidationContext): ValidationResult {
@@ -40,11 +36,6 @@ export function validateCharacterOptionSelection(selection: CharacterOptionSelec
     const classRestrictions = strings(option.metadata.classRestrictions);
     if (classRestrictions?.length && !classRestrictions.some((value) => same(character.className, value))) results.push(validationReasons.unsupportedAccessRule(`${selection.nameSnapshot} requires one of these classes: ${classRestrictions.join(", ")}. The recorded class is ${character.className ?? "unknown"}.`));
     if (ancestryRestrictions?.length && !ancestryRestrictions.some((value) => same(character.ancestry, value))) results.push(validationReasons.unsupportedAccessRule(`${selection.nameSnapshot} requires one of these ancestries: ${ancestryRestrictions.join(", ")}. The recorded ancestry is ${character.ancestry ?? "unknown"}.`));
-    if (selection.acquisitionMethod === "awarded") {
-      const origin = selection.grantOrigin && same(character.background ?? null, selection.grantOrigin)
-        ? context.options.find((candidate) => candidate.optionType === "background" && same(candidate.name, selection.grantOrigin!)) : null;
-      if (!origin || !knownGrant(origin, selection.nameSnapshot)) results.push(validationReasons.unsupportedAccessRule(`${selection.nameSnapshot} was awarded${selection.grantOrigin ? ` by ${selection.grantOrigin}` : ""}; Nexus cannot verify the award or feat-slot rules.`));
-    }
   }
   return results.length ? aggregateValidationResults(results) : validated();
 }
