@@ -11,7 +11,8 @@ export type OptionType = typeof OPTION_TYPES[number];
 export const FEAT_CATEGORIES = ["class", "ancestry", "skill", "general"] as const;
 export type FeatCategory = typeof FEAT_CATEGORIES[number];
 export type NethysOption = { name: string; optionType: OptionType; sourceMaterialTitle?: string; sourceMaterialIdentity?: string; sourceUrl: string; metadata: Record<string, unknown> };
-export type NethysSearchResult = { name: string; optionType: "heritage" | "feat"; sourceUrl: string; sourceMaterialTitle?: string; level?: number; featCategory?: FeatCategory; summary?: string };
+export type SearchableOptionType = "ancestry" | "background" | "heritage" | "feat";
+export type NethysSearchResult = { name: string; optionType: SearchableOptionType; sourceUrl: string; sourceMaterialTitle?: string; level?: number; featCategory?: FeatCategory; summary?: string };
 export class NethysOptionError extends Error { constructor(public code: "invalid_url" | "unsupported" | "unavailable" | "parse_failed", message: string) { super(message); } }
 const paths: Record<OptionType, RegExp> = {
   class: /^\/classes\/[^/]+\/?$/i,
@@ -145,16 +146,18 @@ export async function importNethysOption(value: string, database = getDb(), fetc
 }
 export async function searchCharacterOptions(type: OptionType, query = "", database = getDb()) { return database.select().from(characterOptions).where(and(eq(characterOptions.optionType, type), ilike(characterOptions.normalizedName, `%${normalizeOptionName(query)}%`))).orderBy(asc(characterOptions.name)).limit(50); }
 
-const searchType = (source: Record<string, unknown>): "heritage" | "feat" | null => {
+const searchType = (source: Record<string, unknown>): SearchableOptionType | null => {
   const url = typeof source.url === "string" ? source.url : "";
-  if (/^\/feats\//i.test(url) || /^feat$/i.test(String(source.type ?? ""))) return "feat";
   if (/^\/heritages\//i.test(url) || /\/heritages\//i.test(url) || /^heritage$/i.test(String(source.type ?? ""))) return "heritage";
   if (versatileHeritagePath.test(url)) return "heritage";
+  if (/^\/ancestries\//i.test(url) || /^ancestry$/i.test(String(source.type ?? ""))) return "ancestry";
+  if (/^\/backgrounds\//i.test(url) || /^background$/i.test(String(source.type ?? ""))) return "background";
+  if (/^\/feats\//i.test(url) || /^feat$/i.test(String(source.type ?? ""))) return "feat";
   return null;
 };
 
 /** Normalize the public AoN Elasticsearch response into safe, review-only results. */
-export function normalizeNethysSearchResponse(value: unknown, expectedType: "heritage" | "feat", category?: FeatCategory): NethysSearchResult[] {
+export function normalizeNethysSearchResponse(value: unknown, expectedType: SearchableOptionType, category?: FeatCategory): NethysSearchResult[] {
   if (!value || typeof value !== "object") throw new NethysOptionError("parse_failed", "Archives of Nethys returned an unreadable search response.");
   const hits = (value as { hits?: { hits?: unknown } }).hits?.hits;
   if (!Array.isArray(hits)) throw new NethysOptionError("parse_failed", "Archives of Nethys returned an unreadable search response.");
@@ -174,7 +177,7 @@ export function normalizeNethysSearchResponse(value: unknown, expectedType: "her
   });
 }
 
-export async function searchNethysOptions(query: string, expectedType: "heritage" | "feat", category?: FeatCategory, fetcher: typeof fetch = fetch) {
+export async function searchNethysOptions(query: string, expectedType: SearchableOptionType, category?: FeatCategory, fetcher: typeof fetch = fetch) {
   const trimmed = query.trim();
   if (trimmed.length < 2) return [];
   const escaped = trimmed.replace(/[+\-=!(){}\[\]^"~*?:\\/]|&&|\|\|/g, "\\$&");
