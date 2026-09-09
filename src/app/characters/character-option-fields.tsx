@@ -1,8 +1,8 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { Dialog } from "@/app/dialog";
 import { StyledSelect } from "@/app/styled-select";
-import { importCharacterOptionAction } from "./character-options-actions";
+import { OptionCatalogSearch, type SelectedCatalogOption } from "./option-catalog-search";
 
 export type CharacterOptionDraft = {
   key: string; selectionKind: "heritage" | "feat"; name: string; acquiredLevel: number;
@@ -16,10 +16,10 @@ export type CharacterOptionDraft = {
 const inputClass = "w-full rounded-xl border border-border-strong bg-surface-raised px-4 py-3 outline-none focus:border-brand";
 const empty = (kind: "heritage" | "feat", level: number): CharacterOptionDraft => ({ key: crypto.randomUUID(), selectionKind: kind, name: "", acquiredLevel: level, featCategory: null, acquisitionMethod: "selected", grantOrigin: "" });
 
-function OptionImport({ kind, onImported }: { kind: "heritage" | "feat"; onImported: (option: Awaited<ReturnType<typeof importCharacterOptionAction>> & { ok: true }) => void }) {
-  const [open, setOpen] = useState(false); const [url, setUrl] = useState(""); const [message, setMessage] = useState(""); const [pending, startTransition] = useTransition();
-  function submit() { startTransition(async () => { const result = await importCharacterOptionAction(url, kind); if (!result.ok) return setMessage(result.error); onImported(result); setOpen(false); setUrl(""); setMessage(""); }); }
-  return <><button type="button" onClick={() => setOpen(true)} className="text-sm font-semibold text-brand hover:underline">Import from Archives of Nethys</button>{open ? <Dialog open title={`Import ${kind}`} description="Paste an official Starfinder 2e Archives of Nethys link. Manual entry remains available if import fails." onClose={() => setOpen(false)} closeLabel={`Close import ${kind}`} className="max-w-lg"><label htmlFor={`${kind}-import-url`} className="mt-5 block text-sm font-semibold">Archives of Nethys link</label><input id={`${kind}-import-url`} type="url" autoFocus value={url} onChange={(event) => { setUrl(event.currentTarget.value); setMessage(""); }} className={`mt-2 ${inputClass}`} />{message ? <p role="alert" className="mt-3 text-sm text-danger">{message}</p> : null}<div className="mt-6 flex justify-end gap-3"><button type="button" onClick={() => setOpen(false)} className="rounded-full border border-border-strong px-4 py-2 font-semibold">Cancel</button><button type="button" onClick={submit} disabled={pending || !url.trim()} className="rounded-full bg-brand px-4 py-2 font-semibold text-on-brand disabled:opacity-60">{pending ? "Importing…" : "Import"}</button></div></Dialog> : null}</>;
+function OptionImport({ kind, category, initialQuery, onImported }: { kind: "heritage" | "feat"; category?: CharacterOptionDraft["featCategory"]; initialQuery?: string; onImported: (result: { option: SelectedCatalogOption }) => void }) {
+  const [open, setOpen] = useState(false);
+  const select = (option: SelectedCatalogOption) => { onImported({ option }); setOpen(false); };
+  return <><button type="button" onClick={() => setOpen(true)} className="text-sm font-semibold text-brand hover:underline">Find or import from Archives of Nethys</button>{open ? <Dialog open title={`Import ${kind}`} description={`Search by name or paste an exact Archives of Nethys link. Manual entry remains available.`} onClose={() => setOpen(false)} closeLabel={`Close import ${kind}`} className="max-w-2xl"><div className="mt-5"><OptionCatalogSearch kind={kind} category={category} initialQuery={initialQuery} onSelected={select} /></div><div className="mt-5 flex justify-end"><button type="button" onClick={() => setOpen(false)} className="rounded-full border border-border-strong px-4 py-2 font-semibold">Cancel</button></div></Dialog> : null}</>;
 }
 
 function OptionEditor({ value, onChange, onRemove, heading }: { value: CharacterOptionDraft; onChange: (value: CharacterOptionDraft) => void; onRemove?: () => void; heading: string }) {

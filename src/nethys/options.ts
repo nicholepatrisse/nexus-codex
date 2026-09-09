@@ -11,6 +11,7 @@ export type OptionType = typeof OPTION_TYPES[number];
 export const FEAT_CATEGORIES = ["class", "ancestry", "skill", "general"] as const;
 export type FeatCategory = typeof FEAT_CATEGORIES[number];
 export type NethysOption = { name: string; optionType: OptionType; sourceMaterialTitle?: string; sourceMaterialIdentity?: string; sourceUrl: string; metadata: Record<string, unknown> };
+export type NethysSearchResult = { name: string; optionType: "heritage" | "feat"; sourceUrl: string; sourceMaterialTitle?: string; level?: number; featCategory?: FeatCategory; summary?: string };
 export class NethysOptionError extends Error { constructor(public code: "invalid_url" | "unsupported" | "unavailable" | "parse_failed", message: string) { super(message); } }
 const paths: Record<OptionType, RegExp> = {
   class: /^\/classes\/[^/]+\/?$/i,
@@ -143,3 +144,46 @@ export async function importNethysOption(value: string, database = getDb(), fetc
   return saved!;
 }
 export async function searchCharacterOptions(type: OptionType, query = "", database = getDb()) { return database.select().from(characterOptions).where(and(eq(characterOptions.optionType, type), ilike(characterOptions.normalizedName, `%${normalizeOptionName(query)}%`))).orderBy(asc(characterOptions.name)).limit(50); }
+
+const searchType = (source: Record<string, unknown>): "heritage" | "feat" | null => {
+  const url = typeof source.url === "string" ? source.url : "";
+  if (/^\/feats\//i.test(url) || /^feat$/i.test(String(source.type ?? ""))) return "feat";
+  if (/^\/heritages\//i.test(url) || /\/heritages\//i.test(url) || /^heritage$/i.test(String(source.type ?? ""))) return "heritage";
+  if (versatileHeritagePath.test(url)) return "heritage";
+  return null;
+};
+
+/** Normalize the public AoN Elasticsearch response into safe, review-only results. */
+export function normalizeNethysSearchResponse(value: unknown, expectedType: "heritage" | "feat", category?: FeatCategory): NethysSearchResult[] {
+  if (!value || typeof value !== "object") throw new NethysOptionError("parse_failed", "Archives of Nethys returned an unreadable search response.");
+  const hits = (value as { hits?: { hits?: unknown } }).hits?.hits;
+  if (!Array.isArray(hits)) throw new NethysOptionError("parse_failed", "Archives of Nethys returned an unreadable search response.");
+  return hits.flatMap((hit): NethysSearchResult[] => {
+    const source = hit && typeof hit === "object" && "_source" in hit ? (hit as { _source?: unknown })._source : null;
+    if (!source || typeof source !== "object") return [];
+    const row = source as Record<string, unknown>; const optionType = searchType(row);
+    if (optionType !== expectedType || typeof row.name !== "string" || typeof row.url !== "string") return [];
+    const traits = Array.isArray(row.trait) ? row.trait.filter((item): item is string => typeof item === "string") : [];
+    const traitGroups = Array.isArray(row.trait_group) ? row.trait_group.filter((item): item is string => typeof item === "string") : [];
+    const featTaxonomy = [...traitGroups, ...traits].map((item) => item.toLocaleLowerCase("en-US"));
+    const featCategory = optionType === "feat" ? FEAT_CATEGORIES.find((item) => featTaxonomy.includes(item)) : undefined;
+    if (category && featCategory !== category) return [];
+    let sourceUrl: URL; try { sourceUrl = new URL(row.url, "https://2e.aonsrd.com"); } catch { return []; }
+    if (sourceUrl.hostname !== "2e.aonsrd.com" || optionTypeFromUrl(sourceUrl) !== optionType) return [];
+    return [{ name: stripOptionActionMarkers(row.name), optionType, sourceUrl: sourceUrl.href, sourceMaterialTitle: typeof row.primary_source === "string" ? row.primary_source : undefined, level: typeof row.level === "number" ? row.level : undefined, featCategory, summary: typeof row.summary === "string" ? row.summary : undefined }];
+  });
+}
+
+export async function searchNethysOptions(query: string, expectedType: "heritage" | "feat", category?: FeatCategory, fetcher: typeof fetch = fetch) {
+  const trimmed = query.trim();
+  if (trimmed.length < 2) return [];
+  const escaped = trimmed.replace(/[+\-=!(){}\[\]^"~*?:\\/]|&&|\|\|/g, "\\$&");
+  const url = new URL("https://elasticsearch.aonprd.com/aonsf/_search");
+  url.searchParams.set("q", `name:(${escaped})`); url.searchParams.set("size", "25");
+  let response: Response;
+  try { response = await fetcher(url, { headers: { Accept: "application/json", "User-Agent": "NexusCodex/1.0 option search" }, signal: AbortSignal.timeout(10_000) }); }
+  catch { throw new NethysOptionError("unavailable", "Archives of Nethys search is unavailable right now. Manual entry and link import are still available."); }
+  if (!response.ok) throw new NethysOptionError("unavailable", "Archives of Nethys search is unavailable right now. Manual entry and link import are still available.");
+  try { return normalizeNethysSearchResponse(await response.json(), expectedType, category); }
+  catch (error) { if (error instanceof NethysOptionError) throw error; throw new NethysOptionError("parse_failed", "Archives of Nethys returned unreadable search results. Manual entry and link import are still available."); }
+}

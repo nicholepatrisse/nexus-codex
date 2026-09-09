@@ -60,6 +60,15 @@ describe("character validation summary", () => {
     expect(html).not.toContain("/edit");
   });
 
+  it("links missing sourcebooks to Materials Owned for the character owner", () => {
+    const missingContext: IdentityValidationContext = { ownedMaterialIdentities: [], options: [{ optionType: "ancestry", name: "Barathu", sourceMaterialIdentity: "galactic-ancestries", sourceMaterialTitle: "Galactic Ancestries", sourceUrl: "https://2e.aonsrd.com/ancestries/1-barathu", metadata: {} }] };
+    const summary = deriveCharacterValidationSummary(character({ ancestry: "Barathu" }), missingContext, []);
+    expect(summary.details[0]).toMatchObject({ source: "Galactic Ancestries", sourceHref: "https://2e.aonsrd.com/ancestries/1-barathu", materialHref: "/profile?tab=materials&material=galactic-ancestries" });
+    const ownerHtml = renderToStaticMarkup(createElement(SummaryView, { summary }));
+    expect(ownerHtml).toContain('href="/profile?tab=materials&amp;material=galactic-ancestries"');
+    expect(renderToStaticMarkup(createElement(SummaryView, { summary, readOnly: true }))).toContain('href="https://2e.aonsrd.com/ancestries/1-barathu"');
+  });
+
   it("counts each heritage and feat once and links review to its edit section", () => {
     const optionContext: IdentityValidationContext = { ...context, options: [...context.options, { id: "catalog-feat", optionType: "feat", name: "Awarded Feat", sourceMaterialIdentity: "player-core", sourceMaterialTitle: "Starfinder Player Core", sourceUrl: "https://2e.aonsrd.com/feats/1", metadata: { level: 1, featCategory: "general" } }] };
     const summary = deriveCharacterValidationSummary(character(), optionContext, [], [feat]);
