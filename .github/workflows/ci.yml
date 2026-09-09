@@ -47,7 +47,10 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
-      - run: pnpm exec playwright install --with-deps chromium
+      # GitHub's Ubuntu image already includes Chromium runtime dependencies.
+      # Avoid `--with-deps`: it refreshes unrelated third-party apt sources and
+      # can fail before Playwright installs when a repository is mid-publish.
+      - run: pnpm exec playwright install chromium
       - run: pnpm test:e2e
 
   migrate-production:
