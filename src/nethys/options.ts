@@ -164,7 +164,9 @@ export function normalizeNethysSearchResponse(value: unknown, expectedType: "her
     const row = source as Record<string, unknown>; const optionType = searchType(row);
     if (optionType !== expectedType || typeof row.name !== "string" || typeof row.url !== "string") return [];
     const traits = Array.isArray(row.trait) ? row.trait.filter((item): item is string => typeof item === "string") : [];
-    const featCategory = optionType === "feat" ? FEAT_CATEGORIES.find((item) => traits.some((trait) => trait.toLocaleLowerCase("en-US") === item)) : undefined;
+    const traitGroups = Array.isArray(row.trait_group) ? row.trait_group.filter((item): item is string => typeof item === "string") : [];
+    const featTaxonomy = [...traitGroups, ...traits].map((item) => item.toLocaleLowerCase("en-US"));
+    const featCategory = optionType === "feat" ? FEAT_CATEGORIES.find((item) => featTaxonomy.includes(item)) : undefined;
     if (category && featCategory !== category) return [];
     let sourceUrl: URL; try { sourceUrl = new URL(row.url, "https://2e.aonsrd.com"); } catch { return []; }
     if (sourceUrl.hostname !== "2e.aonsrd.com" || optionTypeFromUrl(sourceUrl) !== optionType) return [];

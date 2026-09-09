@@ -62,10 +62,12 @@ describe("Archives of Nethys character options", () => {
   it("normalizes search results and filters incompatible option types and feat categories", () => {
     const response = { hits: { hits: [
       { _source: { name: "Intimidating Shot", type: "Feat", url: "/feats/821-intimidating-shot", level: 1, primary_source: "Player Core", trait: ["General", "Skill"], summary: "Demoralize with a ranged weapon." } },
+      { _source: { name: "Size Up", type: "Feat", url: "/feats/444-size-up", level: 1, primary_source: "Player Core", trait: ["Envoy", "Exploration"], trait_group: ["Mechanics", "Class"] } },
       { _source: { name: "Moonborn", type: "Heritage", url: "/heritages/7-moonborn", primary_source: "Galaxy Guide" } },
       { _source: { name: "Wrong URL", type: "Feat", url: "https://example.com/feats/1" } },
     ] } };
     expect(normalizeNethysSearchResponse(response, "feat", "skill")).toEqual([{ name: "Intimidating Shot", optionType: "feat", sourceUrl: "https://2e.aonsrd.com/feats/821-intimidating-shot", sourceMaterialTitle: "Player Core", level: 1, featCategory: "skill", summary: "Demoralize with a ranged weapon." }]);
+    expect(normalizeNethysSearchResponse(response, "feat", "class")).toEqual([{ name: "Size Up", optionType: "feat", sourceUrl: "https://2e.aonsrd.com/feats/444-size-up", sourceMaterialTitle: "Player Core", level: 1, featCategory: "class", summary: undefined }]);
     expect(normalizeNethysSearchResponse(response, "heritage")).toEqual([{ name: "Moonborn", optionType: "heritage", sourceUrl: "https://2e.aonsrd.com/heritages/7-moonborn", sourceMaterialTitle: "Galaxy Guide", level: undefined, featCategory: undefined, summary: undefined }]);
   });
   it("surfaces malformed and unavailable search responses as recoverable errors", async () => {
