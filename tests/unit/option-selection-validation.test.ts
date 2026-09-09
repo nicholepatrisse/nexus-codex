@@ -27,13 +27,15 @@ describe("heritage and feat advisory validation", () => {
   it("leaves feat prerequisite checking to character sheet builders", () => expect(validateCharacterOptionSelection(selection(), character, context({ prerequisites: "trained in Society" })).status).toBe("validated"));
 
   it.each([
+    ["level", selection({ acquiredLevel: 1 }), context({ level: 2 })],
+    ["category", selection({ featCategory: "skill" }), context({ featCategory: "general" })],
+    ["class restriction", selection(), context({ classRestrictions: ["Mystic"] })],
+    ["ancestry restriction", selection(), context({ ancestryRestrictions: ["Android"] })],
+    ["heritage ancestry restriction", selection({ selectionKind: "heritage", featCategory: null }), context({ ancestryRestrictions: ["Android"] }, { optionType: "heritage" })],
+  ])("leaves %s checking to character sheet builders", (_label, value, validationContext) => expect(validateCharacterOptionSelection(value, character, validationContext).status).toBe("validated"));
+
+  it.each([
     ["unknown catalog selection", selection({ characterOptionId: null }), context()],
     ["linked Chronicle", selection({ sourceChronicleId: "chronicle-1" }), context()],
-    ["wrong level", selection({ acquiredLevel: 1 }), context({ level: 2 })],
-    ["wrong category", selection({ featCategory: "skill" }), context({ featCategory: "general" })],
-    ["wrong class", selection(), context({ classRestrictions: ["Mystic"] })],
-    ["wrong ancestry", selection(), context({ ancestryRestrictions: ["Android"] })],
   ])("keeps %s as Needs Review", (_label, value, validationContext) => expect(validateCharacterOptionSelection(value, character, validationContext).status).toBe("unvalidated"));
-
-  it("checks reliable heritage ancestry metadata", () => expect(validateCharacterOptionSelection(selection({ selectionKind: "heritage", featCategory: null }), character, context({ ancestryRestrictions: ["Android"] }, { optionType: "heritage" })).status).toBe("unvalidated"));
 });
