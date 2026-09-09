@@ -200,6 +200,27 @@ body {
   }
 }
 
+/* Starting-item search folds away after selection without an abrupt layout
+   jump. Grid rows allow the content's natural height to animate. */
+.item-picker-slide {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  visibility: hidden;
+  transition: grid-template-rows 220ms ease, opacity 160ms ease, visibility 0s linear 220ms;
+}
+.item-picker-slide > div { min-height: 0; overflow: hidden; }
+.item-picker-slide[data-open="true"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .item-picker-slide { transition: none; }
+}
+
 @utility responsive-title {
   font-size: clamp(1.875rem, 8vw, 2.5rem);
   line-height: 1.1;

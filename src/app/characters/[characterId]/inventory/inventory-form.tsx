@@ -1,13 +1,11 @@
 "use client";
 import Link from "next/link";
-import { useActionState, useId, useState, useTransition } from "react";
-import { SelectionCard } from "@/app/selection-card";
+import { useActionState, useState } from "react";
 import { StyledSelect } from "@/app/styled-select";
 import { FormField } from "@/app/form-field";
 import type { InventoryFormState } from "./actions";
 import type { InventoryEntry } from "@/character/inventory";
-import { fetchNethysItemAction } from "./nethys-actions";
-import type { NethysItem } from "@/nethys/items";
+import { ItemCatalogSearch, type ImportedItemChoice } from "@/app/characters/item-catalog-search";
 import { validateInventoryEntry } from "@/character/inventory-validation";
 import { materialTitleWithoutCitation, normalizeMaterialIdentity } from "@/materials/material-identity";
 import { MaterialResolutionActions } from "@/materials/material-resolution-actions";
@@ -19,6 +17,7 @@ export function InventoryForm({ characterId, entry, chronicles, ownedMaterialIde
   const [state, formAction, pending] = useActionState(action, initial);
   const [acquisitionType, setAcquisitionType] = useState(entry?.acquisitionType ?? "purchased");
   const [itemName, setItemName] = useState(entry?.itemNameSnapshot ?? "");
+  const [contentItemId, setContentItemId] = useState(entry?.contentItemId ?? "");
   const [itemLink, setItemLink] = useState(entry?.itemLinkSnapshot ?? "");
   const [notes, setNotes] = useState(entry?.notes ?? "");
   const [validationNote, setValidationNote] = useState(entry?.validationNote ?? "");
@@ -37,26 +36,13 @@ export function InventoryForm({ characterId, entry, chronicles, ownedMaterialIde
   const [itemValue, setItemValue] = useState(String(entry?.valueMinor ?? ""));
   const [amountPaid, setAmountPaid] = useState(String(entry?.amountPaidMinor ?? ""));
   const [amountPaidAdjusted, setAmountPaidAdjusted] = useState(Boolean(entry));
-  const [lookupError, setLookupError] = useState<string>();
   const [lookupMessage, setLookupMessage] = useState<string>();
-  const [importChoices, setImportChoices] = useState<{ item: NethysItem; notes: string; sourceMaterialId: string | null; sourceMaterialIdentity: string | null }[]>([]);
-  const importChoiceName = useId();
-  const [lookingUp, startLookup] = useTransition();
   function defaultAmountPaid(value = itemValue, count = quantity, acquisition = acquisitionType) {
     return acquisition === "starting_equipment" || !value ? "" : String(Number(value) * (Number(count) || 1));
   }
-  function lookupNethys() {
-    setLookupError(undefined); setLookupMessage(undefined); setImportChoices([]);
-    startLookup(async () => {
-      const result = await fetchNethysItemAction(itemLink);
-      if (!result.ok) { setLookupError(result.error); return; }
-      if (result.items.length > 1) { setImportChoices(result.items); setLookupMessage("This page contains multiple items. Choose the one you want to import."); return; }
-      applyImport(result.items[0]!);
-    });
-  }
-  function applyImport(choice: { item: NethysItem; notes: string; sourceMaterialId: string | null; sourceMaterialIdentity: string | null }) {
+  function applyImport(choice: ImportedItemChoice) {
     const { item, notes: importedNotes } = choice;
-    setItemName(item.name); setItemLink(item.url); setNotes(importedNotes); setBulk(item.bulk ?? ""); setSourceMaterialTitle(item.source ?? ""); setSourceMaterialId(choice.sourceMaterialId ?? ""); setSourceMaterialIdentity(choice.sourceMaterialIdentity ?? (item.source ? normalizeMaterialIdentity(materialTitleWithoutCitation(item.source)) : "")); setSocietyLegal(item.societyLegal == null ? "" : String(item.societyLegal)); setSocietyStatus(item.societyStatus ?? ""); setRarity(item.rarity ?? ""); setImportChoices([]);
+    setItemName(item.name); setContentItemId(""); setItemLink(item.url); setNotes(importedNotes); setBulk(item.bulk ?? ""); setSourceMaterialTitle(item.source ?? ""); setSourceMaterialId(choice.sourceMaterialId ?? ""); setSourceMaterialIdentity(choice.sourceMaterialIdentity ?? (item.source ? normalizeMaterialIdentity(materialTitleWithoutCitation(item.source)) : "")); setSocietyLegal(item.societyLegal == null ? "" : String(item.societyLegal)); setSocietyStatus(item.societyStatus ?? ""); setRarity(item.rarity ?? "");
     if (item.priceCredits != null) { const price = String(item.priceCredits); const total = String(item.priceCredits * (Number(quantity) || 1)); setItemValue(price); setUnitPrice(price); setTotalPrice(total); if (!amountPaidAdjusted) setAmountPaid(defaultAmountPaid(price)); }
     setLookupMessage(`${item.name} imported. Review and edit the details before saving.`);
   }
@@ -66,15 +52,16 @@ export function InventoryForm({ characterId, entry, chronicles, ownedMaterialIde
   const validation = validateInventoryEntry({ itemNameSnapshot: itemName || "This item", itemLinkSnapshot: itemLink || null, sourceMaterialIdentity: sourceMaterialIdentity || null, sourceMaterialTitle: sourceMaterialTitle || null, societyLegal: societyLegal === "true" ? true : societyLegal === "false" ? false : null, societyStatus: societyStatus || null, rarity: rarity || null, sourceChronicleId: sourceChronicleId || null }, [...ownedMaterialIdentities, ...addedMaterialIdentities]);
   const missingMaterial = validation.issues.some((issue) => issue.type === "missing_material_ownership" && issue.resolvable);
   return <form action={formAction} className="mt-8 space-y-5">
-    <input type="hidden" name="contentItemId" value={entry?.contentItemId ?? ""} />
+    <input type="hidden" name="contentItemId" value={contentItemId} />
     <input type="hidden" name="sourceMaterialIdentity" value={sourceMaterialIdentity} />
     <input type="hidden" name="sourceMaterialId" value={sourceMaterialId} />
     <input type="hidden" name="societyLegal" value={societyLegal} />
     <input type="hidden" name="societyStatus" value={societyStatus} />
     <input type="hidden" name="rarity" value={rarity} />
     {idempotencyKey ? <input type="hidden" name="idempotencyKey" value={idempotencyKey} /> : null}
-    <FormField id="itemName" label="Item name" errors={state.fieldErrors?.itemName}>{(controlProps) => <input {...controlProps} className={field.replace("mt-1 ", "")} name="itemName" required maxLength={200} value={itemName} onChange={(event) => setItemName(event.target.value)} />}</FormField>
-    <div><label className="text-sm font-semibold" htmlFor="itemLink">Item link <span className="font-normal text-text-muted">(optional)</span></label><div className="flex items-start gap-2"><input className={field} id="itemLink" name="itemLink" type="url" inputMode="url" maxLength={2000} placeholder="https://2e.aonsrd.com/treasure/…" value={itemLink} onChange={(event) => setItemLink(event.target.value)} /><button className="mt-1 shrink-0 rounded-xl border border-border-strong px-4 py-2 font-semibold disabled:opacity-60" type="button" disabled={lookingUp || !itemLink.trim()} onClick={lookupNethys}>{lookingUp ? "Fetching…" : "Fetch details"}</button></div><p className="mt-1 text-sm text-text-muted">Paste a Starfinder 2e Archives of Nethys item URL to autofill available details.</p><ErrorText errors={state.fieldErrors?.itemLink} />{lookupError ? <p role="alert" className="mt-1 text-sm text-danger">{lookupError}</p> : null}{lookupMessage ? <p role="status" className="mt-1 text-sm text-success">{lookupMessage}</p> : null}{importChoices.length ? <fieldset className="mt-3 rounded-2xl border border-border bg-surface-raised p-4"><legend className="px-1 text-sm font-semibold">Which item?</legend><div className="mt-1 grid gap-3">{importChoices.map((choice) => <SelectionCard key={`${choice.item.name}-${choice.item.level}`} name={importChoiceName} value={choice.item.url} title={choice.item.name} description={`Item ${choice.item.level}`} metadata={choice.item.price} onChange={() => applyImport(choice)} />)}</div></fieldset> : null}</div>
+    <ItemCatalogSearch initialQuery={itemName} onSelected={applyImport} />
+    <FormField id="itemName" label="Item name" errors={state.fieldErrors?.itemName}>{(controlProps) => <input {...controlProps} className={field.replace("mt-1 ", "")} name="itemName" required maxLength={200} value={itemName} onChange={(event) => { setItemName(event.target.value); setContentItemId(""); }} />}</FormField>
+    <div><label className="text-sm font-semibold" htmlFor="itemLink">Item link <span className="font-normal text-text-muted">(optional)</span></label><input className={field} id="itemLink" name="itemLink" type="url" inputMode="url" maxLength={2000} placeholder="https://2e.aonsrd.com/treasure/…" value={itemLink} onChange={(event) => setItemLink(event.target.value)} /><p className="mt-1 text-sm text-text-muted">Populated by item search or editable for manual entries.</p><ErrorText errors={state.fieldErrors?.itemLink} />{lookupMessage ? <p role="status" className="mt-1 text-sm text-success">{lookupMessage}</p> : null}</div>
     <div className="grid gap-5 sm:grid-cols-3"><div><label className="text-sm font-semibold" htmlFor="quantity">Quantity</label><input className={field} id="quantity" name="quantity" type="number" min="1" step="1" required value={quantity} onChange={(event) => { const next = event.target.value; setQuantity(next); if (!amountPaidAdjusted) setAmountPaid(defaultAmountPaid(itemValue, next)); if (unitPrice) setTotalPrice(String(Number(unitPrice) * (Number(next) || 1))); }} /><ErrorText errors={state.fieldErrors?.quantity} /></div><div><label className="text-sm font-semibold" htmlFor="bulk">Bulk <span className="font-normal text-text-muted">(each)</span></label><input className={field} id="bulk" name="bulk" maxLength={20} placeholder="—, L, 1…" value={bulk} onChange={(event) => setBulk(event.target.value)} /><ErrorText errors={state.fieldErrors?.bulk} /></div><div><label className="text-sm font-semibold" htmlFor="acquisitionType">Acquisition</label><StyledSelect name="acquisitionType" label="Acquisition" defaultValue={entry?.acquisitionType ?? "purchased"} options={acquisitionOptions} invalid={Boolean(state.fieldErrors?.acquisitionType)} onValueChange={(next) => { setAcquisitionType(next); if (!amountPaidAdjusted) setAmountPaid(defaultAmountPaid(itemValue, quantity, next)); }} /></div></div>
     <div><label className="text-sm font-semibold" htmlFor="acquiredOn">Acquired on</label><input className={field} id="acquiredOn" name="acquiredOn" type="date" required defaultValue={entry?.acquiredOn ?? new Date().toISOString().slice(0,10)} /><ErrorText errors={state.fieldErrors?.acquiredOn} /></div>
     <div className="space-y-5"><div><label className="text-sm font-semibold" htmlFor="valueMinor">Item value <span className="font-normal text-text-muted">(credits each)</span></label><input className={field} id="valueMinor" name="valueMinor" type="number" min="0" step="1" value={itemValue} onChange={(event) => { const next = event.target.value; setItemValue(next); if (!amountPaidAdjusted) setAmountPaid(defaultAmountPaid(next)); if (!entry && acquisitionType === "purchased") { setUnitPrice(next); setTotalPrice(String(Number(next) * (Number(quantity) || 1))); } }} /><p className="mt-1 text-sm text-text-muted">Used to calculate sale proceeds, including for starting equipment and rewards.</p><ErrorText errors={state.fieldErrors?.valueMinor} /></div>
