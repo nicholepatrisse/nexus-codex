@@ -1,0 +1,2 @@
+ALTER TABLE "characters" ADD COLUMN "character_sheet_url" text;--> statement-breakpoint
+ALTER TABLE "characters" ADD CONSTRAINT "characters_character_sheet_url_length_check" CHECK ("characters"."character_sheet_url" is null or length("characters"."character_sheet_url") <= 2048);

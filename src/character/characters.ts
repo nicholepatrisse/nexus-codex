@@ -24,6 +24,19 @@ const startingItemSchema = z.object({ url: z.string().url(), name: z.string().tr
 export const VALIDATION_NOTE_MAX_LENGTH = 1000;
 const optionalValidationNoteSchema = z.string().trim().max(VALIDATION_NOTE_MAX_LENGTH, "Validation notes must be 1,000 characters or fewer.")
   .nullable().optional().transform((value) => value || null);
+const optionalCharacterSheetUrlSchema = z.string().trim().max(2048, "Character sheet URL must be 2,048 characters or fewer.")
+  .nullable().optional().transform((value, context) => {
+    if (value === undefined) return undefined;
+    if (!value) return null;
+    try {
+      const url = new URL(value);
+      if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error("Unsupported protocol");
+      return url.href;
+    } catch {
+      context.addIssue({ code: "custom", message: "Enter a complete web address beginning with http:// or https://." });
+      return z.NEVER;
+    }
+  });
 
 export const createCharacterInputSchema = z.object({
   name: z.string().trim().min(1, "Enter a character name.").max(100, "Character name must be 100 characters or fewer."),
@@ -40,6 +53,7 @@ export const createCharacterInputSchema = z.object({
   backgroundValidationNote: optionalValidationNoteSchema,
   backstory: z.string().trim().max(5000, "Backstory must be 5,000 characters or fewer.").nullable().optional().transform((value) => value || null),
   notes: z.string().trim().max(5000, "Notes must be 5,000 characters or fewer.").nullable().optional().transform((value) => value || null),
+  characterSheetUrl: optionalCharacterSheetUrlSchema,
 }).transform((input, context) => {
   const startingLevel = input.startingLevel as Sfs2StartingLevel;
   const startingCredits = input.startingCredits ?? SFS2_STARTING_WEALTH[startingLevel][0].credits;
@@ -70,6 +84,7 @@ export const updateCharacterInputSchema = z.object({
   backgroundSourceChronicleId: z.string().trim().max(100).nullable().optional().transform((value) => value || null),
   backstory: z.string().trim().max(5000, "Backstory must be 5,000 characters or fewer.").nullable().optional().transform((value) => value || null),
   notes: z.string().trim().max(5000, "Notes must be 5,000 characters or fewer.").nullable().optional().transform((value) => value || null),
+  characterSheetUrl: optionalCharacterSheetUrlSchema,
 }).superRefine((input, context) => {
   const fields = [input.startingLevel, input.startingCredits, input.startingItems];
   if (fields.every((value) => value === undefined)) return;
@@ -113,7 +128,7 @@ export async function getCharacterProgressions(
   return new Map(characterRows.map((character) => [character.id, deriveSfs2Progression(character.startingLevel, rewardsByCharacter.get(character.id) ?? [])]));
 }
 export interface CharacterSession { id: string; communityName: string; communitySlug: string; scenarioCode: string; scenarioTitle: string; startsAt: Date; displayTimeZone: string; signupStatus: "confirmed" | "waitlisted" | "cancelled" | null; participationType: "player" | "gm_credit"; sessionStatus: "published" | "completed" | "cancelled"; }
-export interface CharacterDetail { id: string; name: string; societyNumber: string; gameSystemName: string; startingLevel: number; startingLevelLocked: boolean; startingCredits: number; startingItems: { url: string; name: string }[]; currentLevel: number; xp: number; creditsMinor: number | null; className: string | null; classValidationNote: string | null; ancestry: string | null; ancestryValidationNote: string | null; ancestrySourceChronicleId: string | null; ancestrySourceChronicleCharacterId: string | null; background: string | null; backgroundValidationNote: string | null; backgroundSourceChronicleId: string | null; backgroundSourceChronicleCharacterId: string | null; backstory: string | null; notes: string | null; isOwner: boolean; upcomingSessions: CharacterSession[]; pastSessions: CharacterSession[]; }
+export interface CharacterDetail { id: string; name: string; societyNumber: string; gameSystemName: string; startingLevel: number; startingLevelLocked: boolean; startingCredits: number; startingItems: { url: string; name: string }[]; currentLevel: number; xp: number; creditsMinor: number | null; className: string | null; classValidationNote: string | null; ancestry: string | null; ancestryValidationNote: string | null; ancestrySourceChronicleId: string | null; ancestrySourceChronicleCharacterId: string | null; background: string | null; backgroundValidationNote: string | null; backgroundSourceChronicleId: string | null; backgroundSourceChronicleCharacterId: string | null; backstory: string | null; notes: string | null; characterSheetUrl: string | null; isOwner: boolean; upcomingSessions: CharacterSession[]; pastSessions: CharacterSession[]; }
 function communityRole(access: { isActiveMember: boolean; roles: ("owner" | "gm")[] }): CommunityRole | "member" | "visitor" {
   if (access.roles.includes("owner")) return "owner";
   if (access.roles.includes("gm")) return "gm";
@@ -121,7 +136,7 @@ function communityRole(access: { isActiveMember: boolean; roles: ("owner" | "gm"
 }
 /** Returns only character and game data the actor is authorized to see. */
 export async function getCharacterDetail(actor: AuthenticatedActor, characterId: string, now: Date = new Date(), database: Database = getDb()): Promise<CharacterDetail | null> {
-  const [character] = await database.select({ id: characters.id, personId: characters.personId, name: characters.name, societyNumber: characters.societyNumber, gameSystemName: gameSystems.name, startingLevel: characters.startingLevel, startingLevelLocked: characters.startingLevelLocked, className: characters.className, classValidationNote: characters.classValidationNote, ancestry: characters.ancestry, ancestryValidationNote: characters.ancestryValidationNote, ancestrySourceChronicleId: characters.ancestrySourceChronicleId, background: characters.background, backgroundValidationNote: characters.backgroundValidationNote, backgroundSourceChronicleId: characters.backgroundSourceChronicleId, backstory: characters.backstory, notes: characters.notes }).from(characters).innerJoin(gameSystems, eq(gameSystems.id, characters.gameSystemId)).where(eq(characters.id, characterId)).limit(1);
+  const [character] = await database.select({ id: characters.id, personId: characters.personId, name: characters.name, societyNumber: characters.societyNumber, gameSystemName: gameSystems.name, startingLevel: characters.startingLevel, startingLevelLocked: characters.startingLevelLocked, className: characters.className, classValidationNote: characters.classValidationNote, ancestry: characters.ancestry, ancestryValidationNote: characters.ancestryValidationNote, ancestrySourceChronicleId: characters.ancestrySourceChronicleId, background: characters.background, backgroundValidationNote: characters.backgroundValidationNote, backgroundSourceChronicleId: characters.backgroundSourceChronicleId, backstory: characters.backstory, notes: characters.notes, characterSheetUrl: characters.characterSheetUrl }).from(characters).innerJoin(gameSystems, eq(gameSystems.id, characters.gameSystemId)).where(eq(characters.id, characterId)).limit(1);
   if (!character) return null;
   const isOwner = character.personId === actor.personId;
   if (!isOwner) {
@@ -159,7 +174,7 @@ export async function getCharacterDetail(actor: AuthenticatedActor, characterId:
     const [item] = remainingEquipment.splice(index, 1);
     return item?.url ? [{ url: item.url, name: item.name }] : [];
   });
-  return { id: character.id, name: character.name, societyNumber: character.societyNumber, gameSystemName: character.gameSystemName, startingLevel: character.startingLevel, startingLevelLocked: character.startingLevelLocked, startingCredits: startingCredit?.amountMinor ?? SFS2_STARTING_WEALTH[character.startingLevel as Sfs2StartingLevel][0].credits, startingItems, currentLevel: progression.currentLevel, xp: progression.totalXp, creditsMinor, className: character.className, classValidationNote: character.classValidationNote, ancestry: character.ancestry, ancestryValidationNote: character.ancestryValidationNote, ancestrySourceChronicleId: character.ancestrySourceChronicleId, ancestrySourceChronicleCharacterId: ancestrySource?.characterId ?? null, background: character.background, backgroundValidationNote: character.backgroundValidationNote, backgroundSourceChronicleId: character.backgroundSourceChronicleId, backgroundSourceChronicleCharacterId: backgroundSource?.characterId ?? null, backstory: character.backstory, notes: character.notes, isOwner, upcomingSessions, pastSessions };
+  return { id: character.id, name: character.name, societyNumber: character.societyNumber, gameSystemName: character.gameSystemName, startingLevel: character.startingLevel, startingLevelLocked: character.startingLevelLocked, startingCredits: startingCredit?.amountMinor ?? SFS2_STARTING_WEALTH[character.startingLevel as Sfs2StartingLevel][0].credits, startingItems, currentLevel: progression.currentLevel, xp: progression.totalXp, creditsMinor, className: character.className, classValidationNote: character.classValidationNote, ancestry: character.ancestry, ancestryValidationNote: character.ancestryValidationNote, ancestrySourceChronicleId: character.ancestrySourceChronicleId, ancestrySourceChronicleCharacterId: ancestrySource?.characterId ?? null, background: character.background, backgroundValidationNote: character.backgroundValidationNote, backgroundSourceChronicleId: character.backgroundSourceChronicleId, backgroundSourceChronicleCharacterId: backgroundSource?.characterId ?? null, backstory: character.backstory, notes: character.notes, characterSheetUrl: character.characterSheetUrl, isOwner, upcomingSessions, pastSessions };
 }
 export async function createCharacter(actor: AuthenticatedActor, rawInput: CreateCharacterInput, database: Database = getDb()) {
   const input = createCharacterInputSchema.parse(rawInput);
@@ -183,7 +198,7 @@ export async function createCharacter(actor: AuthenticatedActor, rawInput: Creat
     return await database.transaction(async (transaction) => {
       const [created] = await transaction.insert(characters).values({
         id: randomUUID(), personId: actor.personId, gameSystemId: SUPPORTED_GAME_SYSTEM.id,
-        name: input.name, societyNumber, startingLevel: input.startingLevel, className: input.className, classValidationNote: input.classValidationNote, ancestry: input.ancestry, ancestryValidationNote: input.ancestryValidationNote, background: input.background, backgroundValidationNote: input.backgroundValidationNote, backstory: input.backstory, notes: input.notes,
+        name: input.name, societyNumber, startingLevel: input.startingLevel, className: input.className, classValidationNote: input.classValidationNote, ancestry: input.ancestry, ancestryValidationNote: input.ancestryValidationNote, background: input.background, backgroundValidationNote: input.backgroundValidationNote, backstory: input.backstory, notes: input.notes, characterSheetUrl: input.characterSheetUrl,
       }).returning({ id: characters.id, name: characters.name });
       if (!created) throw new CharacterCreationError("The character could not be created.");
       await transaction.insert(characterCreditLedgerEntries).values({ id: randomUUID(), characterId: created.id, amountMinor: input.startingCredits, displayScale: 1, type: "starting_credits", effectiveOn: new Date().toISOString().slice(0, 10), source: "character_creation", notes: startingWealthNote(input.startingLevel, input.startingCredits) });
@@ -224,7 +239,7 @@ export async function updateCharacter(actor: AuthenticatedActor, characterId: st
       if (!source) throw new InvalidAncestryChronicleError("The background Source Chronicle must belong to one of your characters.");
     }
     const { startingCredits } = input;
-    const details = { name: input.name, startingLevel: input.startingLevel, className: input.className, classValidationNote: input.classValidationNote, ancestry: input.ancestry, ancestryValidationNote: input.ancestryValidationNote, ancestrySourceChronicleId: input.ancestry === null ? null : input.ancestrySourceChronicleId, background: input.background, backgroundValidationNote: input.backgroundValidationNote, backgroundSourceChronicleId: input.background === null ? null : input.backgroundSourceChronicleId, backstory: input.backstory, notes: input.notes };
+    const details = { name: input.name, startingLevel: input.startingLevel, className: input.className, classValidationNote: input.classValidationNote, ancestry: input.ancestry, ancestryValidationNote: input.ancestryValidationNote, ancestrySourceChronicleId: input.ancestry === null ? null : input.ancestrySourceChronicleId, background: input.background, backgroundValidationNote: input.backgroundValidationNote, backgroundSourceChronicleId: input.background === null ? null : input.backgroundSourceChronicleId, backstory: input.backstory, notes: input.notes, characterSheetUrl: input.characterSheetUrl };
     const [updated] = await transaction.update(characters).set({ ...details, updatedAt: new Date() })
       .where(and(eq(characters.id, characterId), eq(characters.personId, actor.personId), changingStartingSetup ? eq(characters.startingLevelLocked, false) : undefined))
       .returning({ id: characters.id, name: characters.name });
