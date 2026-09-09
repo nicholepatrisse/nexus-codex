@@ -1,4 +1,10 @@
+import { randomUUID } from "node:crypto";
+import { and, asc, eq, ilike } from "drizzle-orm";
 import { load } from "cheerio";
+import { getDb } from "@/db/client";
+import { characterOptions } from "@/db/schema";
+import { SUPPORTED_GAME_SYSTEM } from "@/game-system/config";
+import { materialTitleWithoutCitation, normalizeMaterialIdentity } from "@/materials/material-identity";
 
 const HOST = "2e.aonsrd.com";
 const ITEM_PATH = /^\/(?:treasure\/[^/]+|equipment\/(?:ammunition|armor|shields|weapons)\/[^/]+)\/?$/i;
@@ -21,6 +27,12 @@ export type NethysItem = {
   societyStatus?: "standard" | "limited" | "restricted";
   usage?: string;
   category?: string;
+};
+
+export type NethysItemSearchResult = Pick<NethysItem, "name" | "level" | "category"> & {
+  sourceUrl: string;
+  sourceMaterialTitle?: string;
+  summary?: string;
 };
 
 export class NethysItemError extends Error {
@@ -191,4 +203,66 @@ export function nethysItemNotes(item: NethysItem) {
     item.traits.length && `Traits: ${item.traits.join(", ")}`,
   ].filter(Boolean).join("\n");
   return [metadata, item.description].filter(Boolean).join("\n\n");
+}
+
+function itemSearchType(row: Record<string, unknown>) {
+  const url = typeof row.url === "string" ? row.url : "";
+  return /^\/(?:treasure|equipment\/(?:ammunition|armor|shields|weapons))\//i.test(url);
+}
+
+/** Normalize AoN's public Elasticsearch response without trusting remote URLs or metadata. */
+export function normalizeNethysItemSearchResponse(value: unknown, requiredLevel?: number): NethysItemSearchResult[] {
+  if (!value || typeof value !== "object") throw new NethysItemError("parse_failed", "Archives of Nethys returned an unreadable search response.");
+  const hits = (value as { hits?: { hits?: unknown } }).hits?.hits;
+  if (!Array.isArray(hits)) throw new NethysItemError("parse_failed", "Archives of Nethys returned an unreadable search response.");
+  return hits.flatMap((hit): NethysItemSearchResult[] => {
+    const source = hit && typeof hit === "object" && "_source" in hit ? (hit as { _source?: unknown })._source : null;
+    if (!source || typeof source !== "object") return [];
+    const row = source as Record<string, unknown>;
+    if (!itemSearchType(row) || typeof row.name !== "string" || typeof row.url !== "string") return [];
+    let sourceUrl: URL;
+    try { sourceUrl = new URL(row.url, `https://${HOST}`); } catch { return []; }
+    try { validateNethysItemUrl(sourceUrl.href); } catch { return []; }
+    const level = typeof row.level === "number" && Number.isInteger(row.level) ? row.level : undefined;
+    if (requiredLevel != null && level != null && level !== requiredLevel) return [];
+    const category = typeof row.type === "string" ? row.type : typeof row.category === "string" ? row.category : undefined;
+    return [{ name: row.name.trim(), level, category, sourceUrl: sourceUrl.href, sourceMaterialTitle: typeof row.primary_source === "string" ? row.primary_source : undefined, summary: typeof row.summary === "string" ? row.summary : undefined }];
+  });
+}
+
+export async function searchNethysItems(query: string, requiredLevel?: number, fetcher: typeof fetch = fetch) {
+  const trimmed = query.trim();
+  if (trimmed.length < 2) return [];
+  const escaped = trimmed.replace(/[+\-=!(){}\[\]^"~*?:\\/]|&&|\|\|/g, "\\$&");
+  const url = new URL("https://elasticsearch.aonprd.com/aonsf/_search");
+  url.searchParams.set("q", `name:(${escaped})`);
+  url.searchParams.set("size", "25");
+  let response: Response;
+  try { response = await fetcher(url, { headers: { Accept: "application/json", "User-Agent": "NexusCodex/1.0 item search" }, signal: AbortSignal.timeout(10_000) }); }
+  catch { throw new NethysItemError("unavailable", "Archives of Nethys item search is unavailable right now. Exact-link import and manual entry are still available."); }
+  if (!response.ok) throw new NethysItemError("unavailable", "Archives of Nethys item search is unavailable right now. Exact-link import and manual entry are still available.");
+  try {
+    const normalized = normalizeNethysItemSearchResponse(await response.json(), requiredLevel);
+    return normalized.filter((item, index, all) => all.findIndex((candidate) => candidate.sourceUrl === item.sourceUrl) === index);
+  }
+  catch (error) { if (error instanceof NethysItemError) throw error; throw new NethysItemError("parse_failed", "Archives of Nethys returned unreadable item results. Exact-link import and manual entry are still available."); }
+}
+
+const itemCatalogUrl = (item: NethysItem) => `${item.url}#item=${encodeURIComponent(item.name)}${item.level == null ? "" : `&level=${item.level}`}`;
+const itemMetadata = (item: NethysItem) => ({ level: item.level, price: item.price, priceCredits: item.priceCredits, bulk: item.bulk, hands: item.hands, source: item.source, sourceUrl: item.sourceUrl, description: item.description, traits: item.traits, rarity: item.rarity, societyLegal: item.societyLegal, societyStatus: item.societyStatus, usage: item.usage, category: item.category });
+
+export async function catalogNethysItem(item: NethysItem, database = getDb()) {
+  const normalizedName = item.name.normalize("NFKC").replace(/\s+/g, " ").trim().toLocaleLowerCase("en-US");
+  const sourceMaterialTitle = item.source ? materialTitleWithoutCitation(item.source) : undefined;
+  const sourceMaterialIdentity = sourceMaterialTitle ? normalizeMaterialIdentity(sourceMaterialTitle) : undefined;
+  const sourceUrl = itemCatalogUrl(item);
+  const [saved] = await database.insert(characterOptions).values({ id: randomUUID(), gameSystemId: SUPPORTED_GAME_SYSTEM.id, optionType: "item", name: item.name, normalizedName, sourceMaterialIdentity, sourceMaterialTitle, sourceUrl, metadata: itemMetadata(item) }).onConflictDoUpdate({ target: characterOptions.sourceUrl, set: { name: item.name, normalizedName, sourceMaterialIdentity, sourceMaterialTitle, metadata: itemMetadata(item), updatedAt: new Date() } }).returning();
+  return saved!;
+}
+
+export async function searchCatalogItems(query: string, requiredLevel?: number, database = getDb()) {
+  const normalized = query.normalize("NFKC").replace(/\s+/g, " ").trim().toLocaleLowerCase("en-US");
+  if (!normalized) return [];
+  const rows = await database.select().from(characterOptions).where(and(eq(characterOptions.optionType, "item"), ilike(characterOptions.normalizedName, `%${normalized}%`))).orderBy(asc(characterOptions.name)).limit(50);
+  return rows.filter((row) => requiredLevel == null || row.metadata.level === requiredLevel);
 }

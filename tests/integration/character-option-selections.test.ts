@@ -7,6 +7,7 @@ import { createCharacterOptionSelection, deleteCharacterOptionSelection, listOwn
 import { getDb } from "@/db/client";
 import { authUsers, characterOptionSelections, characterOptions, characters, gameSystems, people } from "@/db/schema";
 import { SUPPORTED_GAME_SYSTEM } from "@/game-system/config";
+import { catalogNethysItem, searchCatalogItems } from "@/nethys/items";
 
 const describeWithDatabase = process.env.CI ? describe : describe.skip;
 const userIds: string[] = [];
@@ -74,5 +75,17 @@ describeWithDatabase("character option selection persistence", () => {
       expect.objectContaining({ nameSnapshot: "Skill Training", featCategory: "general", acquisitionMethod: "awarded", grantOrigin: "Scenario reward" }),
     ]));
     expect(await replaceCharacterOptionSelections(ownerActor, character.id, [{ selectionKind: "feat", acquiredLevel: 5, name: "Manual replacement" }])).toEqual([expect.objectContaining({ nameSnapshot: "Manual replacement", featCategory: null })]);
+  });
+
+  it("deduplicates imported item variants and filters the Nexus item catalog by required level", async () => {
+    await getDb().insert(gameSystems).values({ id: SUPPORTED_GAME_SYSTEM.id, code: SUPPORTED_GAME_SYSTEM.code, name: SUPPORTED_GAME_SYSTEM.name }).onConflictDoUpdate({ target: gameSystems.id, set: { code: SUPPORTED_GAME_SYSTEM.code, name: SUPPORTED_GAME_SYSTEM.name } });
+    const suffix = randomUUID();
+    const item = { url: `https://2e.aonsrd.com/treasure/${suffix}-test-kit`, name: `Test Kit ${suffix}`, level: 3, price: "100 credits", priceCredits: 100, source: "Player Core pg. 10", traits: ["Common"] };
+    const first = await catalogNethysItem(item);
+    const second = await catalogNethysItem(item);
+    expect(second.id).toBe(first.id);
+    expect(await searchCatalogItems(`Test Kit ${suffix}`, 3)).toEqual([expect.objectContaining({ id: first.id, optionType: "item", metadata: expect.objectContaining({ level: 3, priceCredits: 100 }) })]);
+    expect(await searchCatalogItems(`Test Kit ${suffix}`, 2)).toEqual([]);
+    await getDb().delete(characterOptions).where(eq(characterOptions.id, first.id));
   });
 });

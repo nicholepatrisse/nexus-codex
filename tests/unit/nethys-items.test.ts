@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fetchNethysItem, NethysItemError, nethysItemNotes, parseNethysItemHtml, parseNethysItemsHtml, validateNethysItemUrl } from "@/nethys/items";
+import { fetchNethysItem, NethysItemError, nethysItemNotes, normalizeNethysItemSearchResponse, parseNethysItemHtml, parseNethysItemsHtml, searchNethysItems, validateNethysItemUrl } from "@/nethys/items";
 
 const hygieneKit = `<div class="treasure"><h1 class="title"><span class="sfs">icon</span> Hygiene Kit <span class="feature-level">Item 0</span></h1><div class="sources"><strong>Source</strong> <a>Player Core pg. 241</a></div><div><b>Price</b> 2 credits</div><div><div><b>Hands</b> 2</div><div><b>Bulk</b> L</div></div><hr><div class="treasure-description">Everything needed for good grooming.</div></div>`;
 const sunshades = `<div class="treasure"><h1 class="title">Sunshades <span class="feature-level">Item 0+</span></h1><div class="treasure-description">Sunshades make everyone look cooler.</div><div class="treasure"><h2 class="title">Sunshades (Commercial) <span class="feature-level">Item 0</span></h2><div class="sources"><strong>Source</strong> Player Core pg. 241</div><div><b>Price</b> 2 credits</div><div><b>Bulk</b> —</div></div><div class="treasure"><h2 class="title">Sunshades (Tactical) <span class="feature-level">Item 3</span></h2><div class="sources"><strong>Source</strong> Player Core pg. 241</div><div><b>Price</b> 450 credits</div><div><b>Bulk</b> —</div><div class="treasure-description">Protects against blinded and dazzled.</div></div></div>`;
@@ -79,5 +79,35 @@ describe("Archives of Nethys item import", () => {
   it("inherits an SFS Limited marker from a multi-item parent", () => {
     const limited = `<div class="treasure"><h1 class="title"><span class="sfs"><img alt="SFS Limited"></span> Degradation Grenade <span class="feature-level">Item 0+</span></h1><div class="treasure"><h2 class="title">Degradation Grenade (Commercial) <span class="feature-level">Item 0</span></h2><div class="sources">Source Starfinder Society Scenario #1-12: Take the Bait pg. 14</div></div></div>`;
     expect(parseNethysItemsHtml(limited, "https://2e.aonsrd.com/treasure/178-degradation-grenade")[0]).toMatchObject({ name: "Degradation Grenade (Commercial)", societyStatus: "limited", societyLegal: undefined });
+  });
+
+  it("normalizes item search results and filters known levels and unsupported types", () => {
+    const response = { hits: { hits: [
+      { _source: { name: "Hygiene Kit", type: "Treasure", url: "/treasure/19-hygiene-kit", level: 0, primary_source: "Player Core", summary: "Grooming supplies." } },
+      { _source: { name: "Tactical Medkit", type: "Treasure", url: "/treasure/20-medkit", level: 3 } },
+      { _source: { name: "Wrong type", type: "Feat", url: "/feats/1-wrong", level: 0 } },
+      { _source: { name: "Wrong host", type: "Treasure", url: "https://example.com/treasure/1-wrong", level: 0 } },
+    ] } };
+    expect(normalizeNethysItemSearchResponse(response, 0)).toEqual([{ name: "Hygiene Kit", level: 0, category: "Treasure", sourceUrl: "https://2e.aonsrd.com/treasure/19-hygiene-kit", sourceMaterialTitle: "Player Core", summary: "Grooming supplies." }]);
+  });
+
+  it("keeps results with missing level metadata for page-level review", () => {
+    const response = { hits: { hits: [{ _source: { name: "Medkit", type: "Treasure", url: "/treasure/20-medkit" } }] } };
+    expect(normalizeNethysItemSearchResponse(response, 3)).toHaveLength(1);
+  });
+
+  it("surfaces malformed and unavailable item searches as recoverable failures", async () => {
+    expect(() => normalizeNethysItemSearchResponse({})).toThrow(/unreadable/);
+    const unavailable = vi.fn().mockRejectedValue(new Error("offline"));
+    await expect(searchNethysItems("medkit", undefined, unavailable)).rejects.toMatchObject({ code: "unavailable" });
+  });
+
+  it("collapses multiple search hits that resolve to the same variant page", async () => {
+    const body = { hits: { hits: [
+      { _source: { name: "Force Field", type: "Treasure", url: "/treasure/32-force-field", level: 1 } },
+      { _source: { name: "Force Field (Commercial)", type: "Treasure", url: "/treasure/32-force-field", level: 1 } },
+    ] } };
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } }));
+    await expect(searchNethysItems("force field", 1, fetcher)).resolves.toEqual([expect.objectContaining({ name: "Force Field", sourceUrl: "https://2e.aonsrd.com/treasure/32-force-field" })]);
   });
 });
