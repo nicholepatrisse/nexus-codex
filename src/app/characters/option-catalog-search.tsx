@@ -3,9 +3,9 @@ import { useState, useTransition } from "react";
 import { importCharacterOptionAction, searchCharacterOptionsAction } from "./character-options-actions";
 
 export type SelectedCatalogOption = { id: string; name: string; sourceMaterialIdentity: string | null; sourceMaterialTitle: string | null; sourceUrl: string | null; metadata: Record<string, unknown> };
-type Props = { kind: "heritage" | "feat"; category?: "class" | "ancestry" | "skill" | "general" | null; onSelected: (option: SelectedCatalogOption) => void };
-export function OptionCatalogSearch({ kind, category, onSelected }: Props) {
-  const [query, setQuery] = useState(""); const [result, setResult] = useState<Awaited<ReturnType<typeof searchCharacterOptionsAction>> | null>(null);
+type Props = { kind: "heritage" | "feat"; category?: "class" | "ancestry" | "skill" | "general" | null; initialQuery?: string; onSelected: (option: SelectedCatalogOption) => void };
+export function OptionCatalogSearch({ kind, category, initialQuery = "", onSelected }: Props) {
+  const [query, setQuery] = useState(initialQuery); const [result, setResult] = useState<Awaited<ReturnType<typeof searchCharacterOptionsAction>> | null>(null);
   const [searching, startSearch] = useTransition(); const [importingUrl, setImportingUrl] = useState("");
   const search = () => startSearch(async () => setResult(await searchCharacterOptionsAction(query, kind, kind === "feat" ? category ?? undefined : undefined)));
   const chooseRemote = (url: string) => { setImportingUrl(url); startSearch(async () => { const imported = await importCharacterOptionAction(url, kind); setImportingUrl(""); if (!imported.ok) return setResult({ ok: false, error: imported.error }); onSelected(imported.option); }); };
