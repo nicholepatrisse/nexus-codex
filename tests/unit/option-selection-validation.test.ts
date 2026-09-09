@@ -24,10 +24,11 @@ describe("heritage and feat advisory validation", () => {
 
   it("marks confirmed Society restrictions invalid", () => expect(validateCharacterOptionSelection(selection(), character, context({ societyLegal: false })).status).toBe("invalid"));
 
+  it("leaves feat prerequisite checking to character sheet builders", () => expect(validateCharacterOptionSelection(selection(), character, context({ prerequisites: "trained in Society" })).status).toBe("validated"));
+
   it.each([
     ["unknown catalog selection", selection({ characterOptionId: null }), context()],
     ["awarded feat", selection({ acquisitionMethod: "awarded", grantOrigin: "Scenario reward" }), context()],
-    ["unsupported prerequisite", selection(), context({ prerequisites: "trained in Society" })],
     ["linked Chronicle", selection({ sourceChronicleId: "chronicle-1" }), context()],
     ["wrong level", selection({ acquiredLevel: 1 }), context({ level: 2 })],
     ["wrong category", selection({ featCategory: "skill" }), context({ featCategory: "general" })],

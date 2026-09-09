@@ -40,7 +40,6 @@ export function validateCharacterOptionSelection(selection: CharacterOptionSelec
     const classRestrictions = strings(option.metadata.classRestrictions);
     if (classRestrictions?.length && !classRestrictions.some((value) => same(character.className, value))) results.push(validationReasons.unsupportedAccessRule(`${selection.nameSnapshot} requires one of these classes: ${classRestrictions.join(", ")}. The recorded class is ${character.className ?? "unknown"}.`));
     if (ancestryRestrictions?.length && !ancestryRestrictions.some((value) => same(character.ancestry, value))) results.push(validationReasons.unsupportedAccessRule(`${selection.nameSnapshot} requires one of these ancestries: ${ancestryRestrictions.join(", ")}. The recorded ancestry is ${character.ancestry ?? "unknown"}.`));
-    if (option.metadata.prerequisites) results.push(validationReasons.unsupportedAccessRule(`${selection.nameSnapshot} has prerequisites Nexus cannot fully evaluate: ${String(option.metadata.prerequisites)}.`));
     if (selection.acquisitionMethod === "awarded") {
       const origin = selection.grantOrigin && same(character.background ?? null, selection.grantOrigin)
         ? context.options.find((candidate) => candidate.optionType === "background" && same(candidate.name, selection.grantOrigin!)) : null;
