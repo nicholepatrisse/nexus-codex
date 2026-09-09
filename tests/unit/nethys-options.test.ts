@@ -64,11 +64,19 @@ describe("Archives of Nethys character options", () => {
       { _source: { name: "Intimidating Shot", type: "Feat", url: "/feats/821-intimidating-shot", level: 1, primary_source: "Player Core", trait: ["General", "Skill"], summary: "Demoralize with a ranged weapon." } },
       { _source: { name: "Size Up", type: "Feat", url: "/feats/444-size-up", level: 1, primary_source: "Player Core", trait: ["Envoy", "Exploration"], trait_group: ["Mechanics", "Class"] } },
       { _source: { name: "Moonborn", type: "Heritage", url: "/heritages/7-moonborn", primary_source: "Galaxy Guide" } },
+      { _source: { name: "Nchaki Attendant Shirren", type: "Heritage", url: "/ancestries/13-shirren/heritages/127-nchaki-attendant-shirren", primary_source: "Galactic Ancestries" } },
+      { _source: { name: "Android", type: "Ancestry", url: "/ancestries/2-android", primary_source: "Player Core" } },
+      { _source: { name: "Ace Pilot", type: "Background", url: "/backgrounds/8-ace-pilot", primary_source: "Player Core" } },
       { _source: { name: "Wrong URL", type: "Feat", url: "https://example.com/feats/1" } },
     ] } };
     expect(normalizeNethysSearchResponse(response, "feat", "skill")).toEqual([{ name: "Intimidating Shot", optionType: "feat", sourceUrl: "https://2e.aonsrd.com/feats/821-intimidating-shot", sourceMaterialTitle: "Player Core", level: 1, featCategory: "skill", summary: "Demoralize with a ranged weapon." }]);
     expect(normalizeNethysSearchResponse(response, "feat", "class")).toEqual([{ name: "Size Up", optionType: "feat", sourceUrl: "https://2e.aonsrd.com/feats/444-size-up", sourceMaterialTitle: "Player Core", level: 1, featCategory: "class", summary: undefined }]);
-    expect(normalizeNethysSearchResponse(response, "heritage")).toEqual([{ name: "Moonborn", optionType: "heritage", sourceUrl: "https://2e.aonsrd.com/heritages/7-moonborn", sourceMaterialTitle: "Galaxy Guide", level: undefined, featCategory: undefined, summary: undefined }]);
+    expect(normalizeNethysSearchResponse(response, "heritage")).toEqual([
+      { name: "Moonborn", optionType: "heritage", sourceUrl: "https://2e.aonsrd.com/heritages/7-moonborn", sourceMaterialTitle: "Galaxy Guide", level: undefined, featCategory: undefined, summary: undefined },
+      { name: "Nchaki Attendant Shirren", optionType: "heritage", sourceUrl: "https://2e.aonsrd.com/ancestries/13-shirren/heritages/127-nchaki-attendant-shirren", sourceMaterialTitle: "Galactic Ancestries", level: undefined, featCategory: undefined, summary: undefined },
+    ]);
+    expect(normalizeNethysSearchResponse(response, "ancestry")).toEqual([{ name: "Android", optionType: "ancestry", sourceUrl: "https://2e.aonsrd.com/ancestries/2-android", sourceMaterialTitle: "Player Core", level: undefined, featCategory: undefined, summary: undefined }]);
+    expect(normalizeNethysSearchResponse(response, "background")).toEqual([{ name: "Ace Pilot", optionType: "background", sourceUrl: "https://2e.aonsrd.com/backgrounds/8-ace-pilot", sourceMaterialTitle: "Player Core", level: undefined, featCategory: undefined, summary: undefined }]);
   });
   it("surfaces malformed and unavailable search responses as recoverable errors", async () => {
     expect(() => normalizeNethysSearchResponse({}, "feat")).toThrow(/unreadable/);
