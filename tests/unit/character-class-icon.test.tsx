@@ -5,7 +5,7 @@ import { CharacterClassIcon, getCharacterClassIcon } from "@/character/character
 describe("CharacterClassIcon", () => {
   it.each(["Envoy", "Mystic", "Operative", "Solarian", "Soldier", "Witchwarper"])("maps the supported %s class", (className) => {
     expect(getCharacterClassIcon(className)?.label).toBe(className);
-    expect(getCharacterClassIcon(className)?.src).toBe(`/character-class-icons/${className.toLowerCase()}.png`);
+    expect(getCharacterClassIcon(className)?.src).toBe(`/character-class-icons/${className.toLowerCase()}-v2.png`);
   });
 
   it("normalizes class names before matching", () => {
