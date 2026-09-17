@@ -12,15 +12,16 @@ function previewIssueMessage(issue: { type: string; message: string }, optionNam
   return issue.message;
 }
 
-export function PathmuncherImport({ characterId, onApply }: { characterId?: string; onApply: (values: { name: string; className: string; ancestry: string; background: string; options: CharacterOptionDraft[] }) => void }) {
+export function PathmuncherImport({ characterId, onApply }: { characterId?: string; onApply: (values: { name: string; className: string; ancestry: string; background: string; options: CharacterOptionDraft[]; approval: SuccessfulPreview["approval"]; confirmedRemovalIds: string[] }) => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<SuccessfulPreview | null>(null);
   const [error, setError] = useState("");
   const [applied, setApplied] = useState(false);
   const [pending, startTransition] = useTransition();
   const [levelReviewed, setLevelReviewed] = useState(false);
+  const [removalsConfirmed, setRemovalsConfirmed] = useState(false);
   function upload(file: File | undefined) {
-    setPreview(null); setError(""); setApplied(false); setLevelReviewed(false);
+    setPreview(null); setError(""); setApplied(false); setLevelReviewed(false); setRemovalsConfirmed(false);
     if (!file) return;
     if (file.size > 1_000_000) return setError("Choose a JSON file no larger than 1 MB.");
     if (file.type && file.type !== "application/json" && !file.name.toLowerCase().endsWith(".json")) return setError("Choose a JSON file exported by Pathbuilder.");
@@ -34,7 +35,7 @@ export function PathmuncherImport({ characterId, onApply }: { characterId?: stri
   }
   function applyPreview() {
     if (!preview) return;
-    onApply(preview.proposed);
+    onApply({ ...preview.proposed, approval: preview.approval, confirmedRemovalIds: (preview.changes?.options ?? []).flatMap((change) => change.change === "removal" && change.id ? [change.id] : []) });
     setPreview(null);
     setLevelReviewed(false);
     setApplied(true);
@@ -65,8 +66,9 @@ export function PathmuncherImport({ characterId, onApply }: { characterId?: stri
       <section><h3 className="font-semibold">Heritage and feats ({preview.proposed.options.length})</h3><ul className="mt-2 space-y-2">{preview.proposed.options.map((option, index) => { const resolved = option.selectionKind === "heritage" ? preview.review.character.heritages[index] : preview.review.feats[index - preview.review.character.heritages.length]; const validation = preview.optionValidation[index]!; return <li key={option.key} className="rounded-xl border border-border bg-surface-raised p-3 text-sm"><div className="flex flex-wrap justify-between gap-2"><strong>{option.name}</strong><span className={statusClass[validation.status]}>{validation.status}</span></div><p className="mt-1 text-text-muted">Raw category: {option.selectionKind === "heritage" ? "Heritage" : resolved && "raw" in resolved ? resolved.raw.exportedCategory : "Unknown"} · Nexus category: {option.featCategory ?? option.selectionKind} · {option.acquisitionMethod}{option.grantOrigin ? ` · origin: ${option.grantOrigin}` : ""}</p><p className="text-text-muted">Source: {option.sourceMaterialTitle ?? "No catalog/source match"} · Match: {resolved && "match" in resolved ? matchLabel(resolved.match.status) : resolved ? matchLabel(resolved.status) : "Manual review"}</p>{validation.issues.map((issue) => <p key={issue.message} className="mt-1 text-warning">{previewIssueMessage(issue, option.name)}</p>)}</li>; })}</ul></section>
       {preview.changes ? <section><h3 className="font-semibold">Effect on this character</h3><ul className="mt-2 list-disc pl-5 text-sm">{preview.changes.fields.map((item) => <li key={item.field}><span className="capitalize">{item.field.replace("Name", " name")}</span>: {item.change}{item.change === "change" ? ` — “${item.before || "blank"}” → “${item.after}”` : ""}</li>)}{preview.changes.options.map((item, index) => <li key={`${item.kind}-${item.name}-${index}`}>{item.change}: {item.name} ({item.kind})</li>)}</ul><p className="mt-2 text-sm text-text-muted"><strong>Protected and unchanged:</strong> {preview.changes.protected.join(", ")}.</p></section> : null}
       {preview.review.unsupportedFields.length || preview.review.unsupportedValues.length ? <details className="rounded-xl border border-border bg-surface-raised p-3"><summary className="cursor-pointer font-semibold">Not imported ({preview.review.unsupportedFields.length + preview.review.unsupportedValues.length})</summary><ul className="mt-2 list-disc pl-5 text-sm text-text-muted">{preview.review.unsupportedFields.map((item) => <li key={item.path}>{item.path} ({item.valueType})</li>)}{preview.review.unsupportedValues.map((item) => <li key={item.path}>{item.path}: {item.value}</li>)}</ul></details> : null}
+      {preview.changes?.options.some(({ change }) => change === "removal") ? <label className="flex items-start gap-3 rounded-xl border border-warning/50 p-3 text-sm"><input type="checkbox" checked={removalsConfirmed} onChange={(event) => setRemovalsConfirmed(event.currentTarget.checked)} className="mt-1" /><span>I explicitly approve every removal listed above. Manual selections are never removed without this confirmation.</span></label> : null}
       <label className="flex items-start gap-3 rounded-xl border border-border p-3 text-sm"><input type="checkbox" checked={levelReviewed} onChange={(event) => setLevelReviewed(event.currentTarget.checked)} className="mt-1" /><span>I understand that build level {preview.review.character.currentLevel} will not change the Nexus starting level. I will choose or keep the correct starting level and wealth in the form.</span></label>
-      <button type="button" disabled={!levelReviewed} onClick={applyPreview} className="rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-on-brand disabled:opacity-50">Use these reviewed values</button>
+      <button type="button" disabled={!levelReviewed || Boolean(preview.changes?.options.some(({ change }) => change === "removal") && !removalsConfirmed)} onClick={applyPreview} className="rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-on-brand disabled:opacity-50">Use these reviewed values</button>
     </div> : null}
   </section>;
 }

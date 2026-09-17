@@ -5,7 +5,8 @@ import type { AuthenticatedActor } from "@/auth/actor";
 import { resolveCommunityAccessBySlug } from "@/authorization/community-access";
 import { canPerformCommunityOperation, type CommunityRole } from "@/authorization/policy";
 import { getDb } from "@/db/client";
-import { characterCreditLedgerEntries, characterInventoryEntries, characters, chronicles, communities, contentItems, gameSystems, people, sessionGmCredits, sessionSignups, sessions } from "@/db/schema";
+import { characterCreditLedgerEntries, characterInventoryEntries, characterOptionSelections, characterOptions, characters, chronicles, communities, contentItems, gameSystems, people, sessionGmCredits, sessionSignups, sessions } from "@/db/schema";
+import type { CharacterOptionSelectionInput } from "@/character/option-selections";
 import { SUPPORTED_GAME_SYSTEM } from "@/game-system/config";
 import { deriveSfs2Progression } from "@/character/sfs2-progression";
 import { isValidStartingCredits, SFS2_STARTING_ITEM_LEVELS, SFS2_STARTING_WEALTH, startingWealthNote, usesPermanentStartingItems, type Sfs2StartingLevel } from "@/character/sfs2-starting-wealth";
@@ -176,8 +177,12 @@ export async function getCharacterDetail(actor: AuthenticatedActor, characterId:
   });
   return { id: character.id, name: character.name, societyNumber: character.societyNumber, gameSystemName: character.gameSystemName, startingLevel: character.startingLevel, startingLevelLocked: character.startingLevelLocked, startingCredits: startingCredit?.amountMinor ?? SFS2_STARTING_WEALTH[character.startingLevel as Sfs2StartingLevel][0].credits, startingItems, currentLevel: progression.currentLevel, xp: progression.totalXp, creditsMinor, className: character.className, classValidationNote: character.classValidationNote, ancestry: character.ancestry, ancestryValidationNote: character.ancestryValidationNote, ancestrySourceChronicleId: character.ancestrySourceChronicleId, ancestrySourceChronicleCharacterId: ancestrySource?.characterId ?? null, background: character.background, backgroundValidationNote: character.backgroundValidationNote, backgroundSourceChronicleId: character.backgroundSourceChronicleId, backgroundSourceChronicleCharacterId: backgroundSource?.characterId ?? null, backstory: character.backstory, notes: character.notes, characterSheetUrl: character.characterSheetUrl, isOwner, upcomingSessions, pastSessions };
 }
-export async function createCharacter(actor: AuthenticatedActor, rawInput: CreateCharacterInput, database: Database = getDb()) {
+export async function createCharacter(actor: AuthenticatedActor, rawInput: CreateCharacterInput, database: Database = getDb(), optionSelections: CharacterOptionSelectionInput[] = [], importMetadata?: { adapterVersion: number; digest: string }) {
   const input = createCharacterInputSchema.parse(rawInput);
+  if (input.idempotencyKey) {
+    const [existing] = await database.select({ id: characters.id, name: characters.name }).from(characters).where(and(eq(characters.personId, actor.personId), eq(characters.creationIdempotencyKey, input.idempotencyKey))).limit(1);
+    if (existing) return existing;
+  }
   const requiredLevels = SFS2_STARTING_ITEM_LEVELS[input.startingLevel as Sfs2StartingLevel];
   const selectedItems = await Promise.all(input.startingItems.map(async (selection, index) => {
     const item = (await fetchNethysItems(selection.url)).find((candidate) => candidate.name === selection.name && candidate.level === requiredLevels[index]);
@@ -198,7 +203,7 @@ export async function createCharacter(actor: AuthenticatedActor, rawInput: Creat
     return await database.transaction(async (transaction) => {
       const [created] = await transaction.insert(characters).values({
         id: randomUUID(), personId: actor.personId, gameSystemId: SUPPORTED_GAME_SYSTEM.id,
-        name: input.name, societyNumber, startingLevel: input.startingLevel, className: input.className, classValidationNote: input.classValidationNote, ancestry: input.ancestry, ancestryValidationNote: input.ancestryValidationNote, background: input.background, backgroundValidationNote: input.backgroundValidationNote, backstory: input.backstory, notes: input.notes, characterSheetUrl: input.characterSheetUrl,
+        name: input.name, societyNumber, startingLevel: input.startingLevel, className: input.className, classValidationNote: input.classValidationNote, ancestry: input.ancestry, ancestryValidationNote: input.ancestryValidationNote, background: input.background, backgroundValidationNote: input.backgroundValidationNote, backstory: input.backstory, notes: input.notes, characterSheetUrl: input.characterSheetUrl, creationIdempotencyKey: input.idempotencyKey ?? null, importAdapterVersion: importMetadata?.adapterVersion ?? null, importedAt: importMetadata ? new Date() : null, importDigest: importMetadata?.digest ?? null,
       }).returning({ id: characters.id, name: characters.name });
       if (!created) throw new CharacterCreationError("The character could not be created.");
       await transaction.insert(characterCreditLedgerEntries).values({ id: randomUUID(), characterId: created.id, amountMinor: input.startingCredits, displayScale: 1, type: "starting_credits", effectiveOn: new Date().toISOString().slice(0, 10), source: "character_creation", notes: startingWealthNote(input.startingLevel, input.startingCredits) });
@@ -210,10 +215,21 @@ export async function createCharacter(actor: AuthenticatedActor, rawInput: Creat
         notes: `Starting wealth permanent item (level ${requiredLevels[index]}).\n\n${nethysItemNotes(item)}`,
         lotKey: input.idempotencyKey ? `starting-wealth:${input.idempotencyKey}:${index}` : randomUUID(),
       })));
+      for (const [index, option] of optionSelections.entries()) {
+        const [catalog] = option.characterOptionId ? await transaction.select().from(characterOptions).where(and(eq(characterOptions.id, option.characterOptionId), eq(characterOptions.gameSystemId, SUPPORTED_GAME_SYSTEM.id), eq(characterOptions.optionType, option.selectionKind))).limit(1) : [];
+        if (option.characterOptionId && !catalog) throw new CharacterCreationError("An imported catalog option changed. Review the import again.");
+        await transaction.insert(characterOptionSelections).values({ id: randomUUID(), characterId: created.id, selectionKind: option.selectionKind, featCategory: option.selectionKind === "feat" ? option.featCategory ?? null : null, acquiredLevel: Number(option.acquiredLevel), acquisitionMethod: option.acquisitionMethod ?? null, grantOrigin: option.grantOrigin || null, characterOptionId: catalog?.id ?? null, nameSnapshot: catalog?.name ?? option.name, sourceMaterialIdentitySnapshot: catalog?.sourceMaterialIdentity ?? option.sourceMaterialIdentity ?? null, sourceMaterialTitleSnapshot: catalog?.sourceMaterialTitle ?? option.sourceMaterialTitle ?? null, sourceUrlSnapshot: catalog?.sourceUrl ?? option.sourceUrl ?? null, validationNote: option.validationNote || null, sourceChronicleId: option.sourceChronicleId || null, importSource: importMetadata ? "pathbuilder-pathmuncher" : null, importKey: importMetadata ? `${index}:${option.selectionKind}:${normalizeMaterialIdentity(option.name)}` : null });
+      }
       return created;
     });
   } catch (error) {
-    if (typeof error === "object" && error && "code" in error && error.code === "23505") throw new CharacterCreationError("You already have a character with that society number.");
+    if (typeof error === "object" && error && "code" in error && error.code === "23505") {
+      if (input.idempotencyKey) {
+        const [existing] = await database.select({ id: characters.id, name: characters.name }).from(characters).where(and(eq(characters.personId, actor.personId), eq(characters.creationIdempotencyKey, input.idempotencyKey))).limit(1);
+        if (existing) return existing;
+      }
+      throw new CharacterCreationError("You already have a character with that society number.");
+    }
     throw error;
   }
 }
