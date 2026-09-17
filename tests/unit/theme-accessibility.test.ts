@@ -58,9 +58,10 @@ describe("theme accessibility contract", () => {
     expect(css).toMatch(/\.character-identity-name\s*\{\s*font-family:\s*var\(--font-heading\)/);
   });
 
-  test("keeps character cutouts on a flat semantic canvas over ambient page gradients", () => {
+  test("lets the character hero cutouts reveal the ambient page background", () => {
     expect(css).toMatch(/body\s*\{[^}]*radial-gradient/);
-    expect(css).toMatch(/\.character-page\s*\{[^}]*background:\s*var\(--character-canvas\)/);
+    expect(css).toMatch(/\.character-page\s*\{[^}]*background:\s*transparent/);
+    expect(css).toMatch(/\.character-page::before\s*\{[^}]*background:\s*transparent/);
   });
 
   test("the global stylesheet preserves non-color interaction cues", () => {
