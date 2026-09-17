@@ -52,6 +52,7 @@ export function CharacterForm({ societyPlayNumber, usedCharacterNumbers, validat
   const [startingItems, setStartingItems] = useState<(StartingItemSelection | undefined)[]>([]);
   const [characterOptions, setCharacterOptions] = useState<CharacterOptionDraft[]>([]);
   const [importRevision, setImportRevision] = useState(0);
+  const [importApproval, setImportApproval] = useState<unknown>(null);
   const [idempotencyKey] = useState(() => crypto.randomUUID());
   const permanentOption = SFS2_STARTING_WEALTH[startingLevel].find((option) => option.kind === "permanent_items");
   const usesItems = permanentOption?.credits === startingCredits;
@@ -66,7 +67,8 @@ export function CharacterForm({ societyPlayNumber, usedCharacterNumbers, validat
     {returnTo ? <input type="hidden" name="returnTo" value={returnTo} /> : null}
     <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
     <input type="hidden" name="startingItems" value={JSON.stringify(startingItems.filter(Boolean))} />
-    <CharacterFormSection id="import" title="Pathmuncher import" summary="Upload and review a Pathbuilder export"><PathmuncherImport onApply={(values) => { setName(values.name); setClassName(values.className); setAncestry(values.ancestry); setBackground(values.background); setCharacterOptions(values.options); setImportRevision((value) => value + 1); }} /></CharacterFormSection>
+    <input type="hidden" name="importApproval" value={importApproval ? JSON.stringify(importApproval) : ""} />
+    <CharacterFormSection id="import" title="Pathmuncher import" summary="Upload and review a Pathbuilder export"><PathmuncherImport onApply={(values) => { setName(values.name); setClassName(values.className); setAncestry(values.ancestry); setBackground(values.background); setCharacterOptions(values.options); setImportApproval(values.approval); setImportRevision((value) => value + 1); }} /></CharacterFormSection>
     <FormField id="name" label="Character name" errors={state.fieldErrors?.name}>{(controlProps) => <input {...controlProps} name="name" required maxLength={100} value={name} onChange={(event) => setName(event.currentTarget.value)} className={inputClass} />}</FormField>
     <fieldset><legend className="block text-sm font-semibold">Society identification</legend><div className="mt-2 grid grid-cols-[1fr_auto_1fr] items-start gap-3">
       <div aria-label="Society player number" className="rounded-xl border border-border bg-surface px-4 py-3 text-text-muted">{societyPlayNumber || "Not set"}</div>

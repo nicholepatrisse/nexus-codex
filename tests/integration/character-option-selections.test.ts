@@ -77,6 +77,25 @@ describeWithDatabase("character option selection persistence", () => {
     expect(await replaceCharacterOptionSelections(ownerActor, character.id, [{ selectionKind: "feat", acquiredLevel: 5, name: "Manual replacement" }])).toEqual([expect.objectContaining({ nameSnapshot: "Manual replacement", featCategory: null })]);
   });
 
+  it("atomically creates approved imports with provenance and idempotent submission", async () => {
+    const owner = await createTestIdentity({ name: "Import Owner", sessions: 0 });
+    userIds.push(owner.authUser.id);
+    await getDb().insert(gameSystems).values({ id: SUPPORTED_GAME_SYSTEM.id, code: SUPPORTED_GAME_SYSTEM.code, name: SUPPORTED_GAME_SYSTEM.name }).onConflictDoUpdate({ target: gameSystems.id, set: { code: SUPPORTED_GAME_SYSTEM.code, name: SUPPORTED_GAME_SYSTEM.name } });
+    await getDb().update(people).set({ societyPlayNumber: "357357" }).where(eq(people.id, owner.person.id));
+    const actor = { personId: owner.person.id, authUserId: owner.authUser.id, sessionId: "owner" };
+    const idempotencyKey = randomUUID();
+    const input = { name: "Imported Hero", characterNumber: "01", idempotencyKey };
+    const selections = [{ selectionKind: "heritage" as const, acquiredLevel: 1, acquisitionMethod: "selected" as const, name: "Unknown Heritage" }, { selectionKind: "feat" as const, featCategory: "skill" as const, acquiredLevel: 1, acquisitionMethod: "awarded" as const, grantOrigin: "Imported background", name: "Unknown Feat" }];
+    const first = await createCharacter(actor, input, getDb(), selections, { adapterVersion: 1, digest: "a".repeat(64) });
+    const repeated = await createCharacter(actor, input, getDb(), selections, { adapterVersion: 1, digest: "a".repeat(64) });
+    expect(repeated.id).toBe(first.id);
+    expect(await getDb().select().from(characters).where(eq(characters.id, first.id))).toEqual([expect.objectContaining({ importAdapterVersion: 1, importDigest: "a".repeat(64), importedAt: expect.any(Date) })]);
+    expect(await getDb().select().from(characterOptionSelections).where(eq(characterOptionSelections.characterId, first.id))).toEqual(expect.arrayContaining([expect.objectContaining({ importSource: "pathbuilder-pathmuncher", acquisitionMethod: "awarded", grantOrigin: "Imported background" })]));
+
+    await expect(createCharacter(actor, { name: "Broken Import", characterNumber: "02", idempotencyKey: randomUUID() }, getDb(), [{ selectionKind: "feat", acquiredLevel: 1, name: "Changed catalog", characterOptionId: randomUUID() }], { adapterVersion: 1, digest: "b".repeat(64) })).rejects.toThrow("catalog option changed");
+    expect(await getDb().select().from(characters).where(eq(characters.societyNumber, "357357-2702"))).toEqual([]);
+  });
+
   it("deduplicates imported item variants and filters the Nexus item catalog by required level", async () => {
     await getDb().insert(gameSystems).values({ id: SUPPORTED_GAME_SYSTEM.id, code: SUPPORTED_GAME_SYSTEM.code, name: SUPPORTED_GAME_SYSTEM.name }).onConflictDoUpdate({ target: gameSystems.id, set: { code: SUPPORTED_GAME_SYSTEM.code, name: SUPPORTED_GAME_SYSTEM.name } });
     const suffix = randomUUID();
