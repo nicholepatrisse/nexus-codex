@@ -10,7 +10,12 @@
   --theme-on-brand: #0e1724;
   --theme-brand-muted: #172f52;
   --theme-accent: #55d9f6;
-  --theme-accent-secondary: #805ad5;
+  --theme-accent-secondary: #d946ef;
+  --theme-frame-line: #477b96;
+  --theme-frame-secondary: #98509e;
+  --theme-character-rail-gap: 13;
+  --theme-deep-surface: #03182b;
+  --theme-on-deep: #f7fbff;
   --theme-surface: #131b28;
   --theme-surface-raised: #1b2636;
   --theme-surface-hover: #223044;
@@ -60,7 +65,12 @@
     --theme-on-brand: #ffffff;
     --theme-brand-muted: #d7e7fb;
     --theme-accent: #087d96;
-    --theme-accent-secondary: #6941a5;
+    --theme-accent-secondary: #a21caf;
+    --theme-frame-line: #087d96;
+    --theme-frame-secondary: #a21caf;
+    --theme-character-rail-gap: 10;
+    --theme-deep-surface: #062440;
+    --theme-on-deep: #ffffff;
     --theme-surface: #ffffff;
     --theme-surface-raised: #e8eef6;
     --theme-surface-hover: #dce6f2;
@@ -84,6 +94,8 @@
   --color-brand-muted: var(--theme-brand-muted);
   --color-accent: var(--theme-accent);
   --color-accent-secondary: var(--theme-accent-secondary);
+  --color-deep-surface: var(--theme-deep-surface);
+  --color-on-deep: var(--theme-on-deep);
   --color-surface: var(--theme-surface);
   --color-surface-raised: var(--theme-surface-raised);
   --color-surface-hover: var(--theme-surface-hover);
@@ -104,8 +116,8 @@ body {
   min-height: 100vh;
   margin: 0;
   background:
-    radial-gradient(circle at 12% 4%, rgb(47 111 237 / 14%), transparent 30rem),
-    radial-gradient(circle at 88% 12%, rgb(128 90 213 / 8%), transparent 24rem),
+    radial-gradient(circle at 12% 4%, color-mix(in srgb, var(--theme-brand) 14%, transparent), transparent 30rem),
+    radial-gradient(circle at 88% 12%, color-mix(in srgb, var(--theme-accent-secondary) 8%, transparent), transparent 24rem),
     var(--theme-background);
   color: var(--theme-text-primary);
   font-family: Arial, Helvetica, sans-serif;
@@ -340,4 +352,243 @@ body {
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
+}
+
+/* Nexus presentation primitives. Their clipped corners and ambient layers are
+   CSS-only, keeping publication artwork separate from interface decoration. */
+.nexus-panel {
+  position: relative;
+  isolation: isolate;
+  border: 1px solid var(--theme-border);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--theme-surface) 96%, var(--theme-brand)), var(--theme-surface));
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--theme-background) 30%, transparent);
+  clip-path: polygon(0 0, calc(100% - 1.25rem) 0, 100% 1.25rem, 100% 100%, 1.25rem 100%, 0 calc(100% - 1.25rem));
+}
+
+.nexus-panel::after {
+  position: absolute;
+  inset: 0.45rem;
+  z-index: -1;
+  pointer-events: none;
+  content: "";
+  border-top: 1px solid color-mix(in srgb, var(--theme-accent) 45%, transparent);
+  border-right: 1px solid color-mix(in srgb, var(--theme-accent-secondary) 30%, transparent);
+  clip-path: inherit;
+}
+
+.nexus-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin: 0;
+  color: var(--theme-accent);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.nexus-eyebrow > span { width: 1.75rem; height: 2px; background: currentColor; }
+
+.nexus-action {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid transparent;
+  padding: 0.65rem 1.25rem;
+  font-weight: 750;
+  line-height: 1.2;
+  text-decoration: none;
+  clip-path: polygon(0.55rem 0, 100% 0, 100% calc(100% - 0.55rem), calc(100% - 0.55rem) 100%, 0 100%, 0 0.55rem);
+  transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+.nexus-action-primary { color: var(--theme-on-brand); background: var(--theme-brand); }
+.nexus-action-primary:hover { background: var(--theme-brand-hover); box-shadow: 0 7px 22px color-mix(in srgb, var(--theme-brand) 30%, transparent); transform: translateY(-1px); }
+.nexus-action-primary:active { box-shadow: none; transform: translateY(1px); }
+.nexus-action-secondary { color: var(--theme-text-primary); border-color: var(--theme-border-strong); background: var(--theme-surface-raised); }
+.nexus-action-secondary:hover { border-color: var(--theme-accent); background: var(--theme-surface-hover); }
+.nexus-action-secondary:active { background: var(--theme-brand-muted); }
+.nexus-action:disabled, .nexus-action[aria-disabled="true"] { opacity: 0.58; pointer-events: none; transform: none; box-shadow: none; }
+
+.nexus-cover-frame {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--theme-border-strong);
+  background: var(--theme-surface-raised);
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--theme-background) 38%, transparent);
+  clip-path: polygon(0 0, calc(100% - 1rem) 0, 100% 1rem, 100% 100%, 0 100%);
+}
+.nexus-cover-frame::after { position: absolute; inset: 0; pointer-events: none; content: ""; box-shadow: inset 0 0 0 0.35rem color-mix(in srgb, var(--theme-background) 26%, transparent); }
+.nexus-cover-frame > :where(img, picture, video) { display: block; width: 100%; height: 100%; object-fit: cover; }
+.nexus-cover-portrait { aspect-ratio: 2 / 3; }
+.nexus-cover-square { aspect-ratio: 1; }
+
+.nexus-page-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: 1.5rem;
+  border: 1px solid var(--theme-border);
+  color: var(--theme-on-deep);
+  background: linear-gradient(125deg, var(--theme-deep-surface), color-mix(in srgb, var(--theme-deep-surface) 86%, var(--theme-brand)) 65%, color-mix(in srgb, var(--theme-deep-surface) 88%, var(--theme-accent-secondary)));
+  clip-path: polygon(0 0, calc(100% - 2rem) 0, 100% 2rem, 100% 100%, 0 100%);
+}
+.nexus-page-hero-content { position: relative; z-index: 1; max-width: 48rem; }
+.nexus-page-hero-title { margin: 0.65rem 0 0; font-size: clamp(2rem, 7vw, 4.25rem); line-height: 0.98; letter-spacing: -0.04em; }
+.nexus-page-hero-body { max-width: 42rem; margin-top: 1rem; color: color-mix(in srgb, var(--theme-on-deep) 78%, var(--theme-accent)); }
+.nexus-starfield { position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: 0.45; background-image: radial-gradient(circle, var(--theme-accent) 0 1px, transparent 1.5px), linear-gradient(115deg, transparent 65%, color-mix(in srgb, var(--theme-accent-secondary) 14%, transparent) 65.2%, transparent 65.5%); background-position: 0 0, center; background-size: 5rem 5rem, 100% 100%; animation: nexus-drift 24s linear infinite; }
+.nexus-page-hero-visual { display: none; }
+.nexus-page-hero-frame { position: absolute; inset: 0; z-index: 2; width: 100%; height: 100%; pointer-events: none; fill: none; }
+.nexus-page-hero-frame-primary { stroke: var(--theme-frame-line); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.nexus-page-hero-frame-secondary { stroke: var(--theme-frame-secondary); stroke-width: 2; vector-effect: non-scaling-stroke; }
+@keyframes nexus-drift { to { background-position: 5rem 2.5rem, center; } }
+
+@media (min-width: 640px) { .nexus-page-hero { padding: 3rem; } }
+
+/* Characters is the first live composition of the shared system. Keep its
+   information density close to the reference while using only CSS ambience. */
+.character-page {
+  --character-canvas: var(--theme-background);
+  position: relative;
+  isolation: isolate;
+  padding-top: 1.5rem;
+  background: var(--character-canvas);
+}
+.character-page::before {
+  position: absolute;
+  inset: 0 auto 0 50%;
+  z-index: -1;
+  width: 100vw;
+  content: "";
+  background: var(--character-canvas);
+  transform: translateX(-50%);
+}
+.character-page-hero {
+  min-height: 13rem;
+  display: flex;
+  align-items: center;
+  border-radius: 0;
+  border: 0;
+  clip-path: polygon(1.5rem 0, calc(100% - 1.5rem) 0, 100% 1.5rem, 100% calc(100% - 1.5rem), calc(100% - 1.5rem) 100%, 1.5rem 100%, 0 calc(100% - 1.5rem), 0 1.5rem);
+  box-shadow: 0 18px 42px color-mix(in srgb, var(--theme-deep-surface) 24%, transparent);
+}
+.character-page-hero-art {
+  background-color: var(--theme-deep-surface);
+  background-image:
+    linear-gradient(90deg, var(--theme-deep-surface) 0%, color-mix(in srgb, var(--theme-deep-surface) 96%, transparent) 30%, color-mix(in srgb, var(--theme-deep-surface) 46%, transparent) 58%, transparent 78%),
+    url("/nexus-characters-hero.png");
+  background-position: center, center;
+  background-size: cover, cover;
+}
+.character-page-hero::before {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: min(18rem, 22%);
+  pointer-events: none;
+  content: "";
+  background:
+    linear-gradient(132deg, transparent 0 31%, color-mix(in srgb, var(--theme-frame-line) 86%, transparent) 31.2% 31.8%, transparent 32%),
+    linear-gradient(132deg, transparent 0 35%, color-mix(in srgb, var(--theme-deep-surface) 94%, transparent) 35%);
+  clip-path: polygon(32% 0, 100% 0, 100% 100%, 0 100%, 0 82%, 30% 52%, 0 22%);
+}
+.character-page-hero::after {
+  position: absolute;
+  inset: auto 1.6rem 0 1.6rem;
+  height: 0.45rem;
+  pointer-events: none;
+  content: "";
+  background:
+    repeating-linear-gradient(135deg, var(--theme-frame-secondary) 0 0.28rem, transparent 0.28rem 0.55rem) 2.5rem 100% / 3.8rem 0.42rem no-repeat,
+    repeating-linear-gradient(135deg, var(--theme-frame-secondary) 0 0.24rem, transparent 0.24rem 0.5rem) calc(100% - 1.5rem) 100% / 2.5rem 0.35rem no-repeat,
+    linear-gradient(90deg, var(--theme-frame-line), color-mix(in srgb, var(--theme-frame-line) 18%, transparent) 58%, transparent 58%) 0 100% / 60% 2px no-repeat;
+  opacity: 0.9;
+}
+.character-page-hero .nexus-page-hero-content { max-width: min(46rem, 68%); }
+.character-page-hero .nexus-page-hero-visual { display: none; }
+.character-page-action { margin-top: 1rem; }
+.character-list { margin-top: 1.25rem; }
+
+.character-card {
+  display: block;
+  transition: transform 180ms ease;
+}
+.character-card-rail {
+  --character-rail-shadow: color-mix(in srgb, currentColor 72%, var(--theme-background));
+  --character-rail-highlight: color-mix(in srgb, currentColor 72%, var(--theme-on-deep));
+  position: absolute;
+  inset: 0 auto 0 -0.15rem;
+  z-index: 3;
+  display: block;
+  width: 2.8rem;
+}
+.character-card-rail svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.character-card-rail-mask { fill: var(--character-canvas, var(--theme-background)); }
+.character-card-rail-cutout { stroke: var(--character-canvas, var(--theme-background)); stroke-width: var(--theme-character-rail-gap); stroke-linecap: square; stroke-linejoin: miter; }
+.character-card-shell {
+  position: relative;
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr) 4.5rem 1.5rem;
+  align-items: stretch;
+  overflow: hidden;
+  border: 0;
+  background: linear-gradient(145deg, var(--theme-surface), color-mix(in srgb, var(--theme-surface-raised) 82%, var(--theme-background)));
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--theme-background) 24%, transparent);
+  clip-path: polygon(0 0, calc(100% - 0.8rem) 0, 100% 0.8rem, 100% calc(100% - 0.8rem), calc(100% - 0.8rem) 100%, 0 100%);
+  transition: box-shadow 180ms ease;
+}
+.character-card:hover { transform: translateY(-2px); }
+.character-card:hover .character-card-shell { box-shadow: 0 12px 30px color-mix(in srgb, var(--theme-background) 34%, transparent); }
+.character-card-shell-frame { position: absolute; inset: 0; z-index: 2; width: 100%; height: 100%; pointer-events: none; overflow: visible; fill: none; stroke: var(--theme-border); stroke-width: 1; }
+.character-card-shell-frame path { vector-effect: non-scaling-stroke; }
+.character-card:hover .character-card-shell-frame { stroke: var(--theme-brand); }
+.character-card-portrait {
+  position: relative;
+  display: grid;
+  min-height: 6.5rem;
+  isolation: isolate;
+  background: var(--theme-deep-surface);
+  clip-path: polygon(0 0, calc(100% - 2.25rem) 0, 100% 100%, 0 100%);
+}
+.character-card-portrait::after {
+  position: absolute;
+  inset: 0.35rem;
+  z-index: 1;
+  pointer-events: none;
+  content: "";
+  border-top: 1px solid color-mix(in srgb, var(--theme-accent) 72%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--theme-accent) 48%, transparent);
+  clip-path: inherit;
+}
+.character-card-content { align-self: center; min-width: 0; padding: 0.9rem 1rem; }
+.character-card-chip { display: inline-flex; align-items: center; border: 1px solid var(--theme-border); border-radius: 9999px; padding: 0.25rem 0.65rem; background: var(--theme-surface-raised); color: var(--theme-text-muted); font-size: 0.75rem; font-weight: 650; }
+.character-card-class-icon { display: grid; place-items: center; }
+.character-card-class-icon > span { width: 4rem; height: 4rem; }
+.character-card-arrow { align-self: center; color: var(--theme-brand); font-size: 2rem; line-height: 1; }
+
+@media (min-width: 640px) {
+  .character-page { padding-top: 2.25rem; }
+  .character-page-hero { min-height: 14rem; padding: 2.25rem 3rem; }
+  .character-page-action { width: 84%; margin: 1.25rem auto 0; }
+  .character-list { width: 84%; margin: 1.5rem auto 0; }
+  .character-card-rail { width: 2.8rem; }
+  .character-card-shell { grid-template-columns: 10rem minmax(0, 1fr) 7rem 2rem; }
+  .character-card-portrait { min-height: 7.75rem; }
+  .character-card-class-icon > span { width: 5.75rem; height: 5.75rem; }
+}
+
+@media (max-width: 639px) {
+  .character-page-hero::before { right: -9rem; width: 22rem; opacity: 0.48; }
+  .character-page-hero .nexus-page-hero-content { max-width: 92%; }
+  .character-page-hero-art { background-position: center, 62% center; }
+  .character-page-action .nexus-action { width: 100%; }
+  .character-card-shell { grid-template-columns: 5.5rem minmax(0, 1fr) 1.5rem; }
+  .character-card-class-icon { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-interactive, .nexus-action, .nexus-starfield { animation: none; transition: none; }
+  .card-interactive:hover, .nexus-action:hover, .nexus-action:active { transform: none; }
 }
