@@ -21,7 +21,10 @@ export function CharacterSummaryCard({ character, validation }: { character: Cha
       <span className="character-card-content"><CharacterIdentity character={character} variant="selection" /><span className="mt-2 flex flex-wrap gap-2"><span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${styles.badge}`}>{validation}</span>{character.className ? <span className="character-card-chip">{character.className}</span> : null}{character.level != null ? <span className="character-card-chip">Level {character.level}</span> : null}</span></span>
       <span aria-hidden="true" className="character-card-class-icon"><CharacterClassIcon className={character.className} /></span>
       <span aria-hidden="true" className="character-card-arrow">›</span>
-      <svg aria-hidden="true" className="character-card-shell-frame" viewBox="0 0 1000 100" preserveAspectRatio="none"><path d="M1 2 H987 L998 13 V87 L987 98 H1 Z" /></svg>
+      <svg aria-hidden="true" className="character-card-shell-frame" viewBox="0 0 1000 100" preserveAspectRatio="none">
+        <path className="character-card-shell-frame-mobile" d="M100 2 H987 L998 13 V87 L987 98 H100" />
+        <path className="character-card-shell-frame-desktop" d="M1 2 H987 L998 13 V87 L987 98 H1 Z" />
+      </svg>
     </span>
   </Link>;
 }

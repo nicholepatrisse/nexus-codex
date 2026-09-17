@@ -35,6 +35,7 @@ export async function getProfile(actor: AuthenticatedActor) {
       societyPlayNumber: people.societyPlayNumber,
       accountName: authUsers.name,
       email: authUsers.email,
+      image: authUsers.image,
     })
     .from(people)
     .innerJoin(authUsers, eq(authUsers.id, people.authUserId))
