@@ -51,6 +51,13 @@ describe("theme accessibility contract", () => {
     expect(themeCss("light")).toContain("color-scheme: light");
   });
 
+  test("self-hosts the body and display typography", () => {
+    expect(css).toMatch(/@font-face\s*\{[\s\S]*?font-family:\s*"Inter"[\s\S]*?Inter-Variable\.ttf/);
+    expect(css).toMatch(/@font-face\s*\{[\s\S]*?font-family:\s*"Oxanium"[\s\S]*?Oxanium-Variable\.ttf/);
+    expect(css).toMatch(/body\s*\{[\s\S]*?font-family:\s*var\(--font-body\)/);
+    expect(css).toMatch(/\.character-identity-name\s*\{\s*font-family:\s*var\(--font-heading\)/);
+  });
+
   test("keeps character cutouts on a flat semantic canvas over ambient page gradients", () => {
     expect(css).toMatch(/body\s*\{[^}]*radial-gradient/);
     expect(css).toMatch(/\.character-page\s*\{[^}]*background:\s*var\(--character-canvas\)/);
@@ -71,7 +78,29 @@ describe("theme accessibility contract", () => {
     expect(css).toMatch(/\.character-card-rail-cutout\s*\{[^}]*stroke:\s*var\(--character-canvas/);
     expect(css).toMatch(/\.character-card-rail-mask\s*\{[^}]*fill:\s*var\(--character-canvas/);
     expect(css).toMatch(/\.character-card-portrait\s*\{[\s\S]*?clip-path:\s*polygon/);
+    expect(css).toMatch(/\.character-card-shell-frame\s*\{[^}]*stroke-width:\s*1\.5/);
     expect(css).not.toMatch(/\.character-card-class-icon\s*\{[^}]*border-left/);
+    expect(css).toMatch(/\.character-card-class-icon\s*\{[^}]*transform:\s*translateX\(-0\.5rem\)/);
     expect(css).toMatch(/@media \(max-width: 639px\)[\s\S]*?\.character-card-class-icon\s*\{\s*display:\s*none;/);
+  });
+
+  test("uses strong responsive display typography for the character roster", () => {
+    expect(css).toMatch(/\.nexus-page-hero-title\s*\{[^}]*font-weight:\s*700/);
+    expect(css).toMatch(/\.character-identity-name\s*\{[^}]*font-weight:\s*700/);
+    expect(css).toMatch(/\.character-identity-name-selection\s*\{[^}]*font-size:\s*clamp\(1\.2rem, 2\.4vw, 1\.5rem\)/);
+  });
+
+  test("character roster styles cover mobile and wider responsive layouts", () => {
+    expect(css).toMatch(/@media \(max-width: 639px\)[\s\S]*?\.character-page-action \.nexus-action\s*\{\s*width:\s*100%;/);
+    expect(css).toMatch(/@media \(max-width: 639px\)[\s\S]*?\.character-card-shell\s*\{\s*grid-template-columns:\s*5\.5rem minmax\(0, 1fr\) 1\.5rem;/);
+    expect(css).toMatch(/@media \(min-width: 640px\)[\s\S]*?\.character-list\s*\{\s*width:\s*84%;/);
+    expect(css).toMatch(/\.character-page\s*\{[\s\S]*?isolation:\s*isolate;/);
+  });
+
+  test("reduced motion disables roster card movement and transitions", () => {
+    const reducedMotion = css.slice(css.lastIndexOf("@media (prefers-reduced-motion: reduce)"));
+    expect(reducedMotion).toMatch(/\.character-card[^{}]*\{[^}]*transition:\s*none;/);
+    expect(reducedMotion).toMatch(/\.character-card:hover[^{}]*\{[^}]*transform:\s*none;/);
+    expect(reducedMotion).toContain(".character-card-shell");
   });
 });

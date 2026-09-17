@@ -23,6 +23,33 @@ describe("character summary card", () => {
     expect(markup).toContain("character-card-rail-cutout");
     expect(markup).toContain("character-card-rail-mask");
     expect(markup).toContain("character-card-shell-frame");
-    expect(markup).toContain('d="M0 1 H988 L999 12 V88 L988 99 H0"');
+    expect(markup).toContain('d="M1 2 H987 L998 13 V87 L987 98 H1 Z"');
+  });
+
+  it("renders long identity values and high progression values without truncating them", () => {
+    const longName = "Captain Veyra Sable of the Unreasonably Long Interstellar Expedition";
+    const markup = renderToStaticMarkup(<CharacterSummaryCard character={{
+      ...character,
+      name: longName,
+      level: 999,
+      totalXp: 123456789,
+    }} validation="Validated" />);
+
+    expect(markup).toContain(longName);
+    expect(markup).toContain("break-words");
+    expect(markup).toContain("Level 999");
+    expect(markup).toContain("XP 123456789");
+  });
+
+  it("remains readable when class data is missing", () => {
+    const markup = renderToStaticMarkup(<CharacterSummaryCard character={{
+      ...character,
+      className: null,
+    }} validation="Needs Review" />);
+
+    expect(markup).toContain(character.name);
+    expect(markup).toContain("Level 2");
+    expect(markup).not.toContain("Class ");
+    expect(markup).not.toContain("character-card-chip\">Envoy");
   });
 });

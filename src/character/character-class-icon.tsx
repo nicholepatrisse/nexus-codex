@@ -4,12 +4,12 @@ import type { CharacterClass } from "@/character/class-options";
 type ClassIcon = { label: string; src: string };
 
 const classIcons: Record<Lowercase<CharacterClass>, ClassIcon> = {
-  envoy: { label: "Envoy", src: "/character-class-icons/envoy.png" },
-  mystic: { label: "Mystic", src: "/character-class-icons/mystic.png" },
-  operative: { label: "Operative", src: "/character-class-icons/operative.png" },
-  solarian: { label: "Solarian", src: "/character-class-icons/solarian.png" },
-  soldier: { label: "Soldier", src: "/character-class-icons/soldier.png" },
-  witchwarper: { label: "Witchwarper", src: "/character-class-icons/witchwarper.png" },
+  envoy: { label: "Envoy", src: "/character-class-icons/envoy-v2.png" },
+  mystic: { label: "Mystic", src: "/character-class-icons/mystic-v2.png" },
+  operative: { label: "Operative", src: "/character-class-icons/operative-v2.png" },
+  solarian: { label: "Solarian", src: "/character-class-icons/solarian-v2.png" },
+  soldier: { label: "Soldier", src: "/character-class-icons/soldier-v2.png" },
+  witchwarper: { label: "Witchwarper", src: "/character-class-icons/witchwarper-v2.png" },
 };
 
 export function getCharacterClassIcon(className: string | null | undefined): ClassIcon | null {
