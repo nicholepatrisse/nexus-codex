@@ -31,7 +31,8 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   const actor = await getAuthenticatedActor();
   let notifications: AppNotification[] = [];
   let displayName = "Profile";
+  let avatarUrl: string | null = null;
   let notificationsError = false;
-  if (actor) { try { notifications = await listNotificationsForPerson(actor.personId); } catch { notificationsError = true; } displayName = (await getProfile(actor))?.displayName ?? displayName; }
-  return <html lang="en"><body className="flex min-h-screen flex-col"><ApplicationHeader notifications={notifications} notificationsError={notificationsError} displayName={displayName} initiallySignedIn={Boolean(actor)} /><div className="flex-1">{children}</div><ApplicationFooter /></body></html>;
+  if (actor) { try { notifications = await listNotificationsForPerson(actor.personId); } catch { notificationsError = true; } const profile = await getProfile(actor); displayName = profile?.displayName ?? displayName; avatarUrl = profile?.image ?? null; }
+  return <html lang="en"><body className="flex min-h-screen flex-col"><ApplicationHeader notifications={notifications} notificationsError={notificationsError} displayName={displayName} avatarUrl={avatarUrl} initiallySignedIn={Boolean(actor)} /><div className={`flex-1 ${actor ? "pb-20 md:pb-0" : ""}`}>{children}</div><ApplicationFooter /></body></html>;
 }
