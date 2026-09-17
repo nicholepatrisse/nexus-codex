@@ -38,6 +38,7 @@ describe("theme accessibility contract", () => {
       }
     }
     expect(contrast(themeColor(mode, "on-brand"), themeColor(mode, "brand")), `${mode}: button text`).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(themeColor(mode, "on-deep"), themeColor(mode, "deep-surface")), `${mode}: deep hero text`).toBeGreaterThanOrEqual(4.5);
   });
 
   test.each(["dark", "light"] as const)("%s strong borders remain visible against control surfaces", (mode) => {
@@ -50,10 +51,27 @@ describe("theme accessibility contract", () => {
     expect(themeCss("light")).toContain("color-scheme: light");
   });
 
+  test("keeps character cutouts on a flat semantic canvas over ambient page gradients", () => {
+    expect(css).toMatch(/body\s*\{[^}]*radial-gradient/);
+    expect(css).toMatch(/\.character-page\s*\{[^}]*background:\s*var\(--character-canvas\)/);
+  });
+
   test("the global stylesheet preserves non-color interaction cues", () => {
     expect(css).toMatch(/:focus-visible\s*\{[^}]*outline:\s*3px solid/i);
     expect(css).toMatch(/:disabled\s*\{[^}]*filter:/i);
     expect(css).toMatch(/\[aria-invalid="true"\]\s*\{[^}]*box-shadow:/i);
     expect(css).toMatch(/\[aria-current="page"\][^{]*\{[^}]*box-shadow:/i);
+  });
+
+  test("character cards retain clipped geometry and semantic status rails", () => {
+    expect(css).toMatch(/\.character-card-shell\s*\{[\s\S]*?clip-path:\s*polygon/);
+    expect(css).toContain("--character-rail-highlight");
+    expect(css).toContain("--character-rail-shadow");
+    expect(css).toContain(".character-card-rail svg");
+    expect(css).toMatch(/\.character-card-rail-cutout\s*\{[^}]*stroke:\s*var\(--character-canvas/);
+    expect(css).toMatch(/\.character-card-rail-mask\s*\{[^}]*fill:\s*var\(--character-canvas/);
+    expect(css).toMatch(/\.character-card-portrait\s*\{[\s\S]*?clip-path:\s*polygon/);
+    expect(css).not.toMatch(/\.character-card-class-icon\s*\{[^}]*border-left/);
+    expect(css).toMatch(/@media \(max-width: 639px\)[\s\S]*?\.character-card-class-icon\s*\{\s*display:\s*none;/);
   });
 });

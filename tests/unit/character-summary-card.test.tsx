@@ -6,9 +6,9 @@ const character = { id: "character/one", name: "Veyra Sable", societyNumber: "12
 
 describe("character summary card", () => {
   it.each([
-    ["Validated", "border-l-success", "text-success"],
-    ["Needs Review", "border-l-warning", "text-warning"],
-    ["Rules Issue Found", "border-l-danger", "text-danger"],
+    ["Validated", "text-success", "text-success"],
+    ["Needs Review", "text-warning", "text-warning"],
+    ["Rules Issue Found", "text-danger", "text-danger"],
   ] as const)("styles the %s validation state", (validation, rail, tone) => {
     const markup = renderToStaticMarkup(<CharacterSummaryCard character={character} validation={validation} />);
     expect(markup).toContain(rail);
@@ -16,5 +16,13 @@ describe("character summary card", () => {
     expect(markup).toContain("select-none");
     expect(markup).toContain(validation);
     expect(markup).toContain('href="/characters/character%2Fone"');
+    expect(markup).toContain("%2Fcharacter-portrait-placeholder.png");
+    expect(markup.indexOf("character-card-portrait")).toBeLessThan(markup.indexOf("character-card-class-icon"));
+    expect(markup).toContain('d="M36 0 L7 32 L7 144 L22 172"');
+    expect(markup).toContain("linearGradient");
+    expect(markup).toContain("character-card-rail-cutout");
+    expect(markup).toContain("character-card-rail-mask");
+    expect(markup).toContain("character-card-shell-frame");
+    expect(markup).toContain('d="M0 1 H988 L999 12 V88 L988 99 H0"');
   });
 });

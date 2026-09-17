@@ -25,3 +25,17 @@ reduce normal-text contrast below 4.5:1 or strong control borders below 3:1.
 
 The automated contract covers palette regressions. Component tests continue to
 cover the visible status and error wording used by individual workflows.
+
+## Shared presentation primitives
+
+`src/app/visual-system.tsx` provides the layout-neutral pieces for redesign work:
+
+- `AngularPanel` frames major grouped content; callers continue to own padding.
+- `SectionEyebrow` labels a section above its heading without replacing that heading.
+- `ActionButton` supplies primary and secondary link/button states.
+- `CoverFrame` reserves portrait or square media geometry without modifying artwork.
+- `PageHero` provides one page-level heading and optional eyebrow; `StarfieldMotif`
+  is ambient only and is always hidden from assistive technology.
+
+All colors come from semantic tokens. Motion is removed under
+`prefers-reduced-motion`, and decorative layers ignore pointer events.
